@@ -80,14 +80,16 @@ import { fetchAssets } from "./fetchAssets";
     console.log(`♻️  Riutilizzo ${found.length} segmenti da ${dir}`);
     segFiles = found;
   } else {
+    const tasks: Promise<void>[] = [];
     timeline.forEach((seg, idx) => {
       const out = join(paths.temp, `seg${idx}.mp4`);
+      let p: Promise<void>;
       if (seg.kind === "image")
-        renderImageSeg(seg, out, { fps, videoW, videoH, fontPath, logoPath });
+        p = renderImageSeg(seg, out, { fps, videoW, videoH, fontPath, logoPath });
       else if (seg.kind === "filler")
-        renderFillerSegment(seg, out, { fps, videoW, videoH, logoPath });
+        p = renderFillerSegment(seg, out, { fps, videoW, videoH, logoPath });
       else
-        renderOutroSegment(seg, out, {
+        p = renderOutroSegment(seg, out, {
           fps,
           videoW,
           videoH,
@@ -95,8 +97,9 @@ import { fetchAssets } from "./fetchAssets";
           logoPath,
         });
       segFiles.push(out);
-      console.log(`[OK ] Segmento creato: ${out}`);
+      tasks.push(p.then(() => console.log(`[OK ] Segmento creato: ${out}`)));
     });
+    await Promise.all(tasks);
   }
 
   // validazione/repair

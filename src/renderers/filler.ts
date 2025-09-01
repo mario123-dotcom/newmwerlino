@@ -1,12 +1,12 @@
 import { existsSync } from "fs";
 import { FOOTER } from "../config";
-import { runFFmpeg } from "../ffmpeg/run";
+import { runFFmpegAsync } from "../ffmpeg/run";
 
 export function renderFillerSegment(
   seg: { duration: number },
   outPath: string,
   opts: { fps: number; videoW: number; videoH: number; logoPath?: string | null; }
-) {
+): Promise<void> {
   const { fps, videoW, videoH, logoPath } = opts;
   const args: string[] = ["-y","-f","lavfi","-t",`${seg.duration}`,"-r",`${fps}`,"-i",`color=c=black:s=${videoW}x${videoH}:r=${fps}`,
                           "-f","lavfi","-t",`${seg.duration}`,"-i","anullsrc=channel_layout=stereo:sample_rate=44100"];
@@ -22,5 +22,5 @@ export function renderFillerSegment(
             "-c:v","libx264","-pix_fmt","yuv420p","-preset","ultrafast",
             "-c:a","aac","-b:a","192k","-ar","44100","-ac","2","-shortest", outPath);
 
-  runFFmpeg(args, "FFmpeg SEG(filler)");
+  return runFFmpegAsync(args, "FFmpeg SEG(filler)");
 }

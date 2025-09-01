@@ -1,13 +1,13 @@
 import { existsSync } from "fs";
 import { FOOTER, DEFAULT_TTS_VOL, SHADE } from "../config";
-import { runFFmpeg } from "../ffmpeg/run";
+import { runFFmpegAsync } from "../ffmpeg/run";
 import { shadeChain, buildFirstSlideTextChain, buildRevealTextChain_XFADE, zoomExprFullClip } from "../ffmpeg/filters";
 
 export function renderImageSeg(
   seg: { index?: number; duration: number; img?: string | null; tts?: string | null; text?: string; },
   outPath: string,
   opts: { fps: number; videoW: number; videoH: number; fontPath: string; logoPath?: string | null; }
-) {
+): Promise<void> {
   if (!seg.img) throw new Error(`Image file missing for slide ${seg.index}`);
 
   const { fps, videoW, videoH, fontPath, logoPath } = opts;
@@ -48,5 +48,5 @@ export function renderImageSeg(
             "-c:v","libx264","-pix_fmt","yuv420p","-preset","ultrafast",
             "-c:a","aac","-b:a","192k","-ar","44100","-ac","2","-shortest", outPath);
 
-  runFFmpeg(args, "FFmpeg SEG(image)");
+  return runFFmpegAsync(args, "FFmpeg SEG(image)");
 }
