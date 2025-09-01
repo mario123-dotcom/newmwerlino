@@ -1,8 +1,9 @@
-# Ignora cartella di build
-dist/
+# Cartelle da ignorare
 
-# Ignora dipendenze npm
+src/temp/
+src/output/
 node_modules/
+
 
 # Ignora file di log
 npm-debug.log*
