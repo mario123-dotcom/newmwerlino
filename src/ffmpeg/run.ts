@@ -1,4 +1,4 @@
-import { spawnSync } from "child_process";
+import { spawnSync, spawn } from "child_process";
 import { appendFileSync } from "fs";
 
 const LOG_FILE = "comandi.txt";
@@ -12,6 +12,27 @@ export function runFFmpeg(args: string[], label = "FFmpeg") {
 
   const res = spawnSync("ffmpeg", args, { stdio: "inherit" });
   if (res.status !== 0) throw new Error(`${label} failed (exit ${res.status ?? "unknown"})`);
+}
+
+export function runFFmpegAsync(
+  args: string[],
+  label = "FFmpeg"
+): Promise<void> {
+  const cmd = `ffmpeg ${args.join(" ")}`;
+  console.log(`[${label}] ${cmd}`);
+
+  // Salva anche su file
+  appendFileSync(LOG_FILE, `[${label}] ${cmd}\n`);
+
+  return new Promise((resolve, reject) => {
+    const child = spawn("ffmpeg", args, { stdio: "inherit" });
+
+    child.on("error", (err) => reject(err));
+    child.on("close", (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`${label} failed (exit ${code ?? "unknown"})`));
+    });
+  });
 }
 
 export function runPipe(cmd: string, args: string[], label: string) {
