@@ -1,0 +1,82 @@
+import { MIN_FILLER_SEC, HOLD_EXTRA_MS } from "./config";
+import { normalizeQuotes } from "./utils/text";
+import { parseSec } from "./utils/time";
+import { GetLocalAsset } from "./assets";
+import { Modifications, Segment } from "./types";
+
+export function buildTimeline(mods: Modifications): Segment[] {
+  const slidesRaw: Segment[] = [];
+  for (let i = 0; ; i++) {
+    const imgKey = `Immagine-${i}`;
+    if (!(imgKey in mods)) break;
+
+    const tStart =
+      parseSec(mods[`Slide_${i}.time`]) || parseSec(mods[`TTS-${i}.time`]) || 0;
+    const tDur =
+      parseSec(mods[`Slide_${i}.duration`]) ||
+      parseSec(mods[`TTS-${i}.duration`]) ||
+      3;
+    if (tDur <= 0) continue;
+
+    const text = normalizeQuotes(String(mods[`Testo-${i}`] ?? ""));
+    const ttsLocal = GetLocalAsset("tts", i);
+    const imgLocal = GetLocalAsset("img", i);
+
+    slidesRaw.push({
+      kind: "image",
+      index: i,
+      start: tStart,
+      duration: tDur,
+      text,
+      tts: ttsLocal,
+      img: imgLocal,
+    });
+  }
+  slidesRaw.sort((a, b) => a.start - b.start);
+
+  const timeline: Segment[] = [];
+  let cursorSched = 0;
+
+  slidesRaw.forEach((s) => {
+    const gap = s.start - cursorSched;
+    if (gap > MIN_FILLER_SEC) {
+      timeline.push({
+        kind: "filler",
+        start: cursorSched,
+        duration: gap,
+        text: "",
+        tts: null,
+        img: null,
+      });
+      cursorSched += gap;
+    } else if (gap > 0) cursorSched += gap;
+
+    timeline.push({ ...s, duration: s.duration + HOLD_EXTRA_MS / 1000 });
+    cursorSched += s.duration;
+  });
+
+  const outroText = normalizeQuotes(
+    String(mods["Testo-outro"] ?? "LEGGI L'ARTICOLO INTEGRALE SU")
+  );
+  const outroTimePlanned = parseSec(mods["Outro.time"], cursorSched);
+  if (outroTimePlanned > cursorSched + MIN_FILLER_SEC) {
+    const g = outroTimePlanned - cursorSched;
+    timeline.push({
+      kind: "filler",
+      start: cursorSched,
+      duration: g,
+      text: "",
+      tts: null,
+      img: null,
+    });
+    cursorSched = outroTimePlanned;
+  }
+  timeline.push({
+    kind: "outro",
+    start: cursorSched,
+    duration: parseSec(mods["Outro.duration"], 5),
+    text: outroText,
+  });
+
+  return timeline;
+}

@@ -1,0 +1,83 @@
+// src/core/config.ts
+export type Orientation = "landscape" | "portrait";
+export type OrientationMode = "auto" | Orientation;
+
+export const ORIENTATION_MODE: OrientationMode = "auto"; // "auto" | "landscape" | "portrait"
+
+// Heuristics orientation dal template
+export function deriveOrientation(w: number, h: number): Orientation {
+  if (ORIENTATION_MODE === "landscape" || ORIENTATION_MODE === "portrait") {
+    return ORIENTATION_MODE;
+  }
+  return w >= h ? "landscape" : "portrait";
+}
+
+/** Font + testo */
+export const TEXT = {
+  LINE_HEIGHT: 1.42,
+  MIN_SIZE: 28,
+  MAX_SIZE: 84,
+  TOP_MARGIN_P: {
+    landscape: 0.12,
+    portrait: 0.08,
+  },
+  /** margine sx per allineamento left (solo landscape slide 1) */
+  LEFT_MARGIN_P: 0.08,
+  /** rapporto medio larghezza/carattere in px ≈ k * fontsize */
+  CHAR_WIDTH_K: 0.55, // 0.52–0.58 a seconda del font
+  /** box padding (in multipli del font size) */
+  BOX_PAD_FACTOR: 0.20,
+};
+
+/** Scale di base (fontsize ≈ scale * videoH) */
+export const SCALES = {
+  landscape: { FIRST: 0.20, OTHER: 0.15, OUTRO: 0.03 },
+  portrait:  { FIRST: 0.11, OTHER: 0.10, OUTRO: 0.028 },
+};
+
+/** Target “wrapping” di partenza (caratteri) — verrà adattato in autosize */
+export const WRAP_TARGET = {
+  landscape: { FIRST: 26, OTHER: 44 },
+  portrait:  { FIRST: 18, OTHER: 22 },
+};
+
+export const STAGGER = { base: 0.10, growth: 0.10, jitter: 0.015 };
+
+// Shade (immagini)
+export const SHADE = {
+  strength: 0.9,
+  gamma: 1.0,
+  leftPower: 0.8,
+  vertPower: 0.2,
+  bias: 0.2,
+  enableOnFirstSlide: false,
+};
+
+// Footer / Logo
+export const FOOTER = {
+  LOGO_HEIGHT: 100,
+  LINE_THICKNESS: 3,
+  MARGIN_BOTTOM: 40,
+  GAP: 12,
+};
+
+// Audio
+export const DEFAULT_TTS_VOL = 0.9;
+export const DEFAULT_BG_VOL  = 0.04; // molto basso di base
+
+export const DUCK = {
+  threshold: 0.03,
+  ratio: 20,
+  attack: 5,
+  release: 300,
+  makeup: 1, // FFmpeg richiede >=1
+};
+
+// Altro
+export const HOLD_EXTRA_MS = 250;
+export const MIN_FILLER_SEC = 0.08;
+export const EASE: "linear" | "cubicOut" | "quartOut" = "quartOut";
+export const CONCAT_DEFAULTS = {
+  allowSkipBroken: true,
+  tryAutoRepair: true,
+} as const;
