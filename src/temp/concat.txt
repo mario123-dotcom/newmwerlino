@@ -1,7 +1,0 @@
-file 'C:\\Users\\Mario Stanco\\Desktop\\universita\\tesi\\newmwerlino\\src\\temp\\seg0.mp4'
-file 'C:\\Users\\Mario Stanco\\Desktop\\universita\\tesi\\newmwerlino\\src\\temp\\seg1.mp4'
-file 'C:\\Users\\Mario Stanco\\Desktop\\universita\\tesi\\newmwerlino\\src\\temp\\seg2.mp4'
-file 'C:\\Users\\Mario Stanco\\Desktop\\universita\\tesi\\newmwerlino\\src\\temp\\seg3.mp4'
-file 'C:\\Users\\Mario Stanco\\Desktop\\universita\\tesi\\newmwerlino\\src\\temp\\seg4.mp4'
-file 'C:\\Users\\Mario Stanco\\Desktop\\universita\\tesi\\newmwerlino\\src\\temp\\seg5.mp4'
-file 'C:\\Users\\Mario Stanco\\Desktop\\universita\\tesi\\newmwerlino\\src\\temp\\seg6.mp4'
