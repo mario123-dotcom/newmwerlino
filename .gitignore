@@ -1,0 +1,17 @@
+# Ignora cartella di build
+dist/
+
+# Ignora dipendenze npm
+node_modules/
+
+# Ignora file di log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Ignora file temporanei di sistema
+.DS_Store
+Thumbs.db
+
+# Ignora file environment locali
+.env
