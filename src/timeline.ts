@@ -51,8 +51,9 @@ export function buildTimeline(mods: Modifications): Segment[] {
       cursorSched += gap;
     } else if (gap > 0) cursorSched += gap;
 
-    timeline.push({ ...s, duration: s.duration + HOLD_EXTRA_MS / 1000 });
-    cursorSched += s.duration;
+    const dur = s.duration + HOLD_EXTRA_MS / 1000;
+    timeline.push({ ...s, duration: dur });
+    cursorSched += dur;
   });
 
   const outroText = normalizeQuotes(
