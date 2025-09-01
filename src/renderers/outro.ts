@@ -1,6 +1,6 @@
 import { existsSync } from "fs";
 import { FOOTER, SCALES } from "../config";
-import { runFFmpegAsync } from "../ffmpeg/run";
+import { runFFmpeg } from "../ffmpeg/run";
 import { escDrawText } from "../utils/text";
 import { deriveOrientation } from "../config";
 
@@ -8,7 +8,7 @@ export function renderOutroSegment(
   seg: { duration: number; text?: string },
   outPath: string,
   opts: { fps: number; videoW: number; videoH: number; fontPath: string; logoPath?: string | null; }
-): Promise<void> {
+) {
   const { fps, videoW, videoH, fontPath, logoPath } = opts;
   const text = seg.text || "";
 
@@ -57,5 +57,5 @@ export function renderOutroSegment(
     "-shortest", outPath
   );
 
-  return runFFmpegAsync(args, "FFmpeg SEG(outro)");
+  runFFmpeg(args, "FFmpeg SEG(outro)");
 }
