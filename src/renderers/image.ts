@@ -6,7 +6,14 @@ import { shadeChain, buildFirstSlideTextChain, buildRevealTextChain_XFADE, zoomE
 export function renderImageSeg(
   seg: { index?: number; duration: number; img?: string | null; tts?: string | null; text?: string; },
   outPath: string,
-  opts: { fps: number; videoW: number; videoH: number; fontPath: string; logoPath?: string | null; }
+  opts: {
+    fps: number;
+    videoW: number;
+    videoH: number;
+    fontPath: string;
+    logoPath?: string | null;
+    textTransition?: "wipeup" | "wipedown" | "wipeleft" | "wiperight";
+  }
 ) {
   if (!seg.img) throw new Error(`Image file missing for slide ${seg.index}`);
 
@@ -18,7 +25,17 @@ export function renderImageSeg(
 
   const revealChain = isFirst
     ? buildFirstSlideTextChain(seg.text || "", seg.duration, fontPath, videoW, videoH, fps, textColor)
-    : buildRevealTextChain_XFADE(seg.text || "", seg.duration, fontPath, videoW, videoH, fps, textColor, "wipeup", "center");
+    : buildRevealTextChain_XFADE(
+        seg.text || "",
+        seg.duration,
+        fontPath,
+        videoW,
+        videoH,
+        fps,
+        textColor,
+        opts.textTransition ?? "wipeup",
+        "center"
+      );
 
   const args: string[] = ["-y","-loop","1","-t",`${seg.duration}`,"-r",`${fps}`,"-i",seg.img];
 

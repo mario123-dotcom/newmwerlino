@@ -13,8 +13,9 @@ import { renderFillerSegment } from "./renderers/filler";
 import { renderOutroSegment } from "./renderers/outro";
 import { validateAndRepairSegments } from "./validate";
 import { concatAndFinalizeDemuxer } from "./concat";
-import { REUSE_SEGS, SEGS_DIR } from "./cli";
+import { REUSE_SEGS, SEGS_DIR, TEXT_TRANSITION } from "./cli";
 import { fetchAssets } from "./fetchAssets";
+import { sendFinalVideo } from "./share";
 
 (async () => {
   console.log("[LOG] Recupero asset dal template...");
@@ -83,7 +84,14 @@ import { fetchAssets } from "./fetchAssets";
     timeline.forEach((seg, idx) => {
       const out = join(paths.temp, `seg${idx}.mp4`);
       if (seg.kind === "image")
-        renderImageSeg(seg, out, { fps, videoW, videoH, fontPath, logoPath });
+        renderImageSeg(seg, out, {
+          fps,
+          videoW,
+          videoH,
+          fontPath,
+          logoPath,
+          textTransition: TEXT_TRANSITION,
+        });
       else if (seg.kind === "filler")
         renderFillerSegment(seg, out, { fps, videoW, videoH, logoPath });
       else
@@ -113,6 +121,11 @@ import { fetchAssets } from "./fetchAssets";
       bgVolume: bgVolFromJson,
     });
     console.log(`✅ Video finale creato in ${paths.final}`);
+    try {
+      await sendFinalVideo(paths.final);
+    } catch (err) {
+      console.error("[ERROR] Invio del video fallito:", err);
+    }
   } catch (err) {
     console.error("[ERROR] Finalizzazione fallita:", err);
     console.error(
