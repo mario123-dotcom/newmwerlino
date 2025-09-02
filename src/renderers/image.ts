@@ -31,6 +31,10 @@ export function renderImageSeg(
   const textColor = isFirst ? "black" : "white";
   const shadeStrength = isFirst && !SHADE.enableOnFirstSlide ? 0 : SHADE.strength;
   const transition: TextTransition = (opts.textTransition ?? "wipeup").trim() as TextTransition;
+  const align =
+    transition === "wiperight" ? "left" :
+    transition === "wipeleft" ? "right" :
+    undefined;
 
   const revealChain = isFirst
 
@@ -43,6 +47,7 @@ export function renderImageSeg(
         fps,
         textColor,
         transition,
+        align,
       )
 
     : buildRevealTextChain_XFADE(
@@ -54,8 +59,7 @@ export function renderImageSeg(
         fps,
         textColor,
         transition,
-
-        "center"
+        align,
       );
 
   const args: string[] = ["-y","-loop","1","-t",`${seg.duration}`,"-r",`${fps}`,"-i",seg.img];

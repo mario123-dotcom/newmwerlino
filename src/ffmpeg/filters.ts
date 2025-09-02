@@ -48,16 +48,20 @@ export function buildFirstSlideTextChain(
   fps: number,
   color = "black",
   transition: TextTransition = "wipeup",
+  align?: "left" | "center" | "right",
 ): string {
   const orientation: Orientation = deriveOrientation(videoW, videoH);
   // Forziamo lo stesso numero di righe per orientamento
   const fixedLines = orientation === "portrait" ? 4 : 3;
 
+  const chosenAlign = align ?? (orientation === "landscape" ? "left" : "center");
+
   const auto = autosizeAndWrap(txt, {
     orientation,
     isFirstSlide: true,
-    videoW, videoH,
-    alignLandscapeFirst: "left",
+    videoW,
+    videoH,
+    align: chosenAlign,
     fixedLines,
   });
 
@@ -107,8 +111,7 @@ export function buildRevealTextChain_XFADE(
   fps: number,
   color = "white",
   transition: TextTransition = "wipeup",
-
-  _align: "left" | "center" = "center"
+  align: "left" | "center" | "right" = "center"
 ): string {
   const orientation: Orientation = deriveOrientation(videoW, videoH);
   const fixedLines = orientation === "portrait" ? 4 : 3;
@@ -116,7 +119,9 @@ export function buildRevealTextChain_XFADE(
   const auto = autosizeAndWrap(txt, {
     orientation,
     isFirstSlide: false,
-    videoW, videoH,
+    videoW,
+    videoH,
+    align,
     fixedLines,
   });
 
