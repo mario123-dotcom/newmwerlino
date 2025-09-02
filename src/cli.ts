@@ -17,3 +17,4 @@ export const REUSE_SEGS = hasFlag("reuse-segs") || hasFlag("reuseSegs") || hasFl
 export const SEGS_DIR = getOpt("segsDir");
 
 export const TEXT_TRANSITION = (getOpt("textTransition", "wipeup") as TextTransition);
+

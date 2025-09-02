@@ -18,7 +18,9 @@ export function renderImageSeg(
     videoH: number;
     fontPath: string;
     logoPath?: string | null;
+
     textTransition?: TextTransition;
+
   }
 ) {
   if (!seg.img) throw new Error(`Image file missing for slide ${seg.index}`);
@@ -31,6 +33,7 @@ export function renderImageSeg(
   const transition: TextTransition = (opts.textTransition ?? "wipeup").trim() as TextTransition;
 
   const revealChain = isFirst
+
     ? buildFirstSlideTextChain(
         seg.text || "",
         seg.duration,
@@ -41,6 +44,7 @@ export function renderImageSeg(
         textColor,
         transition,
       )
+
     : buildRevealTextChain_XFADE(
         seg.text || "",
         seg.duration,
@@ -50,6 +54,7 @@ export function renderImageSeg(
         fps,
         textColor,
         transition,
+
         "center"
       );
 

@@ -107,6 +107,7 @@ export function buildRevealTextChain_XFADE(
   fps: number,
   color = "white",
   transition: TextTransition = "wipeup",
+
   _align: "left" | "center" = "center"
 ): string {
   const orientation: Orientation = deriveOrientation(videoW, videoH);
