@@ -25,3 +25,4 @@ test('getOpt falls back to stray argv when npm flag has no value', async () => {
   assert.equal(getOpt('textTransition', 'wipeup'), 'wipeleft');
   process.argv = origArgv;
 });
+
