@@ -1,12 +1,25 @@
 import { existsSync } from "fs";
 import { FOOTER, DEFAULT_TTS_VOL, SHADE } from "../config";
 import { runFFmpeg } from "../ffmpeg/run";
-import { shadeChain, buildFirstSlideTextChain, buildRevealTextChain_XFADE, zoomExprFullClip } from "../ffmpeg/filters";
+import {
+  shadeChain,
+  buildFirstSlideTextChain,
+  buildRevealTextChain_XFADE,
+  zoomExprFullClip,
+} from "../ffmpeg/filters";
+import type { TextTransition } from "../types";
 
 export function renderImageSeg(
   seg: { index?: number; duration: number; img?: string | null; tts?: string | null; text?: string; },
   outPath: string,
-  opts: { fps: number; videoW: number; videoH: number; fontPath: string; logoPath?: string | null; }
+  opts: {
+    fps: number;
+    videoW: number;
+    videoH: number;
+    fontPath: string;
+    logoPath?: string | null;
+    textTransition?: TextTransition;
+  }
 ) {
   if (!seg.img) throw new Error(`Image file missing for slide ${seg.index}`);
 
@@ -15,10 +28,30 @@ export function renderImageSeg(
   const isFirst = seg.index === 0;
   const textColor = isFirst ? "black" : "white";
   const shadeStrength = isFirst && !SHADE.enableOnFirstSlide ? 0 : SHADE.strength;
+  const transition: TextTransition = (opts.textTransition ?? "wipeup").trim() as TextTransition;
 
   const revealChain = isFirst
-    ? buildFirstSlideTextChain(seg.text || "", seg.duration, fontPath, videoW, videoH, fps, textColor)
-    : buildRevealTextChain_XFADE(seg.text || "", seg.duration, fontPath, videoW, videoH, fps, textColor, "wipeup", "center");
+    ? buildFirstSlideTextChain(
+        seg.text || "",
+        seg.duration,
+        fontPath,
+        videoW,
+        videoH,
+        fps,
+        textColor,
+        transition,
+      )
+    : buildRevealTextChain_XFADE(
+        seg.text || "",
+        seg.duration,
+        fontPath,
+        videoW,
+        videoH,
+        fps,
+        textColor,
+        transition,
+        "center"
+      );
 
   const args: string[] = ["-y","-loop","1","-t",`${seg.duration}`,"-r",`${fps}`,"-i",seg.img];
 

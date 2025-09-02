@@ -1,6 +1,7 @@
 // src/ffmpeg/filters.ts
 import { autosizeAndWrap, Orientation } from "../utils/autosize";
 import { deriveOrientation } from "../config";
+import type { TextTransition } from "../types";
 
 /** Ombra laterale: matte RGBA */
 export function shadeChain(
@@ -45,7 +46,8 @@ export function buildFirstSlideTextChain(
   videoW: number,
   videoH: number,
   fps: number,
-  color = "black"
+  color = "black",
+  transition: TextTransition = "wipeup",
 ): string {
   const orientation: Orientation = deriveOrientation(videoW, videoH);
   // Forziamo lo stesso numero di righe per orientamento
@@ -77,12 +79,12 @@ export function buildFirstSlideTextChain(
     parts.push(`[S${i}_canvas]drawtext=fontfile='${fontfile}':fontsize=${auto.fontSize}:fontcolor=${color}@0:x=${auto.xExpr}:y=h-text_h-1+${EXTRA}:text='${safe}':box=1:boxcolor=white@1.0:boxborderw=${auto.padPx}[S${i}_big]`);
     parts.push(`[S${i}_big]drawtext=fontfile='${fontfile}':fontsize=${auto.fontSize}:fontcolor=${color}:x=${auto.xExpr}:y=h-text_h-1:text='${safe}':box=1:boxcolor=white@1.0:boxborderw=${auto.padPx}[S${i}_rgba]`);
 
-    // alpha wipe “dal basso”
+    // alpha wipe con direzione configurabile
     parts.push(`[S${i}_rgba]split=2[S${i}_rgb][S${i}_forA]`);
     parts.push(`[S${i}_forA]alphaextract,format=gray,setsar=1[S${i}_Aorig]`);
     parts.push(`color=c=black:s=${videoW}x${CANV_H}:r=${fps}:d=${segDur},format=gray,setsar=1[S${i}_off]`);
     parts.push(`color=c=white:s=${videoW}x${CANV_H}:r=${fps}:d=${segDur},format=gray,setsar=1[S${i}_on]`);
-    parts.push(`[S${i}_off][S${i}_on]xfade=transition=wipeup:duration=0.6:offset=${offset.toFixed(3)}[S${i}_wipe]`);
+    parts.push(`[S${i}_off][S${i}_on]xfade=transition=${transition}:duration=0.6:offset=${offset.toFixed(3)}[S${i}_wipe]`);
     parts.push(`[S${i}_Aorig][S${i}_wipe]blend=all_mode=multiply[S${i}_A]`);
     parts.push(`[S${i}_rgb][S${i}_A]alphamerge[S${i}_ready]`);
 
@@ -104,7 +106,7 @@ export function buildRevealTextChain_XFADE(
   videoH: number,
   fps: number,
   color = "white",
-  transition: "wipeup" | "wipedown" = "wipeup",
+  transition: TextTransition = "wipeup",
   _align: "left" | "center" = "center"
 ): string {
   const orientation: Orientation = deriveOrientation(videoW, videoH);
@@ -131,7 +133,7 @@ export function buildRevealTextChain_XFADE(
     parts.push(`color=c=black@0.0:s=${videoW}x${auto.lineH}:r=${fps}:d=${segDur},format=rgba,setsar=1[L${i}_canvas]`);
     parts.push(`[L${i}_canvas]drawtext=fontfile='${fontfile}':fontsize=${auto.fontSize}:fontcolor=${color}:x=${auto.xExpr}:y=h-text_h-1:text='${safe}'[L${i}_rgba]`);
 
-    // alpha XFADE (wipeup/wipedown)
+    // alpha XFADE (wipeup/wipedown/wipeleft/wiperight)
     parts.push(`[L${i}_rgba]split=2[L${i}_rgb][L${i}_forA]`);
     parts.push(`[L${i}_forA]alphaextract,format=gray,setsar=1[L${i}_Aorig]`);
     parts.push(`color=c=black:s=${videoW}x${auto.lineH}:r=${fps}:d=${segDur},format=gray,setsar=1[L${i}_off]`);

@@ -8,6 +8,12 @@ export interface FullData {
 
 export type SegType = "image" | "filler" | "outro";
 
+export type TextTransition =
+  | "wipeup"
+  | "wipedown"
+  | "wipeleft"
+  | "wiperight";
+
 export interface Segment {
   kind: SegType;
   index?: number;

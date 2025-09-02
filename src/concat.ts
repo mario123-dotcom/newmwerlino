@@ -3,6 +3,7 @@ import { dirname, resolve } from "path";
 import { ensureDir } from "./utils/fsx";
 import { DUCK } from "./config";
 import { runFFmpeg } from "./ffmpeg/run";
+import { ffprobeJson } from "./validate";
 
 export function concatAndFinalizeDemuxer({
   segments, bgAudioPath, outPath, concatTxtPath, fps, bgVolume
@@ -20,10 +21,14 @@ export function concatAndFinalizeDemuxer({
   writeFileSync(concatTxtPath, filelist, "utf8");
 
   const haveBg = !!(bgAudioPath && existsSync(bgAudioPath));
-  const args: string[] = ["-y","-fflags","+genpts","-f","concat","-safe","0","-i",concatTxtPath];
-  if (haveBg) args.push("-stream_loop","-1","-i",bgAudioPath!);
+  const args: string[] = ["-y", "-fflags", "+genpts", "-f", "concat", "-safe", "0", "-i", concatTxtPath];
+  if (haveBg) args.push("-stream_loop", "-1", "-i", bgAudioPath!);
 
-  const baseAudio = `[0:a:0]aformat=channel_layouts=stereo:sample_rates=44100,aresample=async=1:first_pts=0,asetpts=PTS-STARTPTS[acat]`;
+  const probe = ffprobeJson(segments[0]);
+  const haveAudio = probe?.streams?.some((s: any) => s.codec_type === "audio");
+  const baseAudio = haveAudio
+    ? `[0:a:0]aformat=channel_layouts=stereo:sample_rates=44100,aresample=async=1:first_pts=0,asetpts=PTS-STARTPTS[acat]`
+    : `anullsrc=channel_layout=stereo:sample_rate=44100,asetpts=PTS-STARTPTS[acat]`;
   const audioChain = haveBg
     ? [
         baseAudio,

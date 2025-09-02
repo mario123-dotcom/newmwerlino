@@ -3,6 +3,7 @@
 src/temp/
 src/output/
 node_modules/
+dist/
 
 
 # Ignora file di log
