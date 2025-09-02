@@ -104,7 +104,7 @@ export function buildRevealTextChain_XFADE(
   videoH: number,
   fps: number,
   color = "white",
-  transition: "wipeup" | "wipedown" = "wipeup",
+  transition: "wipeup" | "wipedown" | "wipeleft" | "wiperight" = "wipeup",
   _align: "left" | "center" = "center"
 ): string {
   const orientation: Orientation = deriveOrientation(videoW, videoH);
@@ -131,7 +131,7 @@ export function buildRevealTextChain_XFADE(
     parts.push(`color=c=black@0.0:s=${videoW}x${auto.lineH}:r=${fps}:d=${segDur},format=rgba,setsar=1[L${i}_canvas]`);
     parts.push(`[L${i}_canvas]drawtext=fontfile='${fontfile}':fontsize=${auto.fontSize}:fontcolor=${color}:x=${auto.xExpr}:y=h-text_h-1:text='${safe}'[L${i}_rgba]`);
 
-    // alpha XFADE (wipeup/wipedown)
+    // alpha XFADE (wipeup/wipedown/wipeleft/wiperight)
     parts.push(`[L${i}_rgba]split=2[L${i}_rgb][L${i}_forA]`);
     parts.push(`[L${i}_forA]alphaextract,format=gray,setsar=1[L${i}_Aorig]`);
     parts.push(`color=c=black:s=${videoW}x${auto.lineH}:r=${fps}:d=${segDur},format=gray,setsar=1[L${i}_off]`);
