@@ -10,6 +10,25 @@ function readEnv(name: string) {
   );
 }
 
+function readFromNpmArgv(name: string): string | undefined {
+  try {
+    const raw = process.env.npm_config_argv;
+    if (!raw) return undefined;
+    const parsed = JSON.parse(raw);
+    const remain: string[] = parsed.remain || parsed.original || [];
+    const flag = `--${name}`;
+    const idx = remain.indexOf(flag);
+    if (idx >= 0 && remain[idx + 1] && !remain[idx + 1].startsWith("--"))
+      return remain[idx + 1];
+    const idxBare = remain.indexOf(name);
+    if (idxBare >= 0 && remain[idxBare + 1] && !remain[idxBare + 1].startsWith("--"))
+      return remain[idxBare + 1];
+  } catch {
+    // ignore
+  }
+  return undefined;
+}
+
 
 
 
