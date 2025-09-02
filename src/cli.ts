@@ -11,20 +11,6 @@ function readEnv(name: string) {
 }
 
 
-function readFromNpmArgv(name: string) {
-  try {
-    const raw = process.env.npm_config_argv;
-    if (!raw) return;
-    const parsed = JSON.parse(raw) as { cooked?: string[]; original?: string[] };
-    const arr = parsed?.original ?? parsed?.cooked ?? [];
-    const idx = arr.indexOf(`--${name}`);
-    if (idx >= 0 && arr[idx + 1] && !arr[idx + 1].startsWith("--")) {
-      return arr[idx + 1].trim();
-    }
-  } catch {
-    // ignore
-  }
-}
 
 
 export function hasFlag(name: string) {
@@ -38,7 +24,10 @@ export function getOpt(name: string, def?: string) {
   const env = readEnv(name);
   if (env && env !== "true" && env !== "1") return env.trim();
   const npmArgvVal = readFromNpmArgv(name);
-  return npmArgvVal ?? def;
+  if (npmArgvVal && npmArgvVal !== "true" && npmArgvVal !== "1") return npmArgvVal;
+  if ((env === "true" || env === "1") && ARGV.length && !ARGV[0].startsWith("--"))
+    return ARGV[0].trim();
+  return def;
 
 }
 

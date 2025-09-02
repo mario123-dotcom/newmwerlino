@@ -8,6 +8,21 @@ test('getOpt reads npm argv config value', async () => {
   process.env.npm_config_argv = JSON.stringify({
     original: ['--textTransition', 'wipeleft'],
   });
-  const { getOpt } = await import('../cli');
+  delete require.cache[require.resolve('../cli')];
+  const { getOpt } = require('../cli');
   assert.equal(getOpt('textTransition', 'wipeup'), 'wipeleft');
 });
+
+// Fallback: npm flag without value but trailing arg
+
+test('getOpt falls back to stray argv when npm flag has no value', async () => {
+  const origArgv = process.argv;
+  process.argv = ['node', 'file', 'wipeleft'];
+  process.env.npm_config_texttransition = 'true';
+  delete process.env.npm_config_argv;
+  delete require.cache[require.resolve('../cli')];
+  const { getOpt } = require('../cli');
+  assert.equal(getOpt('textTransition', 'wipeup'), 'wipeleft');
+  process.argv = origArgv;
+});
+
