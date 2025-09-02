@@ -2,14 +2,23 @@ import type { TextTransition } from "./types";
 
 const ARGV = process.argv.slice(2);
 
+function readEnv(name: string) {
+  return (
+    process.env[name.toUpperCase()] ??
+    process.env[`npm_config_${name}`] ??
+    process.env[`npm_config_${name.toLowerCase()}`]
+  );
+}
+
 export function hasFlag(name: string) {
-  return ARGV.includes(`--${name}`) || process.env[name.toUpperCase()] === "1";
+  const env = readEnv(name);
+  return ARGV.includes(`--${name}`) || env === "1" || env === "true";
 }
 export function getOpt(name: string, def?: string) {
   const i = ARGV.indexOf(`--${name}`);
   if (i >= 0 && ARGV[i + 1] && !ARGV[i + 1].startsWith("--"))
     return ARGV[i + 1].trim();
-  const env = process.env[name.toUpperCase()];
+  const env = readEnv(name);
   return env ? env.trim() : def;
 }
 
