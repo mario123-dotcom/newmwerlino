@@ -49,3 +49,4 @@ async function sendViaEmail(filePath: string): Promise<void> {
 
   console.log("[LOG] Video inviato via email");
 }
+
