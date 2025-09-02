@@ -79,7 +79,11 @@ export function renderImageSeg(
   else footer += `;[pre1]null[pre]`;
 
   const vDrawChain = revealChain;
-  const aChain = `[1:a]aformat=channel_layouts=stereo:sample_rates=44100,apad,atrim=0:${seg.duration.toFixed(3)},asetpts=PTS-STARTPTS,volume=${DEFAULT_TTS_VOL}[a]`;
+  const aChain =
+    `[1:a]aformat=channel_layouts=stereo:sample_rates=44100,` +
+    `aresample=async=1:first_pts=0,` +
+    `apad,atrim=0:${seg.duration.toFixed(3)},asetpts=PTS-STARTPTS,` +
+    `volume=${DEFAULT_TTS_VOL}[a]`;
   const fchain = `${vHead};${footer};${vDrawChain};${aChain}`;
 
   args.push("-filter_complex", fchain, "-map", "[v]", "-map", "[a]",
