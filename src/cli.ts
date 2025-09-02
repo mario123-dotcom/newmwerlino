@@ -11,3 +11,9 @@ export function getOpt(name: string, def?: string) {
 
 export const REUSE_SEGS = hasFlag("reuse-segs") || hasFlag("reuseSegs") || hasFlag("reuse");
 export const SEGS_DIR = getOpt("segsDir");
+
+export const TEXT_TRANSITION = (getOpt("textTransition", "wipeup") as
+  | "wipeup"
+  | "wipedown"
+  | "wipeleft"
+  | "wiperight");

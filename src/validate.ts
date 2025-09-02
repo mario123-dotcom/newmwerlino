@@ -4,16 +4,38 @@ import { CONCAT_DEFAULTS } from "./config";
 import { ok, runPipe } from "./ffmpeg/run";
 
 export function ffprobeJson(file: string): any | null {
-  const r = runPipe("ffprobe",
-    ["-v","error","-select_streams","v:0","-show_entries","stream=codec_name,codec_type,width,height","-show_entries","format=duration,format_name","-of","json",file],
-    "ffprobe");
+  const r = runPipe(
+    "ffprobe",
+    [
+      "-v",
+      "error",
+      "-show_entries",
+      "stream=codec_name,codec_type,width,height,sample_rate,channels",
+      "-show_entries",
+      "format=duration,format_name",
+      "-of",
+      "json",
+      file,
+    ],
+    "ffprobe"
+  );
   if (!ok(r)) return null;
-  try { return JSON.parse(r.stdout || "{}"); } catch { return null; }
+  try {
+    return JSON.parse(r.stdout || "{}");
+  } catch {
+    return null;
+  }
 }
 
 export function canOpenMp4(file: string): boolean {
   const j = ffprobeJson(file);
-  return !!(j && Array.isArray(j.streams) && j.streams.length && Number(j.format?.duration) >= 0);
+  const hasVideo = j?.streams?.some((s: any) => s.codec_type === "video");
+  const hasAudio = j?.streams?.some((s: any) => s.codec_type === "audio");
+  return !!(
+    hasVideo &&
+    hasAudio &&
+    Number(j?.format?.duration) >= 0
+  );
 }
 
 export function tryRepairSegment(inputAbs: string): string | null {
