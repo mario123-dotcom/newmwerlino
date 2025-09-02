@@ -8,8 +8,8 @@ type AutoOpts = {
   isFirstSlide: boolean;
   videoW: number;
   videoH: number;
-  /** left solo per FIRST landscape, altrimenti center */
-  alignLandscapeFirst?: "left" | "center";
+  /** allineamento orizzontale del blocco di testo */
+  align?: "left" | "center" | "right";
   /** forza un numero di righe identico per tutte le slide di un orientamento */
   fixedLines?: number;
   /** sovrascrive il target di caratteri per riga; se assente si usa WRAP_TARGET */
@@ -103,7 +103,7 @@ function greedyWrapByCols(words: string[], cols: number): string[] {
 
 /** calcola fontSize/lineH/y0/xExpr coerenti e restituisce righe “bilanciate” */
 export function autosizeAndWrap(text: string, opts: AutoOpts): AutoSizeResult {
-  const { videoW, videoH, orientation, isFirstSlide, alignLandscapeFirst, fixedLines, targetColsOverride } = opts;
+  const { videoW, videoH, orientation, isFirstSlide, align, fixedLines, targetColsOverride } = opts;
 
   // 1) quante righe vogliamo?
   const linesWanted =
@@ -151,9 +151,13 @@ export function autosizeAndWrap(text: string, opts: AutoOpts): AutoSizeResult {
   // 6) padding box + xExpr coerente
   const padPx = Math.max(4, Math.round(fontSize * TEXT.BOX_PAD_FACTOR));
   let xExpr = "(w-text_w)/2";
-  if (isFirstSlide && orientation === "landscape") {
-    const ml = Math.round(videoW * TEXT.LEFT_MARGIN_P);
-    xExpr = `${ml}`;
+  const margin = Math.round(videoW * TEXT.LEFT_MARGIN_P);
+  if (align === "left") {
+    xExpr = `${margin}`;
+  } else if (align === "right") {
+    xExpr = `w-text_w-${margin}`;
+  } else if (isFirstSlide && orientation === "landscape") {
+    xExpr = `${margin}`;
   }
 
   return { lines, fontSize, lineH, y0, padPx, xExpr };
