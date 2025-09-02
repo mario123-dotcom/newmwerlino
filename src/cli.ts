@@ -10,6 +10,7 @@ function readEnv(name: string) {
   );
 }
 
+
 function readFromNpmArgv(name: string) {
   try {
     const raw = process.env.npm_config_argv;
@@ -25,6 +26,7 @@ function readFromNpmArgv(name: string) {
   }
 }
 
+
 export function hasFlag(name: string) {
   const env = readEnv(name);
   return ARGV.includes(`--${name}`) || env === "1" || env === "true";
@@ -37,6 +39,7 @@ export function getOpt(name: string, def?: string) {
   if (env && env !== "true" && env !== "1") return env.trim();
   const npmArgvVal = readFromNpmArgv(name);
   return npmArgvVal ?? def;
+
 }
 
 export const REUSE_SEGS = hasFlag("reuse-segs") || hasFlag("reuseSegs") || hasFlag("reuse");
