@@ -190,20 +190,23 @@ export function buildRevealTextChain_XFADE(
     inLbl = "bar_out";
   }
 
+  const EXTRA = Math.max(6, Math.round(videoH * 0.06));
+
   for (let i = 0; i < auto.lines.length; i++) {
     const safe   = escDrawText(auto.lines[i]);
     const offset = lineOffset(i, segDur, 0.6);
     const lineY  = auto.y0 + i * auto.lineH;
 
-    // canvas “a riga” di altezza esatta = lineH ⇒ spaziatura identica
-    parts.push(`color=c=black@0.0:s=${videoW}x${auto.lineH}:r=${fps}:d=${segDur},format=rgba,setsar=1[L${i}_canvas]`);
-    parts.push(`[L${i}_canvas]drawtext=fontfile='${fontfile}':fontsize=${auto.fontSize}:fontcolor=${color}:x=${auto.xExpr}:y=h-ascent-descent-1:text='${safe}'[L${i}_rgba]`);
+    // canvas “a riga” con margine extra per evitare il taglio delle linee
+    const canvH = auto.lineH + EXTRA;
+    parts.push(`color=c=black@0.0:s=${videoW}x${canvH}:r=${fps}:d=${segDur},format=rgba,setsar=1[L${i}_canvas]`);
+    parts.push(`[L${i}_canvas]drawtext=fontfile='${fontfile}':fontsize=${auto.fontSize}:fontcolor=${color}:x=${auto.xExpr}:y=h-ascent-descent-1+${EXTRA}:text='${safe}'[L${i}_rgba]`);
 
     // alpha XFADE (wipeup/wipedown/wipeleft/wiperight)
     parts.push(`[L${i}_rgba]split=2[L${i}_rgb][L${i}_forA]`);
     parts.push(`[L${i}_forA]alphaextract,format=gray,setsar=1[L${i}_Aorig]`);
-    parts.push(`color=c=black:s=${videoW}x${auto.lineH}:r=${fps}:d=${segDur},format=gray,setsar=1[L${i}_off]`);
-    parts.push(`color=c=white:s=${videoW}x${auto.lineH}:r=${fps}:d=${segDur},format=gray,setsar=1[L${i}_on]`);
+    parts.push(`color=c=black:s=${videoW}x${canvH}:r=${fps}:d=${segDur},format=gray,setsar=1[L${i}_off]`);
+    parts.push(`color=c=white:s=${videoW}x${canvH}:r=${fps}:d=${segDur},format=gray,setsar=1[L${i}_on]`);
     parts.push(`[L${i}_off][L${i}_on]xfade=transition=${transition}:duration=0.6:offset=${offset.toFixed(3)}[L${i}_wipe]`);
     parts.push(`[L${i}_Aorig][L${i}_wipe]blend=all_mode=multiply[L${i}_A]`);
     parts.push(`[L${i}_rgb][L${i}_A]alphamerge[L${i}_ready]`);
