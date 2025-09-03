@@ -14,6 +14,8 @@ export type TextTransition =
   | "wipeleft"
   | "wiperight";
 
+export type LogoPosition = "bottom" | "top-left";
+
 export interface Segment {
   kind: SegType;
   index?: number;

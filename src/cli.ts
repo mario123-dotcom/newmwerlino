@@ -53,5 +53,36 @@ export function getOpt(name: string, def?: string) {
 export const REUSE_SEGS = hasFlag("reuse-segs") || hasFlag("reuseSegs") || hasFlag("reuse");
 export const SEGS_DIR = getOpt("segsDir");
 
-export const TEXT_TRANSITION = (getOpt("textTransition", "wipeup") as TextTransition);
+// Template-based configuration
+type TemplateName = "tmp1" | "tmp2";
+
+interface TemplateConf {
+  textTransition: TextTransition;
+  shadeColor: string;
+  fillColor: string;
+  logoPosition: "bottom" | "top-left";
+}
+
+const TEMPLATE_MAP: Record<TemplateName, TemplateConf> = {
+  tmp1: {
+    textTransition: "wipeup",
+    shadeColor: "black",
+    fillColor: "black",
+    logoPosition: "bottom",
+  },
+  tmp2: {
+    textTransition: "wiperight",
+    shadeColor: "red",
+    fillColor: "red",
+    logoPosition: "top-left",
+  },
+};
+
+const templateOpt = getOpt("template", "tmp1") as TemplateName;
+const TEMPLATE_CONF = TEMPLATE_MAP[templateOpt] || TEMPLATE_MAP.tmp1;
+
+export const TEXT_TRANSITION = TEMPLATE_CONF.textTransition;
+export const SHADE_COLOR = TEMPLATE_CONF.shadeColor;
+export const FILL_COLOR = TEMPLATE_CONF.fillColor;
+export const LOGO_POSITION = TEMPLATE_CONF.logoPosition;
 
