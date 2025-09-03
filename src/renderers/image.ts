@@ -33,6 +33,7 @@ export function renderImageSeg(
   const shadeColor = opts.shadeColor || "black";
   const fillColor = opts.fillColor || "black";
   const logoPosition: LogoPosition = opts.logoPosition || "bottom";
+  const orientation = deriveOrientation(videoW, videoH);
 
   const isFirst = seg.index === 0;
   const textColor = isFirst ? "black" : "white";
@@ -42,6 +43,11 @@ export function renderImageSeg(
     transition === "wiperight" ? "left" :
     transition === "wipeleft" ? "right" :
     undefined;
+
+  const haveLogo = !!(logoPath && existsSync(logoPath));
+  const extraLeft = haveLogo && logoPosition !== "bottom" && orientation === "portrait" && transition === "wiperight"
+    ? FOOTER.LOGO_HEIGHT + FOOTER.GAP
+    : 0;
 
   const revealChain = isFirst
 
@@ -55,6 +61,7 @@ export function renderImageSeg(
         textColor,
         transition,
         align,
+        extraLeft,
       )
 
     : buildRevealTextChain_XFADE(
@@ -67,6 +74,7 @@ export function renderImageSeg(
         textColor,
         transition,
         align,
+        extraLeft,
       );
 
   const args: string[] = ["-y","-loop","1","-t",`${seg.duration}`,"-r",`${fps}`,"-i",seg.img];
@@ -85,7 +93,6 @@ export function renderImageSeg(
     `color=c=${shadeColor}:s=${videoW}x${videoH}:r=${fps}`
   );
 
-  const haveLogo = !!(logoPath && existsSync(logoPath));
   if (haveLogo) args.push("-i", logoPath!);
 
   const baseFit = `scale=${videoW}:${videoH}:force_original_aspect_ratio=increase:flags=bicubic+accurate_rnd+full_chroma_int,crop=${videoW}:${videoH}`;
@@ -102,9 +109,8 @@ export function renderImageSeg(
   } else {
     footer = `[pre0]null[pre1]`;
     if (haveLogo) {
-      const margin = Math.round(videoW * TEXT.LEFT_MARGIN_P);
+      const margin = Math.round(videoW * TEXT.LEFT_MARGIN_P) + extraLeft;
       if (transition === "wiperight") {
-        const orientation = deriveOrientation(videoW, videoH);
         const auto = autosizeAndWrap(seg.text || "", {
           orientation,
           isFirstSlide: isFirst,

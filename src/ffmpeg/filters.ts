@@ -67,6 +67,7 @@ export function buildFirstSlideTextChain(
   color = "black",
   transition: TextTransition = "wipeup",
   align?: "left" | "center" | "right",
+  extraLeftPx = 0,
 ): string {
   const orientation: Orientation = deriveOrientation(videoW, videoH);
 
@@ -87,6 +88,11 @@ export function buildFirstSlideTextChain(
     targetColsOverride: targetOverride,
   });
 
+  if (transition === "wiperight" && extraLeftPx > 0) {
+    const xNum = Number(auto.xExpr);
+    if (!Number.isNaN(xNum)) auto.xExpr = `${xNum + extraLeftPx}`;
+  }
+
   if (!auto.lines.length || (auto.lines.length === 1 && auto.lines[0] === "")) return `[pre]null[v]`;
 
   const EXTRA  = Math.max(6, Math.round(videoH * 0.06));
@@ -96,7 +102,7 @@ export function buildFirstSlideTextChain(
   let inLbl = "pre";
 
   if (transition === "wiperight") {
-    const margin = Math.round(videoW * TEXT.LEFT_MARGIN_P);
+    const margin = Math.round(videoW * TEXT.LEFT_MARGIN_P) + extraLeftPx;
     const barW = Math.max(4, Math.round(auto.fontSize * 0.5));
     const barX = Math.max(0, margin - barW - auto.padPx);
     const barH = videoH - auto.y0;
@@ -151,7 +157,8 @@ export function buildRevealTextChain_XFADE(
   fps: number,
   color = "white",
   transition: TextTransition = "wipeup",
-  align: "left" | "center" | "right" = "center"
+  align: "left" | "center" | "right" = "center",
+  extraLeftPx = 0,
 ): string {
   const orientation: Orientation = deriveOrientation(videoW, videoH);
   const baseCols = WRAP_TARGET[orientation].OTHER;
@@ -169,13 +176,18 @@ export function buildRevealTextChain_XFADE(
     targetColsOverride: targetOverride,
   });
 
+  if (transition === "wiperight" && extraLeftPx > 0) {
+    const xNum = Number(auto.xExpr);
+    if (!Number.isNaN(xNum)) auto.xExpr = `${xNum + extraLeftPx}`;
+  }
+
   if (!auto.lines.length || (auto.lines.length === 1 && auto.lines[0] === "")) return `[pre]null[v]`;
 
   const parts: string[] = [];
   let inLbl = "pre";
 
   if (transition === "wiperight") {
-    const margin = Math.round(videoW * TEXT.LEFT_MARGIN_P);
+    const margin = Math.round(videoW * TEXT.LEFT_MARGIN_P) + extraLeftPx;
     const barW = Math.max(4, Math.round(auto.fontSize * 0.5));
     const barX = Math.max(0, margin - barW - auto.padPx);
     const barH = videoH - auto.y0;
