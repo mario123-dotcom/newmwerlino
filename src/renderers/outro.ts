@@ -14,10 +14,12 @@ export function renderOutroSegment(
     fontPath: string;
     logoPath?: string | null;
     fillColor?: string;
+
   }
 ) {
   const { fps, videoW, videoH, fontPath, logoPath } = opts;
   const fillColor = opts.fillColor || "black";
+
   const text = seg.text || "";
 
   const args: string[] = [
@@ -64,6 +66,7 @@ export function renderOutroSegment(
     fchain +=
       `[base]drawtext=fontfile='${fontPath}':fontsize=${fontSize}:fontcolor=white:` +
       `x=(w-text_w)/2:y=${textCenterY}:text='${escDrawText(text)}'[v]`;
+
   }
 
   args.push(

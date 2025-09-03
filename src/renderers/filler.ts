@@ -34,6 +34,7 @@ export function renderFillerSegment(
     fchain += `;[2:v]scale=-1:${FOOTER.LOGO_HEIGHT},format=rgba[lg];[base][lg]overlay=x=(W-w)/2:y=(H-h)/2[v]`;
   else fchain += `;[base]null[v]`;
 
+
   args.push(
     "-filter_complex",
     fchain,
