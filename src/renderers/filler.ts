@@ -19,10 +19,12 @@ export function renderFillerSegment(
   if (logoPosition === "bottom") {
     const lineY = `ih-${FOOTER.MARGIN_BOTTOM + FOOTER.LOGO_HEIGHT + FOOTER.GAP}`;
     fchain = `[0:v]format=rgba[base];[base]drawbox=x=0:y=${lineY}:w=iw:h=${FOOTER.LINE_THICKNESS}:color=${fillColor}@0.95:t=fill[pre1]`;
-    if (haveLogo) fchain += `;[2:v]scale=-1:${FOOTER.LOGO_HEIGHT},format=rgba[lg];[pre1][lg]overlay=x=(W-w)/2:y=(H-h)/2[v]`;
+    if (haveLogo)
+      fchain += `;[2:v]scale=-1:${FOOTER.LOGO_HEIGHT},format=rgba[lg];[pre1][lg]overlay=x=(W-w)/2:y=H-h-${FOOTER.MARGIN_BOTTOM}[v]`;
     else fchain += `;[pre1]null[v]`;
   } else {
-    fchain = `[0:v]format=rgba[base][pre1]`;
+    fchain = `[0:v]format=rgba[base]`;
+
     if (haveLogo) fchain += `;[2:v]scale=-1:${FOOTER.LOGO_HEIGHT},format=rgba[lg];[base][lg]overlay=x=${FOOTER.MARGIN_BOTTOM}:y=${FOOTER.MARGIN_BOTTOM}[v]`;
     else fchain += `;[base]null[v]`;
   }
