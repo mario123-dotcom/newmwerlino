@@ -69,8 +69,6 @@ export function buildFirstSlideTextChain(
   align?: "left" | "center" | "right",
 ): string {
   const orientation: Orientation = deriveOrientation(videoW, videoH);
-  // Forziamo lo stesso numero di righe per orientamento
-  const fixedLines = orientation === "portrait" ? 4 : 3;
 
   const chosenAlign = align ?? (orientation === "landscape" ? "left" : "center");
 
@@ -86,7 +84,7 @@ export function buildFirstSlideTextChain(
     videoW,
     videoH,
     align: chosenAlign,
-    fixedLines,
+
     targetColsOverride: targetOverride,
   });
 
@@ -156,7 +154,6 @@ export function buildRevealTextChain_XFADE(
   align: "left" | "center" | "right" = "center"
 ): string {
   const orientation: Orientation = deriveOrientation(videoW, videoH);
-  const fixedLines = orientation === "portrait" ? 4 : 3;
   const baseCols = WRAP_TARGET[orientation].OTHER;
   const targetOverride = transition === "wiperight"
     ? Math.max(1, Math.round(baseCols * 0.8))
@@ -169,7 +166,7 @@ export function buildRevealTextChain_XFADE(
     videoW,
     videoH,
     align,
-    fixedLines,
+
     targetColsOverride: targetOverride,
   });
 
