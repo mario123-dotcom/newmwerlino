@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { writeFileSync, unlinkSync } from "fs";
 import { FOOTER, TEXT } from "../config";
 
+
 // Ensure template2 landscape places logo below text
 test("template2 landscape logo below text", (t) => {
   let captured: string[] | undefined;
@@ -42,5 +43,6 @@ test("template2 landscape logo below text", (t) => {
       `overlay=x=${margin}:y=H-h-${FOOTER.MARGIN_BOTTOM}`
     )
   );
+
 });
 

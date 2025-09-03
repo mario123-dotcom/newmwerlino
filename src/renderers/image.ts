@@ -114,6 +114,7 @@ export function renderImageSeg(
         const logoX = margin;
         const logoYExpr = `H-h-${FOOTER.MARGIN_BOTTOM}`;
         footer += `;[3:v]scale=-1:${FOOTER.LOGO_HEIGHT},format=rgba[lg];[pre1][lg]overlay=x=${logoX}:y=${logoYExpr}[pre]`;
+
       } else {
         const logoY = FOOTER.MARGIN_BOTTOM + FOOTER.GAP;
         footer += `;[3:v]scale=-1:${FOOTER.LOGO_HEIGHT},format=rgba[lg];[pre1][lg]overlay=x=${margin}:y=${logoY}[pre]`;
