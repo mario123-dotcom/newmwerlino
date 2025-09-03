@@ -9,13 +9,31 @@ export function shadeChain(
   gamma = 1.0,
   leftPower = 0.8,
   vertPower = 0.2,
-  bias = 0.2
+  bias = 0.2,
+  color = "black"
 ): string {
   if (strength <= 0) return "format=rgba,geq=r='0':g='0':b='0':a='0'";
   const shape  = `pow(1-(X/W),${leftPower})*pow(Y/H,${vertPower})`;
   const shaped = gamma === 1.0 ? shape : `pow(${shape},${gamma})`;
   const aExpr  = `255*${Math.max(0, Math.min(1, strength))}*clip(((${shaped})-${bias})/(1-${bias}),0\\,1)`;
-  return `format=rgba,geq=r='0':g='0':b='0':a='${aExpr}'`;
+  const rgb = (() => {
+    const col = color.toLowerCase();
+    if (col.startsWith("#") && (col.length === 7 || col.length === 4)) {
+      const hex = col.slice(1);
+      const r = hex.length === 3 ? parseInt(hex[0] + hex[0], 16) : parseInt(hex.slice(0, 2), 16);
+      const g = hex.length === 3 ? parseInt(hex[1] + hex[1], 16) : parseInt(hex.slice(2, 4), 16);
+      const b = hex.length === 3 ? parseInt(hex[2] + hex[2], 16) : parseInt(hex.slice(4, 6), 16);
+      return { r, g, b };
+    }
+    switch (col) {
+      case "red":
+        return { r: 255, g: 0, b: 0 };
+      case "black":
+      default:
+        return { r: 0, g: 0, b: 0 };
+    }
+  })();
+  return `format=rgba,geq=r='${rgb.r}':g='${rgb.g}':b='${rgb.b}':a='${aExpr}'`;
 }
 
 /** Zoom leggero (per zoompan) */
