@@ -88,14 +88,33 @@ export function autosizeAndWrap(text: string, opts: AutoOpts): AutoSizeResult {
     blockH = lines.length * lineH;
   }
 
-  // 5) y di partenza centrato nello spazio disponibile (clamp)
+  // 5) verifica larghezza massima e ridimensiona se necessario
+  const margin = Math.round(videoW * TEXT.LEFT_MARGIN_P);
+  const maxWidth = videoW - margin * 2;
+  let padPx = Math.max(4, Math.round(fontSize * TEXT.BOX_PAD_FACTOR));
+  let maxLineW =
+    Math.max(0, ...lines.map((l) => l.length)) * fontSize * TEXT.CHAR_WIDTH_K + padPx * 2;
+  if (maxLineW > maxWidth) {
+    const scale = maxWidth / maxLineW;
+    fontSize = Math.max(TEXT.MIN_SIZE, Math.floor(fontSize * scale));
+    lineH = Math.max(1, Math.round(fontSize * TEXT.LINE_HEIGHT));
+    padPx = Math.max(4, Math.round(fontSize * TEXT.BOX_PAD_FACTOR));
+    blockH = lines.length * lineH;
+    if (blockH > available) {
+      fontSize = Math.floor(available / (lines.length * TEXT.LINE_HEIGHT));
+      fontSize = Math.max(TEXT.MIN_SIZE, Math.min(TEXT.MAX_SIZE, fontSize));
+      lineH = Math.max(1, Math.round(fontSize * TEXT.LINE_HEIGHT));
+      padPx = Math.max(4, Math.round(fontSize * TEXT.BOX_PAD_FACTOR));
+      blockH = lines.length * lineH;
+    }
+  }
+
+  // 6) y di partenza centrato nello spazio disponibile (clamp)
   const y0Centered = topMarginPx + Math.floor((available - blockH) / 2);
   const y0 = Math.max(topMarginPx, Math.min(bottomLimit - blockH, y0Centered));
 
-  // 6) padding box + xExpr coerente
-  const padPx = Math.max(4, Math.round(fontSize * TEXT.BOX_PAD_FACTOR));
+  // 7) xExpr coerente
   let xExpr = "(w-text_w)/2";
-  const margin = Math.round(videoW * TEXT.LEFT_MARGIN_P);
   if (align === "left") {
     xExpr = `${margin}`;
   } else if (align === "right") {
