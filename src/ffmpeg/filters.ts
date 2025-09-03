@@ -91,7 +91,6 @@ export function buildFirstSlideTextChain(
 
   const EXTRA  = Math.max(6, Math.round(videoH * 0.06));
   const CANV_H = auto.lineH + EXTRA;
-  const blockH = auto.lines.length * auto.lineH;
 
   const parts: string[] = [];
   let inLbl = "pre";
@@ -100,15 +99,16 @@ export function buildFirstSlideTextChain(
     const margin = Math.round(videoW * TEXT.LEFT_MARGIN_P);
     const barW = Math.max(4, Math.round(auto.fontSize * 0.5));
     const barX = Math.max(0, margin - barW - auto.padPx);
-    parts.push(`color=c=black:s=${barW}x${blockH}:r=${fps}:d=${segDur},format=rgba,setsar=1[bar_can]`);
+    const barH = videoH - auto.y0;
+    parts.push(`color=c=black:s=${barW}x${barH}:r=${fps}:d=${segDur},format=rgba,setsar=1[bar_can]`);
     parts.push(`[bar_can]split=2[bar_rgb][bar_forA]`);
     parts.push(`[bar_forA]alphaextract,format=gray,setsar=1[bar_Aorig]`);
-    parts.push(`color=c=black:s=${barW}x${blockH}:r=${fps}:d=${segDur},format=gray,setsar=1[bar_off]`);
-    parts.push(`color=c=white:s=${barW}x${blockH}:r=${fps}:d=${segDur},format=gray,setsar=1[bar_on]`);
+    parts.push(`color=c=black:s=${barW}x${barH}:r=${fps}:d=${segDur},format=gray,setsar=1[bar_off]`);
+    parts.push(`color=c=white:s=${barW}x${barH}:r=${fps}:d=${segDur},format=gray,setsar=1[bar_on]`);
     parts.push(`[bar_off][bar_on]xfade=transition=wipeup:duration=0.6:offset=0[bar_wipe]`);
     parts.push(`[bar_Aorig][bar_wipe]blend=all_mode=multiply[bar_A]`);
     parts.push(`[bar_rgb][bar_A]alphamerge[bar_ready]`);
-    parts.push(`[pre][bar_ready]overlay=x=${barX}:y=${auto.y0}[bar_out]`);
+    parts.push(`[pre][bar_ready]overlay=x=${barX}:y=H-h[bar_out]`);
     inLbl = "bar_out";
   }
 
@@ -176,17 +176,17 @@ export function buildRevealTextChain_XFADE(
   if (transition === "wiperight") {
     const margin = Math.round(videoW * TEXT.LEFT_MARGIN_P);
     const barW = Math.max(4, Math.round(auto.fontSize * 0.5));
-    const blockH = auto.lines.length * auto.lineH;
     const barX = Math.max(0, margin - barW - auto.padPx);
-    parts.push(`color=c=black:s=${barW}x${blockH}:r=${fps}:d=${segDur},format=rgba,setsar=1[bar_can]`);
+    const barH = videoH - auto.y0;
+    parts.push(`color=c=black:s=${barW}x${barH}:r=${fps}:d=${segDur},format=rgba,setsar=1[bar_can]`);
     parts.push(`[bar_can]split=2[bar_rgb][bar_forA]`);
     parts.push(`[bar_forA]alphaextract,format=gray,setsar=1[bar_Aorig]`);
-    parts.push(`color=c=black:s=${barW}x${blockH}:r=${fps}:d=${segDur},format=gray,setsar=1[bar_off]`);
-    parts.push(`color=c=white:s=${barW}x${blockH}:r=${fps}:d=${segDur},format=gray,setsar=1[bar_on]`);
+    parts.push(`color=c=black:s=${barW}x${barH}:r=${fps}:d=${segDur},format=gray,setsar=1[bar_off]`);
+    parts.push(`color=c=white:s=${barW}x${barH}:r=${fps}:d=${segDur},format=gray,setsar=1[bar_on]`);
     parts.push(`[bar_off][bar_on]xfade=transition=wipeup:duration=0.6:offset=0[bar_wipe]`);
     parts.push(`[bar_Aorig][bar_wipe]blend=all_mode=multiply[bar_A]`);
     parts.push(`[bar_rgb][bar_A]alphamerge[bar_ready]`);
-    parts.push(`[pre][bar_ready]overlay=x=${barX}:y=${auto.y0}[bar_out]`);
+    parts.push(`[pre][bar_ready]overlay=x=${barX}:y=H-h[bar_out]`);
     inLbl = "bar_out";
   }
 

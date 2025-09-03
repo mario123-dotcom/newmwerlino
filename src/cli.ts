@@ -1,4 +1,5 @@
 import type { TextTransition } from "./types";
+import { TEXT } from "./config";
 
 const ARGV = process.argv.slice(2);
 
@@ -80,6 +81,12 @@ const TEMPLATE_MAP: Record<TemplateName, TemplateConf> = {
 
 const templateOpt = getOpt("template", "tmp1") as TemplateName;
 const TEMPLATE_CONF = TEMPLATE_MAP[templateOpt] || TEMPLATE_MAP.tmp1;
+
+if (templateOpt === "tmp2") {
+  TEXT.LEFT_MARGIN_P += 0.02;
+  TEXT.TOP_MARGIN_P.landscape += 0.02;
+  TEXT.TOP_MARGIN_P.portrait += 0.02;
+}
 
 export const TEXT_TRANSITION = TEMPLATE_CONF.textTransition;
 export const SHADE_COLOR = TEMPLATE_CONF.shadeColor;
