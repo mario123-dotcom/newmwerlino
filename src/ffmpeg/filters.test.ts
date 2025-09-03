@@ -10,16 +10,16 @@ const opts = {
   fps: 30
 };
 
-test("text chains use ascent/descent for consistent spacing", () => {
+test("text chains keep consistent spacing using descent", () => {
   const chainFirst = buildFirstSlideTextChain(
     "prima riga", opts.segDur, opts.fontfile, opts.videoW, opts.videoH, opts.fps
   );
-  assert.ok(chainFirst.includes("h-ascent-descent-1"));
+  assert.ok(chainFirst.includes("h-descent"));
   assert.ok(!chainFirst.includes("text_h"));
 
   const chainOther = buildRevealTextChain_XFADE(
     "seconda riga", opts.segDur, opts.fontfile, opts.videoW, opts.videoH, opts.fps
   );
-  assert.ok(chainOther.includes("h-ascent-descent-1"));
+  assert.ok(chainOther.includes("h-descent"));
   assert.ok(!chainOther.includes("text_h"));
 });
