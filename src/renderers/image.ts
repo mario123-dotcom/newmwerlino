@@ -111,18 +111,10 @@ export function renderImageSeg(
     if (haveLogo) {
       const margin = Math.round(videoW * TEXT.LEFT_MARGIN_P) + extraLeft;
       if (transition === "wiperight") {
-        const auto = autosizeAndWrap(seg.text || "", {
-          orientation,
-          isFirstSlide: isFirst,
-          videoW,
-          videoH,
-          align,
-        });
-        const barW = Math.max(4, Math.round(auto.fontSize * 0.5));
-        const barX = Math.max(0, margin - barW - auto.padPx);
-        const logoXExpr = `${barX - FOOTER.GAP}-w`;
+        const logoX = margin;
         const logoYExpr = `H-h-${FOOTER.MARGIN_BOTTOM}`;
-        footer += `;[3:v]scale=-1:${FOOTER.LOGO_HEIGHT},format=rgba[lg];[pre1][lg]overlay=x=${logoXExpr}:y=${logoYExpr}[pre]`;
+        footer += `;[3:v]scale=-1:${FOOTER.LOGO_HEIGHT},format=rgba[lg];[pre1][lg]overlay=x=${logoX}:y=${logoYExpr}[pre]`;
+
       } else {
         const logoY = FOOTER.MARGIN_BOTTOM + FOOTER.GAP;
         footer += `;[3:v]scale=-1:${FOOTER.LOGO_HEIGHT},format=rgba[lg];[pre1][lg]overlay=x=${margin}:y=${logoY}[pre]`;

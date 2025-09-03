@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { writeFileSync, unlinkSync } from "fs";
-import { FOOTER } from "../config";
+import { FOOTER, TEXT } from "../config";
+
 
 // Ensure template2 landscape places logo below text
 test("template2 landscape logo below text", (t) => {
@@ -36,6 +37,12 @@ test("template2 landscape logo below text", (t) => {
   const idx = captured!.indexOf("-filter_complex");
   assert.notEqual(idx, -1);
   const fchain = captured![idx + 1];
-  assert.ok(fchain.includes(`:y=H-h-${FOOTER.MARGIN_BOTTOM}`));
+  const margin = Math.round(1920 * TEXT.LEFT_MARGIN_P);
+  assert.ok(
+    fchain.includes(
+      `overlay=x=${margin}:y=H-h-${FOOTER.MARGIN_BOTTOM}`
+    )
+  );
+
 });
 
