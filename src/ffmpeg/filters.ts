@@ -119,8 +119,8 @@ export function buildFirstSlideTextChain(
 
     parts.push(`color=c=black@0.0:s=${videoW}x${CANV_H}:r=${fps}:d=${segDur},format=rgba,setsar=1[S${i}_canvas]`);
     // box “doppio” per bordo pieno + anti-alias
-    parts.push(`[S${i}_canvas]drawtext=fontfile='${fontfile}':fontsize=${auto.fontSize}:fontcolor=${color}@0:x=${auto.xExpr}:y=h-text_h-1+${EXTRA}:text='${safe}':box=1:boxcolor=white@1.0:boxborderw=${auto.padPx}[S${i}_big]`);
-    parts.push(`[S${i}_big]drawtext=fontfile='${fontfile}':fontsize=${auto.fontSize}:fontcolor=${color}:x=${auto.xExpr}:y=h-text_h-1:text='${safe}':box=1:boxcolor=white@1.0:boxborderw=${auto.padPx}[S${i}_rgba]`);
+    parts.push(`[S${i}_canvas]drawtext=fontfile='${fontfile}':fontsize=${auto.fontSize}:fontcolor=${color}@0:x=${auto.xExpr}:y=h-ascent-descent-1+${EXTRA}:text='${safe}':box=1:boxcolor=white@1.0:boxborderw=${auto.padPx}[S${i}_big]`);
+    parts.push(`[S${i}_big]drawtext=fontfile='${fontfile}':fontsize=${auto.fontSize}:fontcolor=${color}:x=${auto.xExpr}:y=h-ascent-descent-1:text='${safe}':box=1:boxcolor=white@1.0:boxborderw=${auto.padPx}[S${i}_rgba]`);
 
     // alpha wipe con direzione configurabile
     parts.push(`[S${i}_rgba]split=2[S${i}_rgb][S${i}_forA]`);
@@ -197,7 +197,7 @@ export function buildRevealTextChain_XFADE(
 
     // canvas “a riga” di altezza esatta = lineH ⇒ spaziatura identica
     parts.push(`color=c=black@0.0:s=${videoW}x${auto.lineH}:r=${fps}:d=${segDur},format=rgba,setsar=1[L${i}_canvas]`);
-    parts.push(`[L${i}_canvas]drawtext=fontfile='${fontfile}':fontsize=${auto.fontSize}:fontcolor=${color}:x=${auto.xExpr}:y=h-text_h-1:text='${safe}'[L${i}_rgba]`);
+    parts.push(`[L${i}_canvas]drawtext=fontfile='${fontfile}':fontsize=${auto.fontSize}:fontcolor=${color}:x=${auto.xExpr}:y=h-ascent-descent-1:text='${safe}'[L${i}_rgba]`);
 
     // alpha XFADE (wipeup/wipedown/wipeleft/wiperight)
     parts.push(`[L${i}_rgba]split=2[L${i}_rgb][L${i}_forA]`);
