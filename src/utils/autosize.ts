@@ -32,6 +32,7 @@ function tokenize(text: string): string[] {
     .filter(Boolean);
 }
 
+
 /** wrap “greedy” su target colonne */
 function greedyWrapByCols(words: string[], cols: number): string[] {
   const lines: string[] = [];
@@ -64,6 +65,7 @@ export function autosizeAndWrap(text: string, opts: AutoOpts): AutoSizeResult {
   const targetCols = targetColsOverride ?? defaultCols;
 
   const lines = greedyWrapByCols(words, targetCols);
+
 
   // 3) area verticale disponibile
   const topMarginPx = Math.round(videoH * TEXT.TOP_MARGIN_P[orientation]);

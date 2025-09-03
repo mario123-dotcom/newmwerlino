@@ -75,6 +75,7 @@ export function buildFirstSlideTextChain(
   const baseCols = WRAP_TARGET[orientation].FIRST;
   const targetOverride = transition === "wiperight"
     ? Math.max(1, Math.round(baseCols * 0.8))
+
     : undefined;
 
   const auto = autosizeAndWrap(txt, {
@@ -83,6 +84,7 @@ export function buildFirstSlideTextChain(
     videoW,
     videoH,
     align: chosenAlign,
+
     targetColsOverride: targetOverride,
   });
 
@@ -155,6 +157,7 @@ export function buildRevealTextChain_XFADE(
   const baseCols = WRAP_TARGET[orientation].OTHER;
   const targetOverride = transition === "wiperight"
     ? Math.max(1, Math.round(baseCols * 0.8))
+
     : undefined;
 
   const auto = autosizeAndWrap(txt, {
@@ -163,6 +166,7 @@ export function buildRevealTextChain_XFADE(
     videoW,
     videoH,
     align,
+
     targetColsOverride: targetOverride,
   });
 
