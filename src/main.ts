@@ -102,7 +102,7 @@ import { sendFinalVideo } from "./share";
           videoH,
           logoPath,
           fillColor: FILL_COLOR,
-          logoPosition: LOGO_POSITION,
+
         });
       else
         renderOutroSegment(seg, out, {
@@ -112,7 +112,7 @@ import { sendFinalVideo } from "./share";
           fontPath,
           logoPath,
           fillColor: FILL_COLOR,
-          logoPosition: LOGO_POSITION,
+
         });
       segFiles.push(out);
       console.log(`[OK ] Segmento creato: ${out}`);

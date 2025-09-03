@@ -14,12 +14,12 @@ export function renderOutroSegment(
     fontPath: string;
     logoPath?: string | null;
     fillColor?: string;
-    logoPosition?: "bottom" | "top-left";
+
   }
 ) {
   const { fps, videoW, videoH, fontPath, logoPath } = opts;
   const fillColor = opts.fillColor || "black";
-  const logoPosition = opts.logoPosition || "bottom";
+
   const text = seg.text || "";
 
   const args: string[] = [
@@ -53,26 +53,20 @@ export function renderOutroSegment(
   const OUTRO_GAP = 18;
 
   let fchain = `[0:v]format=rgba[base];`;
+  const textCenterY = Math.round((videoH - lineH) / 2 + (lineH - 1));
 
-  if (logoPosition === "bottom") {
-    const groupH = lineH + OUTRO_GAP + FOOTER.LOGO_HEIGHT;
-    const topY = Math.round((videoH - groupH) / 2);
-    const textY = topY + (lineH - 1);
-    const logoY = topY + lineH + OUTRO_GAP;
+  if (haveLogo) {
+    const logoY = Math.round((videoH - FOOTER.LOGO_HEIGHT) / 2);
+    const textY = logoY - OUTRO_GAP - 1;
     fchain +=
       `[base]drawtext=fontfile='${fontPath}':fontsize=${fontSize}:fontcolor=white:` +
       `x=(w-text_w)/2:y=${textY}:text='${escDrawText(text)}'[pre]`;
-    if (haveLogo)
-      fchain += `;[2:v]scale=-1:${FOOTER.LOGO_HEIGHT},format=rgba[lg];[pre][lg]overlay=x=(W-w)/2:y=${logoY}[v]`;
-    else fchain += `;[pre]null[v]`;
+    fchain += `;[2:v]scale=-1:${FOOTER.LOGO_HEIGHT},format=rgba[lg];[pre][lg]overlay=x=(W-w)/2:y=${logoY}[v]`;
   } else {
-    const textY = Math.round((videoH - lineH) / 2 + (lineH - 1));
     fchain +=
       `[base]drawtext=fontfile='${fontPath}':fontsize=${fontSize}:fontcolor=white:` +
-      `x=(w-text_w)/2:y=${textY}:text='${escDrawText(text)}'[pre]`;
-    if (haveLogo)
-      fchain += `;[2:v]scale=-1:${FOOTER.LOGO_HEIGHT},format=rgba[lg];[pre][lg]overlay=x=${FOOTER.MARGIN_BOTTOM}:y=${FOOTER.MARGIN_BOTTOM}[v]`;
-    else fchain += `;[pre]null[v]`;
+      `x=(w-text_w)/2:y=${textCenterY}:text='${escDrawText(text)}'[v]`;
+
   }
 
   args.push(
