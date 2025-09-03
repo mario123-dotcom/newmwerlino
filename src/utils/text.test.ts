@@ -5,7 +5,39 @@ import { wrapParagraph, normalizeQuotes, escDrawText } from './text';
 test('wrapParagraph breaks text into lines respecting width', () => {
   assert.deepStrictEqual(
     wrapParagraph('uno due tre', 7),
-    ['uno due', 'tre']
+    ['uno', 'due tre']
+  );
+});
+
+test('wrapParagraph wraps at about 30 chars', () => {
+  const txt = 'Una serie di scosse, a partire da domenica';
+  assert.deepStrictEqual(
+    wrapParagraph(txt, 30),
+    ['Una serie di', 'scosse, a partire da domenica']
+  );
+});
+
+test('wrapParagraph uses common-sense breaks', () => {
+  const s = 'una serie di scosse, a partire da domenica, ha colpito i campi flegrei, culminando con una di magnitudo 4.0 alle 4:55 di lunedì.';
+  assert.deepStrictEqual(
+    wrapParagraph(s, 30),
+    [
+      'una serie di scosse, a partire',
+      'da domenica, ha colpito i',
+      'campi flegrei, culminando',
+      'con una di magnitudo',
+      '4.0 alle 4:55 di lunedì.'
+    ]
+  );
+  const s2 = "nonostante l'intensità delle scosse, la protezione civile riporta che non ci sono danni significativi finora.";
+  assert.deepStrictEqual(
+    wrapParagraph(s2, 30),
+    [
+      "nonostante l'intensità delle",
+      'scosse, la protezione civile',
+      'riporta che non ci sono',
+      'danni significativi finora.'
+    ]
   );
 });
 
