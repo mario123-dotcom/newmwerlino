@@ -24,6 +24,7 @@ export function renderFillerSegment(
     else fchain += `;[pre1]null[v]`;
   } else {
     fchain = `[0:v]format=rgba[base]`;
+
     if (haveLogo) fchain += `;[2:v]scale=-1:${FOOTER.LOGO_HEIGHT},format=rgba[lg];[base][lg]overlay=x=${FOOTER.MARGIN_BOTTOM}:y=${FOOTER.MARGIN_BOTTOM}[v]`;
     else fchain += `;[base]null[v]`;
   }
