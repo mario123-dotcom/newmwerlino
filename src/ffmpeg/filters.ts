@@ -1,6 +1,6 @@
 // src/ffmpeg/filters.ts
 import { autosizeAndWrap, Orientation } from "../utils/autosize";
-import { deriveOrientation } from "../config";
+import { deriveOrientation, WRAP_TARGET, TEXT } from "../config";
 import type { TextTransition } from "../types";
 
 /** Ombra laterale: matte RGBA */
@@ -74,6 +74,11 @@ export function buildFirstSlideTextChain(
 
   const chosenAlign = align ?? (orientation === "landscape" ? "left" : "center");
 
+  const baseCols = WRAP_TARGET[orientation].FIRST;
+  const targetOverride = transition === "wiperight"
+    ? Math.max(1, Math.round(baseCols * 0.8))
+    : undefined;
+
   const auto = autosizeAndWrap(txt, {
     orientation,
     isFirstSlide: true,
@@ -81,15 +86,33 @@ export function buildFirstSlideTextChain(
     videoH,
     align: chosenAlign,
     fixedLines,
+    targetColsOverride: targetOverride,
   });
 
   if (!auto.lines.length || (auto.lines.length === 1 && auto.lines[0] === "")) return `[pre]null[v]`;
 
   const EXTRA  = Math.max(6, Math.round(videoH * 0.06));
   const CANV_H = auto.lineH + EXTRA;
+  const blockH = auto.lines.length * auto.lineH;
 
   const parts: string[] = [];
   let inLbl = "pre";
+
+  if (transition === "wiperight") {
+    const margin = Math.round(videoW * TEXT.LEFT_MARGIN_P);
+    const barW = Math.max(4, Math.round(auto.fontSize * 0.5));
+    const barX = Math.max(0, margin - barW - auto.padPx);
+    parts.push(`color=c=black:s=${barW}x${blockH}:r=${fps}:d=${segDur},format=rgba,setsar=1[bar_can]`);
+    parts.push(`[bar_can]split=2[bar_rgb][bar_forA]`);
+    parts.push(`[bar_forA]alphaextract,format=gray,setsar=1[bar_Aorig]`);
+    parts.push(`color=c=black:s=${barW}x${blockH}:r=${fps}:d=${segDur},format=gray,setsar=1[bar_off]`);
+    parts.push(`color=c=white:s=${barW}x${blockH}:r=${fps}:d=${segDur},format=gray,setsar=1[bar_on]`);
+    parts.push(`[bar_off][bar_on]xfade=transition=wipeup:duration=0.6:offset=0[bar_wipe]`);
+    parts.push(`[bar_Aorig][bar_wipe]blend=all_mode=multiply[bar_A]`);
+    parts.push(`[bar_rgb][bar_A]alphamerge[bar_ready]`);
+    parts.push(`[pre][bar_ready]overlay=x=${barX}:y=${auto.y0}[bar_out]`);
+    inLbl = "bar_out";
+  }
 
   for (let i = 0; i < auto.lines.length; i++) {
     const safe   = escDrawText(auto.lines[i]);
@@ -133,6 +156,10 @@ export function buildRevealTextChain_XFADE(
 ): string {
   const orientation: Orientation = deriveOrientation(videoW, videoH);
   const fixedLines = orientation === "portrait" ? 4 : 3;
+  const baseCols = WRAP_TARGET[orientation].OTHER;
+  const targetOverride = transition === "wiperight"
+    ? Math.max(1, Math.round(baseCols * 0.8))
+    : undefined;
 
   const auto = autosizeAndWrap(txt, {
     orientation,
@@ -141,12 +168,30 @@ export function buildRevealTextChain_XFADE(
     videoH,
     align,
     fixedLines,
+    targetColsOverride: targetOverride,
   });
 
   if (!auto.lines.length || (auto.lines.length === 1 && auto.lines[0] === "")) return `[pre]null[v]`;
 
   const parts: string[] = [];
   let inLbl = "pre";
+
+  if (transition === "wiperight") {
+    const margin = Math.round(videoW * TEXT.LEFT_MARGIN_P);
+    const barW = Math.max(4, Math.round(auto.fontSize * 0.5));
+    const blockH = auto.lines.length * auto.lineH;
+    const barX = Math.max(0, margin - barW - auto.padPx);
+    parts.push(`color=c=black:s=${barW}x${blockH}:r=${fps}:d=${segDur},format=rgba,setsar=1[bar_can]`);
+    parts.push(`[bar_can]split=2[bar_rgb][bar_forA]`);
+    parts.push(`[bar_forA]alphaextract,format=gray,setsar=1[bar_Aorig]`);
+    parts.push(`color=c=black:s=${barW}x${blockH}:r=${fps}:d=${segDur},format=gray,setsar=1[bar_off]`);
+    parts.push(`color=c=white:s=${barW}x${blockH}:r=${fps}:d=${segDur},format=gray,setsar=1[bar_on]`);
+    parts.push(`[bar_off][bar_on]xfade=transition=wipeup:duration=0.6:offset=0[bar_wipe]`);
+    parts.push(`[bar_Aorig][bar_wipe]blend=all_mode=multiply[bar_A]`);
+    parts.push(`[bar_rgb][bar_A]alphamerge[bar_ready]`);
+    parts.push(`[pre][bar_ready]overlay=x=${barX}:y=${auto.y0}[bar_out]`);
+    inLbl = "bar_out";
+  }
 
   for (let i = 0; i < auto.lines.length; i++) {
     const safe   = escDrawText(auto.lines[i]);

@@ -41,12 +41,17 @@ function tokenize(text: string): string[] {
 }
 
 /** distribuisce le parole in N righe con lunghezze (in caratteri) più bilanciate possibile */
-function balancedLinesByCount(words: string[], fixedLines: number): string[] {
+function balancedLinesByCount(
+  words: string[],
+  fixedLines: number,
+  maxCols?: number,
+): string[] {
   if (fixedLines <= 1) return [words.join(" ")];
 
   const lens = words.map(w => w.length);
   const totalChars = lens.reduce((a, b) => a + b, 0) + Math.max(0, words.length - 1); // includi spazi
-  const target = Math.ceil(totalChars / fixedLines);
+  const avg = Math.ceil(totalChars / fixedLines);
+  const target = Math.min(avg, maxCols ?? avg);
 
   const lines: string[] = [];
   let acc: string[] = [];
@@ -117,10 +122,11 @@ export function autosizeAndWrap(text: string, opts: AutoOpts): AutoSizeResult {
     : WRAP_TARGET[orientation].OTHER;
   const targetCols = targetColsOverride ?? defaultCols;
 
-  let lines = balancedLinesByCount(words, linesWanted);
+  let lines = balancedLinesByCount(words, linesWanted, targetCols);
   // Se il testo è molto corto (tipo 1–2 parole), usa greedy per evitare molte righe vuote
   if (words.length <= 3) {
     lines = greedyWrapByCols(words, targetCols);
+    while (lines.length < linesWanted) lines.push("");
   }
 
   // 3) area verticale disponibile

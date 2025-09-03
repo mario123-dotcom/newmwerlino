@@ -37,7 +37,7 @@ export const SCALES = {
 
 /** Target “wrapping” di partenza (caratteri) — verrà adattato in autosize */
 export const WRAP_TARGET = {
-  landscape: { FIRST: 26, OTHER: 44 },
+  landscape: { FIRST: 26, OTHER: 35 },
   portrait:  { FIRST: 18, OTHER: 22 },
 };
 
