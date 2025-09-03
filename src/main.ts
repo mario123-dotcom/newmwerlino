@@ -13,7 +13,7 @@ import { renderFillerSegment } from "./renderers/filler";
 import { renderOutroSegment } from "./renderers/outro";
 import { validateAndRepairSegments } from "./validate";
 import { concatAndFinalizeDemuxer } from "./concat";
-import { REUSE_SEGS, SEGS_DIR, TEXT_TRANSITION } from "./cli";
+import { REUSE_SEGS, SEGS_DIR, TEXT_TRANSITION, FILL_COLOR, SHADE_COLOR, LOGO_POSITION } from "./cli";
 import { fetchAssets } from "./fetchAssets";
 import { sendFinalVideo } from "./share";
 
@@ -91,9 +91,19 @@ import { sendFinalVideo } from "./share";
           fontPath,
           logoPath,
           textTransition: TEXT_TRANSITION,
+          shadeColor: SHADE_COLOR,
+          fillColor: FILL_COLOR,
+          logoPosition: LOGO_POSITION,
         });
       else if (seg.kind === "filler")
-        renderFillerSegment(seg, out, { fps, videoW, videoH, logoPath });
+        renderFillerSegment(seg, out, {
+          fps,
+          videoW,
+          videoH,
+          logoPath,
+          fillColor: FILL_COLOR,
+          logoPosition: LOGO_POSITION,
+        });
       else
         renderOutroSegment(seg, out, {
           fps,
@@ -101,6 +111,8 @@ import { sendFinalVideo } from "./share";
           videoH,
           fontPath,
           logoPath,
+          fillColor: FILL_COLOR,
+          logoPosition: LOGO_POSITION,
         });
       segFiles.push(out);
       console.log(`[OK ] Segmento creato: ${out}`);

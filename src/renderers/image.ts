@@ -7,7 +7,7 @@ import {
   buildRevealTextChain_XFADE,
   zoomExprFullClip,
 } from "../ffmpeg/filters";
-import type { TextTransition } from "../types";
+import type { TextTransition, LogoPosition } from "../types";
 
 export function renderImageSeg(
   seg: { index?: number; duration: number; img?: string | null; tts?: string | null; text?: string; },
@@ -20,12 +20,18 @@ export function renderImageSeg(
     logoPath?: string | null;
 
     textTransition?: TextTransition;
+    shadeColor?: string;
+    fillColor?: string;
+    logoPosition?: LogoPosition;
 
   }
 ) {
   if (!seg.img) throw new Error(`Image file missing for slide ${seg.index}`);
 
   const { fps, videoW, videoH, fontPath, logoPath } = opts;
+  const shadeColor = opts.shadeColor || "black";
+  const fillColor = opts.fillColor || "black";
+  const logoPosition: LogoPosition = opts.logoPosition || "bottom";
 
   const isFirst = seg.index === 0;
   const textColor = isFirst ? "black" : "white";
@@ -67,7 +73,16 @@ export function renderImageSeg(
   if (seg.tts && existsSync(seg.tts)) args.push("-i", seg.tts);
   else args.push("-f","lavfi","-t",`${seg.duration}`,"-i","anullsrc=channel_layout=stereo:sample_rate=44100");
 
-  args.push("-f","lavfi","-t",`${seg.duration}`,"-r",`${fps}`,"-i",`color=c=black:s=${videoW}x${videoH}:r=${fps}`);
+  args.push(
+    "-f",
+    "lavfi",
+    "-t",
+    `${seg.duration}`,
+    "-r",
+    `${fps}`,
+    "-i",
+    `color=c=${shadeColor}:s=${videoW}x${videoH}:r=${fps}`
+  );
 
   const haveLogo = !!(logoPath && existsSync(logoPath));
   if (haveLogo) args.push("-i", logoPath!);
@@ -76,11 +91,18 @@ export function renderImageSeg(
   const zExpr = zoomExprFullClip(seg.duration, fps);
   const move  = `zoompan=z=${zExpr}:x=0:y=0:d=1:s=${videoW}x${videoH}:fps=${fps}`;
 
-  let vHead = `[0:v]${baseFit},${move}[base];[2:v]${shadeChain(shadeStrength, SHADE.gamma)}[shade];[base][shade]overlay=x=0:y=0[pre0]`;
-  const lineY = `ih-${FOOTER.MARGIN_BOTTOM + FOOTER.LOGO_HEIGHT + FOOTER.GAP}`;
-  let footer  = `[pre0]drawbox=x=0:y=${lineY}:w=iw:h=${FOOTER.LINE_THICKNESS}:color=black@0.95:t=fill[pre1]`;
-  if (haveLogo) footer += `;[3:v]scale=-1:${FOOTER.LOGO_HEIGHT},format=rgba[lg];[pre1][lg]overlay=x=(W-w)/2:y=H-h-${FOOTER.MARGIN_BOTTOM}[pre]`;
-  else footer += `;[pre1]null[pre]`;
+  let vHead = `[0:v]${baseFit},${move}[base];[2:v]${shadeChain(shadeStrength, SHADE.gamma, SHADE.leftPower, SHADE.vertPower, SHADE.bias, shadeColor)}[shade];[base][shade]overlay=x=0:y=0[pre0]`;
+  let footer = "";
+  if (logoPosition === "bottom") {
+    const lineY = `ih-${FOOTER.MARGIN_BOTTOM + FOOTER.LOGO_HEIGHT + FOOTER.GAP}`;
+    footer = `[pre0]drawbox=x=0:y=${lineY}:w=iw:h=${FOOTER.LINE_THICKNESS}:color=${fillColor}@0.95:t=fill[pre1]`;
+    if (haveLogo) footer += `;[3:v]scale=-1:${FOOTER.LOGO_HEIGHT},format=rgba[lg];[pre1][lg]overlay=x=(W-w)/2:y=H-h-${FOOTER.MARGIN_BOTTOM}[pre]`;
+    else footer += `;[pre1]null[pre]`;
+  } else {
+    footer = `[pre0]null[pre1]`;
+    if (haveLogo) footer += `;[3:v]scale=-1:${FOOTER.LOGO_HEIGHT},format=rgba[lg];[pre1][lg]overlay=x=${FOOTER.MARGIN_BOTTOM}:y=${FOOTER.MARGIN_BOTTOM}[pre]`;
+    else footer += `;[pre1]null[pre]`;
+  }
 
   const vDrawChain = revealChain;
   const aChain =
