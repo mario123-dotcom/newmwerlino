@@ -1,5 +1,5 @@
 import { existsSync } from "fs";
-import { FOOTER, DEFAULT_TTS_VOL, SHADE } from "../config";
+import { FOOTER, DEFAULT_TTS_VOL, SHADE, TEXT } from "../config";
 import { runFFmpeg } from "../ffmpeg/run";
 import {
   shadeChain,
@@ -100,8 +100,11 @@ export function renderImageSeg(
     else footer += `;[pre1]null[pre]`;
   } else {
     footer = `[pre0]null[pre1]`;
-    if (haveLogo) footer += `;[3:v]scale=-1:${FOOTER.LOGO_HEIGHT},format=rgba[lg];[pre1][lg]overlay=x=${FOOTER.MARGIN_BOTTOM}:y=${FOOTER.MARGIN_BOTTOM}[pre]`;
-    else footer += `;[pre1]null[pre]`;
+    if (haveLogo) {
+      const margin = Math.round(videoW * TEXT.LEFT_MARGIN_P);
+      const logoY = FOOTER.MARGIN_BOTTOM + FOOTER.GAP;
+      footer += `;[3:v]scale=-1:${FOOTER.LOGO_HEIGHT},format=rgba[lg];[pre1][lg]overlay=x=${margin}:y=${logoY}[pre]`;
+    } else footer += `;[pre1]null[pre]`;
   }
 
   const vDrawChain = revealChain;

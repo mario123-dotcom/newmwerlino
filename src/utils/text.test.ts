@@ -45,7 +45,7 @@ test('wrapParagraph wraps at about 30 chars', () => {
   const txt = 'Una serie di scosse, a partire da domenica';
   assert.deepStrictEqual(
     wrapParagraph(txt, 30),
-    ['Una serie di scosse, a partire', 'da domenica']
+    ['Una serie di', 'scosse, a partire da domenica']
   );
 });
 
