@@ -160,17 +160,51 @@ export function renderTemplateElement(
       const dir = pickWipeDirection(anim);
       const start = typeof anim.time === "number" ? anim.time : 0;
       const dur = typeof anim.duration === "number" ? anim.duration : 0.6;
-      filter =
-        `color=c=black@0.0:s=${videoW}x${videoH}:r=${fps}:d=${duration},format=rgba,setsar=1[t_can];` +
-        `[t_can]drawtext=fontfile='${font}':text='${text}':x=${finalX}:y=${finalY}:fontsize=${fontsize}:fontcolor=${color}${extra}[t_rgba];` +
-        `[t_rgba]split=2[t_rgb][t_forA];` +
-        `[t_forA]alphaextract,format=gray,setsar=1[t_Aorig];` +
-        `color=c=black:s=${videoW}x${videoH}:r=${fps}:d=${duration},format=gray,setsar=1[t_off];` +
-        `color=c=white:s=${videoW}x${videoH}:r=${fps}:d=${duration},format=gray,setsar=1[t_on];` +
-        `[t_off][t_on]xfade=transition=${dir}:duration=${dur.toFixed(3)}:offset=${start.toFixed(3)}[t_wipe];` +
-        `[t_Aorig][t_wipe]blend=all_mode=multiply[t_A];` +
-        `[t_rgb][t_A]alphamerge[t_ready];` +
-        `[0:v][t_ready]overlay=x=0:y=0[v]`;
+      const lines = fitted.text.split("\n");
+      if (lines.length > 1) {
+        const lineH = fontsize + lineSpacing;
+        const extraLine =
+          (boxColor ? `:box=1:boxcolor=${boxColor}` : "") +
+          (shadowColor
+            ? `:shadowcolor=${shadowColor}:shadowx=${shadowX}:shadowy=${shadowY}`
+            : "") +
+          (letterSpacing ? `:spacing=${letterSpacing}` : "");
+        const parts: string[] = [];
+        let inLbl = "0:v";
+        for (let i = 0; i < lines.length; i++) {
+          const safe = escDrawText(lines[i]);
+          const lineY = finalY + i * lineH;
+          parts.push(`color=c=black@0.0:s=${videoW}x${lineH}:r=${fps}:d=${duration},format=rgba,setsar=1[L${i}_can]`);
+          parts.push(
+            `[L${i}_can]drawtext=fontfile='${font}':text='${safe}':x=${finalX}:y=h-text_h-1:fontsize=${fontsize}:fontcolor=${color}${extraLine}[L${i}_rgba]`
+          );
+          parts.push(`[L${i}_rgba]split=2[L${i}_rgb][L${i}_forA]`);
+          parts.push(`[L${i}_forA]alphaextract,format=gray,setsar=1[L${i}_Aorig]`);
+          parts.push(`color=c=black:s=${videoW}x${lineH}:r=${fps}:d=${duration},format=gray,setsar=1[L${i}_off]`);
+          parts.push(`color=c=white:s=${videoW}x${lineH}:r=${fps}:d=${duration},format=gray,setsar=1[L${i}_on]`);
+          parts.push(
+            `[L${i}_off][L${i}_on]xfade=transition=${dir}:duration=${dur.toFixed(3)}:offset=${start.toFixed(3)}[L${i}_wipe]`
+          );
+          parts.push(`[L${i}_Aorig][L${i}_wipe]blend=all_mode=multiply[L${i}_A]`);
+          parts.push(`[L${i}_rgb][L${i}_A]alphamerge[L${i}_ready]`);
+          const outLbl = i === lines.length - 1 ? "[v]" : `[L${i}_out]`;
+          parts.push(`[${inLbl}][L${i}_ready]overlay=x=0:y=${lineY}${outLbl}`);
+          inLbl = i === lines.length - 1 ? "v" : `L${i}_out`;
+        }
+        filter = parts.join(";");
+      } else {
+        filter =
+          `color=c=black@0.0:s=${videoW}x${videoH}:r=${fps}:d=${duration},format=rgba,setsar=1[t_can];` +
+          `[t_can]drawtext=fontfile='${font}':text='${text}':x=${finalX}:y=${finalY}:fontsize=${fontsize}:fontcolor=${color}${extra}[t_rgba];` +
+          `[t_rgba]split=2[t_rgb][t_forA];` +
+          `[t_forA]alphaextract,format=gray,setsar=1[t_Aorig];` +
+          `color=c=black:s=${videoW}x${videoH}:r=${fps}:d=${duration},format=gray,setsar=1[t_off];` +
+          `color=c=white:s=${videoW}x${videoH}:r=${fps}:d=${duration},format=gray,setsar=1[t_on];` +
+          `[t_off][t_on]xfade=transition=${dir}:duration=${dur.toFixed(3)}:offset=${start.toFixed(3)}[t_wipe];` +
+          `[t_Aorig][t_wipe]blend=all_mode=multiply[t_A];` +
+          `[t_rgb][t_A]alphamerge[t_ready];` +
+          `[0:v][t_ready]overlay=x=0:y=0[v]`;
+      }
     } else {
       let alphaPart = "";
       if (anim && anim.type === "fade") {
@@ -336,17 +370,51 @@ export function renderTemplateSlide(
         const dir = pickWipeDirection(anim);
         const start = typeof anim.time === "number" ? anim.time : 0;
         const dur = typeof anim.duration === "number" ? anim.duration : 0.6;
-        filter +=
-          `color=c=black@0.0:s=${videoW}x${videoH}:r=${fps}:d=${duration},format=rgba,setsar=1[t${idx}_can];` +
-          `[t${idx}_can]drawtext=fontfile='${font}':text='${text}':x=${fx}:y=${fy}:fontsize=${fontsize}:fontcolor=${color}${extra}[t${idx}_rgba];` +
-          `[t${idx}_rgba]split=2[t${idx}_rgb][t${idx}_forA];` +
-          `[t${idx}_forA]alphaextract,format=gray,setsar=1[t${idx}_Aorig];` +
-          `color=c=black:s=${videoW}x${videoH}:r=${fps}:d=${duration},format=gray,setsar=1[t${idx}_off];` +
-          `color=c=white:s=${videoW}x${videoH}:r=${fps}:d=${duration},format=gray,setsar=1[t${idx}_on];` +
-          `[t${idx}_off][t${idx}_on]xfade=transition=${dir}:duration=${dur.toFixed(3)}:offset=${start.toFixed(3)}[t${idx}_wipe];` +
-          `[t${idx}_Aorig][t${idx}_wipe]blend=all_mode=multiply[t${idx}_A];` +
-          `[t${idx}_rgb][t${idx}_A]alphamerge[t${idx}_ready];` +
-          `${cur}[t${idx}_ready]overlay=x=0:y=0${outLbl};`;
+        const lines = fitted.text.split("\n");
+        if (lines.length > 1) {
+          const lineH = fontsize + lineSpacing;
+          const extraLine =
+            (boxColor ? `:box=1:boxcolor=${boxColor}` : "") +
+            (shadowColor
+              ? `:shadowcolor=${shadowColor}:shadowx=${shadowX}:shadowy=${shadowY}`
+              : "") +
+            (letterSpacing ? `:spacing=${letterSpacing}` : "");
+          const parts: string[] = [];
+          let inLbl = cur.slice(1, -1);
+          for (let i = 0; i < lines.length; i++) {
+            const safe = escDrawText(lines[i]);
+            const lineY = fy + i * lineH;
+            parts.push(`color=c=black@0.0:s=${videoW}x${lineH}:r=${fps}:d=${duration},format=rgba,setsar=1[L${idx}_${i}_can]`);
+            parts.push(
+              `[L${idx}_${i}_can]drawtext=fontfile='${font}':text='${safe}':x=${fx}:y=h-text_h-1:fontsize=${fontsize}:fontcolor=${color}${extraLine}[L${idx}_${i}_rgba]`
+            );
+            parts.push(`[L${idx}_${i}_rgba]split=2[L${idx}_${i}_rgb][L${idx}_${i}_forA]`);
+            parts.push(`[L${idx}_${i}_forA]alphaextract,format=gray,setsar=1[L${idx}_${i}_Aorig]`);
+            parts.push(`color=c=black:s=${videoW}x${lineH}:r=${fps}:d=${duration},format=gray,setsar=1[L${idx}_${i}_off]`);
+            parts.push(`color=c=white:s=${videoW}x${lineH}:r=${fps}:d=${duration},format=gray,setsar=1[L${idx}_${i}_on]`);
+            parts.push(
+              `[L${idx}_${i}_off][L${idx}_${i}_on]xfade=transition=${dir}:duration=${dur.toFixed(3)}:offset=${start.toFixed(3)}[L${idx}_${i}_wipe]`
+            );
+            parts.push(`[L${idx}_${i}_Aorig][L${idx}_${i}_wipe]blend=all_mode=multiply[L${idx}_${i}_A]`);
+            parts.push(`[L${idx}_${i}_rgb][L${idx}_${i}_A]alphamerge[L${idx}_${i}_ready]`);
+            const outTmp = i === lines.length - 1 ? outLbl : `[L${idx}_${i}_out]`;
+            parts.push(`[${inLbl}][L${idx}_${i}_ready]overlay=x=0:y=${lineY}${outTmp}`);
+            inLbl = i === lines.length - 1 ? outLbl.slice(1, -1) : `L${idx}_${i}_out`;
+          }
+          filter += parts.join(";");
+        } else {
+          filter +=
+            `color=c=black@0.0:s=${videoW}x${videoH}:r=${fps}:d=${duration},format=rgba,setsar=1[t${idx}_can];` +
+            `[t${idx}_can]drawtext=fontfile='${font}':text='${text}':x=${fx}:y=${fy}:fontsize=${fontsize}:fontcolor=${color}${extra}[t${idx}_rgba];` +
+            `[t${idx}_rgba]split=2[t${idx}_rgb][t${idx}_forA];` +
+            `[t${idx}_forA]alphaextract,format=gray,setsar=1[t${idx}_Aorig];` +
+            `color=c=black:s=${videoW}x${videoH}:r=${fps}:d=${duration},format=gray,setsar=1[t${idx}_off];` +
+            `color=c=white:s=${videoW}x${videoH}:r=${fps}:d=${duration},format=gray,setsar=1[t${idx}_on];` +
+            `[t${idx}_off][t${idx}_on]xfade=transition=${dir}:duration=${dur.toFixed(3)}:offset=${start.toFixed(3)}[t${idx}_wipe];` +
+            `[t${idx}_Aorig][t${idx}_wipe]blend=all_mode=multiply[t${idx}_A];` +
+            `[t${idx}_rgb][t${idx}_A]alphamerge[t${idx}_ready];` +
+            `${cur}[t${idx}_ready]overlay=x=0:y=0${outLbl};`;
+        }
       } else {
         let alphaPart = "";
         if (anim && anim.type === "fade") {

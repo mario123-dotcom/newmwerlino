@@ -156,6 +156,39 @@ test("text includes letter spacing when specified", (t) => {
   assert.ok(fc.includes(":spacing="));
 });
 
+test("multiline wipe uses xfade per line", (t) => {
+  let captured: string[] | undefined;
+  const runMod = require("../ffmpeg/run");
+  t.mock.method(runMod, "runFFmpeg", (args: string[]) => {
+    captured = args;
+  });
+
+  const { renderTemplateSlide } = require("./templateObject");
+  renderTemplateSlide(
+    [
+      {
+        type: "text",
+        text: "hello world",
+        width: "20%",
+        font_size: 20,
+        animations: [{ type: "text-reveal", x_anchor: "0%" }],
+        font_family: "Archivo",
+      },
+    ],
+    1,
+    "out.mp4",
+    { fps: 30, videoW: 100, videoH: 100, fonts: { Archivo: "C:/fonts/font.ttf" } }
+  );
+
+  assert.ok(captured);
+  const idx = captured!.indexOf("-filter_complex");
+  assert.notEqual(idx, -1);
+  const fc = captured![idx + 1];
+  assert.ok(fc.includes("[L0_0_off][L0_0_on]xfade"));
+  assert.ok(fc.includes("[L0_1_off][L0_1_on]xfade"));
+});
+
+
 test("pan animation escapes commas in ffmpeg expressions", (t) => {
   let captured: string[] | undefined;
   const runMod = require("../ffmpeg/run");
