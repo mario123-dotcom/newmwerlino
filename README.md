@@ -40,10 +40,13 @@ Assicurarsi che `ffmpeg` funzioni lanciando `ffmpeg -version` dal terminale.
 ```bash
 npm start               # build + esecuzione completa
 npm start -- --reuse-segs     # riusa segmenti esistenti in src/temp
-npm start -- --template tmp2  # usa il template alternativo
 npm start -- --barColor blue  # imposta il colore della barretta del testo
 
 ```
+
+Il file `template/creatomate_template_news_horizontal.json` viene utilizzato
+automaticamente per determinare colori, animazioni e altre impostazioni del
+video, senza dover più passare l'opzione `--template` da riga di comando.
 I flag aggiuntivi sono descritti in `src/cli.ts`.
 
 Il risultato finale viene salvato in `download/final.mp4`.
