@@ -223,6 +223,7 @@ export function renderTemplateElement(
           `color=c=black@0.0:s=${videoW}x${videoH}:r=${fps}:d=${duration},format=rgba,setsar=1[sh_can];` +
           `[sh_can]drawtext=fontfile='${font}':text='${text}':x=${finalX + shadowX}:y=${finalY + shadowY}:fontsize=${fontsize}:fontcolor=${shadowColor}${shadowExtra}[sh_rgba];` +
           `[sh_rgba]boxblur=${shadowBlur}:${shadowBlur}:${shadowBlur}[sh_blur];` +
+
           `[0:v][sh_blur]overlay=x=0:y=0[tmp_base];` +
           `[tmp_base]drawtext=fontfile='${font}':text='${text}':x=${finalX}:y=${finalY}:fontsize=${fontsize}:fontcolor=${color}${baseExtra}${alphaPart}[v]`;
       } else {
@@ -450,6 +451,7 @@ export function renderTemplateSlide(
             `color=c=black@0.0:s=${videoW}x${videoH}:r=${fps}:d=${duration},format=rgba,setsar=1[sh${idx}_can];` +
             `[sh${idx}_can]drawtext=fontfile='${font}':text='${text}':x=${fx + shadowX}:y=${fy + shadowY}:fontsize=${fontsize}:fontcolor=${shadowColor}${shadowExtra}[sh${idx}_rgba];` +
             `[sh${idx}_rgba]boxblur=${shadowBlur}:${shadowBlur}:${shadowBlur}[sh${idx}_blur];` +
+
             `${cur}[sh${idx}_blur]overlay=x=0:y=0[tmp${idx}_base];` +
             `[tmp${idx}_base]drawtext=fontfile='${font}':text='${text}':x=${fx}:y=${fy}:fontsize=${fontsize}:fontcolor=${color}${baseExtra}${alphaPart}${outLbl};`;
         } else {
