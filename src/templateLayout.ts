@@ -14,6 +14,8 @@ export function loadSlideLayouts(
   const tplPath = join(projectRoot, "template", file);
   const raw = JSON.parse(readFileSync(tplPath, "utf8"));
   const layouts: Record<number, TemplateElement[]> = {};
+  const svgDir = join(projectRoot, "template", "svg");
+  const sanitize = (n: string) => String(n || "").replace(/[^a-zA-Z0-9_-]/g, "_");
 
   const rootEls: any[] = raw.elements || [];
   rootEls.forEach((el: any) => {
@@ -22,28 +24,45 @@ export function loadSlideLayouts(
     if (!m) return;
     const idx = parseInt(m[1]!, 10);
     const arr: TemplateElement[] = [];
-    (el.elements || []).forEach((child: any) => {
-      if (child.type !== "image" && child.type !== "text") return;
-      const t: TemplateElement = {
-        type: child.type === "image" ? "image" : "text",
-        name: child.name,
-        x: child.x,
-        y: child.y,
-        width: child.width,
-        height: child.height,
-        x_anchor: child.x_anchor ?? (child.type === "image" ? "50%" : undefined),
-        y_anchor: child.y_anchor ?? (child.type === "image" ? "50%" : undefined),
-        fit: child.fit,
+      (el.elements || []).forEach((child: any) => {
+        if (child.type === "text" || child.type === "image") {
+          const t: TemplateElement = {
+            type: child.type === "image" ? "image" : "text",
+            name: child.name,
+            x: child.x,
+            y: child.y,
+            width: child.width,
+            height: child.height,
+            x_anchor: child.x_anchor ?? (child.type === "image" ? "50%" : undefined),
+            y_anchor: child.y_anchor ?? (child.type === "image" ? "50%" : undefined),
+            fit: child.fit,
 
-        fill_color: child.fill_color,
-        font_family: child.font_family,
-        font_weight: child.font_weight,
-        font_size: child.font_size,
-        animations: child.animations,
-      };
-      arr.push(t);
-
-    });
+            fill_color: child.fill_color,
+            font_family: child.font_family,
+            font_weight: child.font_weight,
+            font_size: child.font_size,
+            animations: child.animations,
+          };
+          arr.push(t);
+        } else if (child.type === "shape") {
+          const nameS = sanitize(child.name || child.id || "shape");
+          const file = join(svgDir, `${nameS}.svg`).replace(/\\/g, "/");
+          const t: TemplateElement = {
+            type: "image",
+            name: child.name,
+            x: child.x,
+            y: child.y,
+            width: child.width,
+            height: child.height,
+            x_anchor: child.x_anchor ?? "50%",
+            y_anchor: child.y_anchor ?? "50%",
+            animations: child.animations,
+            file,
+            fit: child.fit,
+          };
+          arr.push(t);
+        }
+      });
     layouts[idx] = arr;
   });
 
