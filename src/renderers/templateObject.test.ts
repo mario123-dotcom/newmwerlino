@@ -89,6 +89,6 @@ test("image fit contain scales with aspect ratio", (t) => {
   const fchain = captured![idx + 1];
   assert.equal(
     fchain,
-    `[1:v]scale=100:50:force_original_aspect_ratio=decrease,pad=100:50:(ow-iw)/2:(oh-ih)/2[s0];[0:v][s0]overlay=x=0:y=0[v1]`
+    `[1:v]scale=100:50:force_original_aspect_ratio=decrease,format=rgba,pad=100:50:(ow-iw)/2:(oh-ih)/2:color=black@0[s0];[0:v][s0]overlay=x=0:y=0[v1]`
   );
 });
