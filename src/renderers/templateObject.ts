@@ -1,7 +1,7 @@
 import { runFFmpeg } from "../ffmpeg/run";
 import { parsePercent } from "../utils/num";
 import { ffmpegSafePath } from "../utils/ffmpeg";
-import { escDrawText } from "../utils/text";
+import { escDrawText, fitText } from "../utils/text";
 
 function normalizeColor(c: string): string {
   const m = c.match(/rgba?\((\d+),(\d+),(\d+)(?:,(\d+(?:\.\d+)?))?\)/);
@@ -90,10 +90,12 @@ export function renderTemplateElement(
 
   let filter = "";
   if (el.type === "text") {
-    const text = escDrawText(el.text || "");
     const color = normalizeColor(el.fill_color || "white");
-    const fontsize =
+    const baseSize =
       dimToPx(el.font_size, videoH) ?? dimToPx(el.height, videoH) ?? 48;
+    const fitted = fitText(el.text || "", w ?? videoW, h ?? videoH, baseSize);
+    const text = escDrawText(fitted.text);
+    const fontsize = fitted.fontSize;
     const font = ffmpegSafePath(pickFont(el.font_family));
     const anim = Array.isArray(el.animations) ? el.animations[0] : undefined;
     if (anim && (anim.type === "wipe" || anim.type === "text-reveal")) {
@@ -201,10 +203,12 @@ export function renderTemplateSlide(
 
     const outLbl = `[v${idx + 1}]`;
     if (el.type === "text") {
-      const text = escDrawText(el.text || "");
-      const color = normalizeColor(el.fill_color || "white");
-      const fontsize =
+      const baseSize =
         dimToPx(el.font_size, videoH) ?? dimToPx(el.height, videoH) ?? 48;
+      const fitted = fitText(el.text || "", w ?? videoW, h ?? videoH, baseSize);
+      const text = escDrawText(fitted.text);
+      const color = normalizeColor(el.fill_color || "white");
+      const fontsize = fitted.fontSize;
       const font = ffmpegSafePath(pickFont(el.font_family));
       const anim = Array.isArray(el.animations) ? el.animations[0] : undefined;
       if (anim && (anim.type === "wipe" || anim.type === "text-reveal")) {

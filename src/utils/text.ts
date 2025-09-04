@@ -44,6 +44,33 @@ export function wrapParagraph(text: string, width = 30): string[] {
   return lines.filter(Boolean);
 }
 
+/**
+ * Ridimensiona il font e applica un semplice word-wrap affinché il testo
+ * rientri in un box di dimensioni fissate (in pixel).
+ * Restituisce il testo con interruzioni di riga e la dimensione finale.
+ */
+export function fitText(
+  text: string,
+  boxW: number,
+  boxH: number,
+  baseSize: number
+): { text: string; fontSize: number } {
+  let fontSize = Math.max(1, Math.round(baseSize));
+  const lineHFactor = 1.2;
+  let lines = wrapParagraph(
+    text,
+    Math.max(1, Math.floor(boxW / (fontSize * 0.6)))
+  );
+  while (lines.length * fontSize * lineHFactor > boxH && fontSize > 10) {
+    fontSize -= 2;
+    lines = wrapParagraph(
+      text,
+      Math.max(1, Math.floor(boxW / (fontSize * 0.6)))
+    );
+  }
+  return { text: lines.join("\n"), fontSize };
+}
+
 /** Normalizza gli apici semplici rendendoli compatibili con FFmpeg. */
 export function normalizeQuotes(s: string): string { return String(s).replace(/'/g, "’"); }
 

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { wrapParagraph, normalizeQuotes, escDrawText } from './text';
+import { wrapParagraph, normalizeQuotes, escDrawText, fitText } from './text';
 
 test('wrapParagraph breaks text into lines respecting width', () => {
   assert.deepStrictEqual(
@@ -67,4 +67,11 @@ test('escDrawText escapes colons', () => {
 
 test("escDrawText escapes single quotes", () => {
   assert.strictEqual(escDrawText("'"), "\\'");
+});
+
+test('fitText wraps and shrinks text to fit box', () => {
+  const sample = 'uno due tre quattro cinque sei sette otto nove dieci';
+  const res = fitText(sample, 100, 60, 40);
+  assert.ok(res.text.includes('\n'));
+  assert.ok(res.fontSize < 40);
 });
