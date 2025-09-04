@@ -126,3 +126,45 @@ test("vmin units use smaller viewport dimension as percent", (t) => {
   assert.ok(fc.includes("shadowx=1:shadowy=1"));
   assert.ok(fc.includes("fontsize=2"));
 });
+
+test("pan animation escapes commas in ffmpeg expressions", (t) => {
+  let captured: string[] | undefined;
+  const runMod = require("../ffmpeg/run");
+  t.mock.method(runMod, "runFFmpeg", (args: string[]) => {
+    captured = args;
+  });
+
+  writeFileSync("dummy.png", "");
+  const { renderTemplateSlide } = require("./templateObject");
+  renderTemplateSlide(
+    [
+      {
+        type: "image",
+        file: "dummy.png",
+        animations: [
+          {
+            type: "pan",
+            time: 0,
+            duration: 1,
+            start_x: "0%",
+            end_x: "100%",
+            start_y: "0%",
+            end_y: "0%",
+            start_scale: "100%",
+            end_scale: "120%",
+          },
+        ],
+      },
+    ],
+    1,
+    "out.mp4",
+    { fps: 30, videoW: 100, videoH: 100, fonts: {} }
+  );
+  unlinkSync("dummy.png");
+
+  assert.ok(captured);
+  const idx = captured!.indexOf("-filter_complex");
+  assert.notEqual(idx, -1);
+  const fc = captured![idx + 1];
+  assert.ok(fc.includes("min(max((t-0)/1\\,0)\\,1)"));
+});

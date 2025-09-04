@@ -1,6 +1,6 @@
 import { runFFmpeg } from "../ffmpeg/run";
 import { parsePercent } from "../utils/num";
-import { ffmpegSafePath } from "../utils/ffmpeg";
+import { ffmpegSafePath, ffmpegEscapeExpr } from "../utils/ffmpeg";
 import { escDrawText, fitText } from "../utils/text";
 
 function normalizeColor(c: string): string {
@@ -198,10 +198,14 @@ export function renderTemplateElement(
       const ey = parsePercent(pan.end_y ?? pan.start_y ?? "50%");
       const ss = parsePercent(pan.start_scale ?? "100%");
       const es = parsePercent(pan.end_scale ?? pan.start_scale ?? "100%");
-      const zoom = `(${ss}+(${es - ss})*${prog})`;
-      const xExpr = `(iw*${zoom}-${vw})*(${sx}+(${ex - sx})*${prog})`;
-      const yExpr = `(ih*${zoom}-${vh})*(${sy}+(${ey - sy})*${prog})`;
-      filter = `${src}scale=iw*${zoom}:ih*${zoom}:eval=frame,crop=${vw}:${vh}:x=${xExpr}:y=${yExpr},setsar=1[p0];`;
+      const zoomExpr = `(${ss}+(${es - ss})*${prog})`;
+      const xExpr = `(iw*${zoomExpr}-${vw})*(${sx}+(${ex - sx})*${prog})`;
+      const yExpr = `(ih*${zoomExpr}-${vh})*(${sy}+(${ey - sy})*${prog})`;
+      const zoom = ffmpegEscapeExpr(zoomExpr);
+      const xPan = ffmpegEscapeExpr(xExpr);
+      const yPan = ffmpegEscapeExpr(yExpr);
+      filter = `${src}scale=iw*${zoom}:ih*${zoom}:eval=frame,crop=${vw}:${vh}:x=${xPan}:y=${yPan},setsar=1[p0];`;
+
       imgLbl = "[p0]";
     } else if (w || h) {
       const fit = el.fit;
@@ -367,10 +371,14 @@ export function renderTemplateSlide(
         const ey = parsePercent(pan.end_y ?? pan.start_y ?? "50%");
         const ss = parsePercent(pan.start_scale ?? "100%");
         const es = parsePercent(pan.end_scale ?? pan.start_scale ?? "100%");
-        const zoom = `(${ss}+(${es - ss})*${prog})`;
-        const xExpr = `(iw*${zoom}-${vw})*(${sx}+(${ex - sx})*${prog})`;
-        const yExpr = `(ih*${zoom}-${vh})*(${sy}+(${ey - sy})*${prog})`;
-        filter += `${src}scale=iw*${zoom}:ih*${zoom}:eval=frame,crop=${vw}:${vh}:x=${xExpr}:y=${yExpr},setsar=1[s${idx}];`;
+        const zoomExpr = `(${ss}+(${es - ss})*${prog})`;
+        const xExpr = `(iw*${zoomExpr}-${vw})*(${sx}+(${ex - sx})*${prog})`;
+        const yExpr = `(ih*${zoomExpr}-${vh})*(${sy}+(${ey - sy})*${prog})`;
+        const zoom = ffmpegEscapeExpr(zoomExpr);
+        const xPan = ffmpegEscapeExpr(xExpr);
+        const yPan = ffmpegEscapeExpr(yExpr);
+        filter += `${src}scale=iw*${zoom}:ih*${zoom}:eval=frame,crop=${vw}:${vh}:x=${xPan}:y=${yPan},setsar=1[s${idx}];`;
+
         imgLbl = `[s${idx}]`;
       } else if (w || h) {
         const fit = el.fit;
