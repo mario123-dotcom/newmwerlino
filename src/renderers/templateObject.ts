@@ -11,10 +11,8 @@ function normalizeColor(c: string): string {
     const g = toHex(m[2]!);
     const b = toHex(m[3]!);
     if (m[4]) {
-      const a = Math.round(parseFloat(m[4]!) * 255)
-        .toString(16)
-        .padStart(2, "0");
-      return `#${r}${g}${b}${a}`;
+      const a = parseFloat(m[4]!).toString();
+      return `#${r}${g}${b}@${a}`;
     }
     return `#${r}${g}${b}`;
   }
