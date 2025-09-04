@@ -115,6 +115,7 @@ import { sendFinalVideo } from "./share";
           videoW,
           videoH,
           fonts,
+          ttsPath: seg.tts || undefined,
 
         });
       }

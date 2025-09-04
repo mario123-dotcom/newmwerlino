@@ -92,8 +92,7 @@ export function renderTemplateElement(
       const sh = h ?? -1;
       filter = `[2:v]scale=${sw}:${sh}[s0];[0:v][s0]overlay=x=${finalX}:y=${finalY}[v]`;
     } else {
-      filter = `[0:v][2:v]overlay=x=${finalX}:y=${finalY}[v]`;
-
+      filter = `[2:v]scale=${videoW}:${videoH}:force_original_aspect_ratio=cover,crop=${videoW}:${videoH}[s0];[0:v][s0]overlay=x=${finalX}:y=${finalY}[v]`;
     }
   } else {
     throw new Error(`Unsupported element type: ${el.type}`);
@@ -112,9 +111,15 @@ export function renderTemplateSlide(
   elements: TemplateElement[],
   duration: number,
   outPath: string,
-  opts: { fps: number; videoW: number; videoH: number; fonts: Record<string, string> }
+  opts: {
+    fps: number;
+    videoW: number;
+    videoH: number;
+    fonts: Record<string, string>;
+    ttsPath?: string | null;
+  }
 ) {
-  const { fps, videoW, videoH, fonts } = opts;
+  const { fps, videoW, videoH, fonts, ttsPath } = opts;
   const pickFont = (family?: string) => {
     const f = family && fonts[family];
     return f || Object.values(fonts)[0] || "";
@@ -163,6 +168,9 @@ export function renderTemplateSlide(
         const sh = h ?? -1;
         filter += `${src}scale=${sw}:${sh}[s${idx}];`;
         imgLbl = `[s${idx}]`;
+      } else {
+        filter += `${src}scale=${videoW}:${videoH}:force_original_aspect_ratio=cover,crop=${videoW}:${videoH}[s${idx}];`;
+        imgLbl = `[s${idx}]`;
       }
       filter += `${cur}${imgLbl}overlay=x=${fx}:y=${fy}${outLbl};`;
 
@@ -172,15 +180,19 @@ export function renderTemplateSlide(
   });
   if (filter.endsWith(";")) filter = filter.slice(0, -1);
 
-  // silent audio
-  args.push(
-    "-f",
-    "lavfi",
-    "-t",
-    `${duration}`,
-    "-i",
-    "anullsrc=channel_layout=stereo:sample_rate=44100"
-  );
+  // audio track: use TTS if provided, otherwise generate silence
+  if (ttsPath) {
+    args.push("-i", ttsPath);
+  } else {
+    args.push(
+      "-f",
+      "lavfi",
+      "-t",
+      `${duration}`,
+      "-i",
+      "anullsrc=channel_layout=stereo:sample_rate=44100"
+    );
+  }
   const audioIdx = imgInput; // after images
 
   if (filter) args.push("-filter_complex", filter, "-map", cur, "-map", `${audioIdx}:a`);

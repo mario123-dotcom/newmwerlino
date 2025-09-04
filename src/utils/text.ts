@@ -48,4 +48,10 @@ export function wrapParagraph(text: string, width = 30): string[] {
 export function normalizeQuotes(s: string): string { return String(s).replace(/'/g, "’"); }
 
 /** Escapa stringhe per l'uso nel filtro `drawtext` di FFmpeg. */
-export function escDrawText(s: string): string { return s.replace(/\\/g, "\\\\").replace(/:/g, "\\:").replace(/'/g, "\\'"); }
+export function escDrawText(s: string): string {
+  return s
+    .replace(/\\/g, "\\\\")
+    .replace(/:/g, "\\:")
+    .replace(/'/g, "\\'")
+    .replace(/,/g, "\\,");
+}
