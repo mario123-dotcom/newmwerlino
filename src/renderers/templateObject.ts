@@ -92,7 +92,7 @@ export function renderTemplateElement(
       const sh = h ?? -1;
       filter = `[2:v]scale=${sw}:${sh}[s0];[0:v][s0]overlay=x=${finalX}:y=${finalY}[v]`;
     } else {
-      filter = `[2:v]scale=${videoW}:${videoH}:force_original_aspect_ratio=cover,crop=${videoW}:${videoH}[s0];[0:v][s0]overlay=x=${finalX}:y=${finalY}[v]`;
+      filter = `[2:v]scale=${videoW}:${videoH}:force_original_aspect_ratio=increase,crop=${videoW}:${videoH}[s0];[0:v][s0]overlay=x=${finalX}:y=${finalY}[v]`;
     }
   } else {
     throw new Error(`Unsupported element type: ${el.type}`);
@@ -169,7 +169,7 @@ export function renderTemplateSlide(
         filter += `${src}scale=${sw}:${sh}[s${idx}];`;
         imgLbl = `[s${idx}]`;
       } else {
-        filter += `${src}scale=${videoW}:${videoH}:force_original_aspect_ratio=cover,crop=${videoW}:${videoH}[s${idx}];`;
+        filter += `${src}scale=${videoW}:${videoH}:force_original_aspect_ratio=increase,crop=${videoW}:${videoH}[s${idx}];`;
         imgLbl = `[s${idx}]`;
       }
       filter += `${cur}${imgLbl}overlay=x=${fx}:y=${fy}${outLbl};`;
