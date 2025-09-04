@@ -1,8 +1,9 @@
-import { existsSync, mkdirSync, writeFileSync, readdirSync, rmSync } from "fs";
+import { existsSync, mkdirSync, writeFileSync, readdirSync, unlinkSync } from "fs";
 import { join } from "path";
 import fetch from "node-fetch"; // npm install node-fetch
 import { paths } from "./paths";
 import { loadTemplate } from "./template";
+import { loadSlideLayouts } from "./templateLayout";
 
 /** Assicura l'esistenza di una directory creando eventuali cartelle mancanti. */
 function ensureDir(dir: string) {
@@ -10,13 +11,6 @@ function ensureDir(dir: string) {
 }
 
 /** Cancella ricorsivamente il contenuto di una cartella. */
-function clearDir(dir: string) {
-  if (!existsSync(dir)) return;
-  for (const file of readdirSync(dir)) {
-    rmSync(join(dir, file), { recursive: true, force: true });
-  }
-}
-
 /** Scarica un file da `url` e lo salva in `outPath`. */
 async function downloadFile(url: string, outPath: string) {
   const res = await fetch(url);
@@ -32,30 +26,39 @@ async function downloadFile(url: string, outPath: string) {
  * template JSON e li organizza nella cartella `download/` pronta per il
  * rendering.
  */
-export async function fetchAssets() {
+export async function fetchAssets(): Promise<Record<string, string>> {
   const data = loadTemplate();
   const mods = data.modifications || {};
 
-  // pulizia delle sottocartelle
-  clearDir(paths.audio);
-  clearDir(paths.images);
-  clearDir(paths.tts);
-
-  // ricrea cartelle
+  // assicura l'esistenza delle cartelle ma non cancella asset esistenti
   ensureDir(paths.audio);
   ensureDir(paths.images);
   ensureDir(paths.tts);
+  ensureDir(paths.fonts);
+
+  // helper per scaricare un asset senza interrompere il flusso
+  async function safeDownload(url: string, outPath: string) {
+    try {
+      await downloadFile(url, outPath);
+    } catch (err: any) {
+      console.warn(`Impossibile scaricare ${url}: ${err.message}`);
+    }
+  }
 
   // Logo
   const logoUrl = String(mods.Logo ?? "");
+  const logoPath = join(paths.images, "logo.png");
+  try { unlinkSync(logoPath); } catch {}
   if (logoUrl.startsWith("http")) {
-    await downloadFile(logoUrl, join(paths.images, "logo.png"));
+    await safeDownload(logoUrl, logoPath);
   }
 
   // Audio
   const audioUrl = String(mods.Audio ?? "");
+  const audioPath = join(paths.audio, "bg.mp3");
+  try { unlinkSync(audioPath); } catch {}
   if (audioUrl.startsWith("http")) {
-    await downloadFile(audioUrl, join(paths.audio, "bg.mp3"));
+    await safeDownload(audioUrl, audioPath);
   }
 
   // TTS
@@ -64,7 +67,9 @@ export async function fetchAssets() {
       const url = String(mods[key] ?? "");
       if (url.startsWith("http")) {
         const idx = key.split("-")[1];
-        await downloadFile(url, join(paths.tts, `tts-${idx}.mp3`));
+        const out = join(paths.tts, `tts-${idx}.mp3`);
+        try { unlinkSync(out); } catch {}
+        await safeDownload(url, out);
       }
     }
   }
@@ -76,10 +81,46 @@ export async function fetchAssets() {
       if (url.startsWith("http")) {
         const idx = key.split("-")[1];
         const ext = url.split(".").pop()?.split("?")[0] || "jpg";
-        await downloadFile(url, join(paths.images, `img${idx}.${ext}`));
+        const out = join(paths.images, `img${idx}.${ext}`);
+        try { unlinkSync(out); } catch {}
+        await safeDownload(url, out);
       }
     }
   }
 
+  // Font
+  const layouts = loadSlideLayouts();
+  const families = new Set<string>();
+  Object.values(layouts).forEach((els) => {
+    els.forEach((el) => {
+      if (el.type === "text" && el.font_family) families.add(el.font_family);
+    });
+  });
+
+  const fontMap: Record<string, string> = {};
+  for (const fam of families) {
+    const dir = fam.toLowerCase().replace(/\s+/g, "");
+    const metaUrl = `https://raw.githubusercontent.com/google/fonts/main/ofl/${dir}/METADATA.pb`;
+    try {
+      const metaRes = await fetch(metaUrl);
+      if (!metaRes.ok) throw new Error(metaRes.statusText);
+      const meta = await metaRes.text();
+      const m = meta.match(/filename: \"([^\"]+)\"/);
+      if (!m) throw new Error("filename non trovato");
+      const filename = m[1];
+      const fontUrl = `https://raw.githubusercontent.com/google/fonts/main/ofl/${dir}/${filename}`;
+      const outPath = join(paths.fonts, filename);
+      await safeDownload(fontUrl, outPath);
+      fontMap[fam] = outPath;
+    } catch (err: any) {
+      console.warn(`Font ${fam} non scaricato: ${err.message}`);
+      const existing = readdirSync(paths.fonts).find((f) =>
+        f.toLowerCase().includes(dir)
+      );
+      if (existing) fontMap[fam] = join(paths.fonts, existing);
+    }
+  }
+
   console.log("✅ Tutti gli asset sono stati scaricati.");
+  return fontMap;
 }

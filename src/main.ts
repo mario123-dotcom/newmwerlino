@@ -1,25 +1,26 @@
 #!/usr/bin/env ts-node
 
-import { readdirSync, existsSync } from "fs";
+import { readdirSync } from "fs";
 import { join } from "path";
 
-import { TEXT, DEFAULT_BG_VOL } from "./config";
+import { DEFAULT_BG_VOL } from "./config";
 import { paths } from "./paths";
 import { loadTemplate } from "./template";
+import { loadSlideLayouts } from "./templateLayout";
 import { buildTimeline } from "./timeline";
 import { GetLocalAsset } from "./assets";
-import { renderImageSeg } from "./renderers/image";
+import { renderTemplateSlide } from "./renderers/templateObject";
 import { renderFillerSegment } from "./renderers/filler";
 import { renderOutroSegment } from "./renderers/outro";
 import { validateAndRepairSegments } from "./validate";
 import { concatAndFinalizeDemuxer } from "./concat";
-import { REUSE_SEGS, SEGS_DIR, TEXT_TRANSITION, FILL_COLOR, SHADE_COLOR, LOGO_POSITION, BAR_COLOR } from "./cli";
+import { REUSE_SEGS, SEGS_DIR, FILL_COLOR } from "./cli";
 import { fetchAssets } from "./fetchAssets";
 import { sendFinalVideo } from "./share";
 
 (async () => {
   console.log("[LOG] Recupero asset dal template...");
-  await fetchAssets(); // <<--- scarica tutti i file prima
+  const fontMap = await fetchAssets(); // scarica tutti i file e ritorna i font
   console.log("[LOG] Asset pronti, procedo al rendering.");
 
   console.log("[LOG] Reading JSON template...");
@@ -28,19 +29,24 @@ import { sendFinalVideo } from "./share";
   const videoW = data.width || 1920;
   const videoH = data.height || 1080;
   const fps = data.frame_rate || 30;
+  const layouts = loadSlideLayouts();
 
   // font
-  const fontFiles = readdirSync(paths.fonts).filter((f) =>
-    /\.(ttf|otf)$/i.test(f)
-  );
-  if (!fontFiles.length) {
+  const fonts: Record<string, string> = { ...fontMap };
+  const fontFiles = readdirSync(paths.fonts).filter((f) => /\.(ttf|otf)$/i.test(f));
+  for (const f of fontFiles) {
+    const abs = join(paths.fonts, f).replace(/\\/g, "/");
+    if (!Object.values(fonts).includes(abs)) {
+      const name = f.replace(/\.[^.]+$/, "");
+      fonts[name] = abs;
+    }
+  }
+  if (!Object.keys(fonts).length) {
     console.error("[ERROR] No fonts in fonts/");
     process.exit(1);
   }
-  let fontPath = join(paths.fonts, fontFiles[0]).replace(/\\/g, "/");
-  if (process.platform === "win32")
-    fontPath = fontPath.replace(/^([A-Za-z]):\//, (_, d) => `${d}\\:/`);
-  console.log("[LOG] Using font:", fontPath);
+  const primaryFont = Object.values(fonts)[0];
+  console.log("[LOG] Using font:", primaryFont);
 
   // logo
   const logoPath = GetLocalAsset("logo") || "";
@@ -83,19 +89,32 @@ import { sendFinalVideo } from "./share";
   } else {
     timeline.forEach((seg, idx) => {
       const out = join(paths.temp, `seg${idx}.mp4`);
-      if (seg.kind === "image")
-        renderImageSeg(seg, out, {
+      if (seg.kind === "image") {
+        const layout = layouts[seg.index ?? 0] || [];
+        const elements = layout
+          .map((e) => {
+            const el = { ...e };
+            if (el.type === "image") {
+              if (e.name === "Logo" && logoPath) el.file = logoPath;
+              else if (seg.img && e.name?.startsWith("Immagine")) el.file = seg.img;
+            } else if (el.type === "text") {
+              if (e.name?.startsWith("Testo")) el.text = seg.text || "";
+              else if (mods[e.name]) el.text = String(mods[e.name]);
+            }
+            return el;
+          })
+          .filter(
+            (el) =>
+              (el.type !== "image" || !!el.file) &&
+              (el.type !== "text" || !!el.text)
+          );
+        renderTemplateSlide(elements, seg.duration, out, {
           fps,
           videoW,
           videoH,
-          fontPath,
-          logoPath,
-          textTransition: TEXT_TRANSITION,
-          shadeColor: SHADE_COLOR,
-          fillColor: FILL_COLOR,
-          logoPosition: LOGO_POSITION,
-          barColor: BAR_COLOR,
+          fonts,
         });
+      }
       else if (seg.kind === "filler")
         renderFillerSegment(seg, out, {
           fps,
@@ -110,7 +129,7 @@ import { sendFinalVideo } from "./share";
           fps,
           videoW,
           videoH,
-          fontPath,
+          fontPath: primaryFont,
           logoPath,
           fillColor: FILL_COLOR,
 
