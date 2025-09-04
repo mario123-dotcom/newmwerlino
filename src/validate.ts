@@ -1,7 +1,7 @@
 import { dirname, parse as parsePath, resolve } from "path";
 import { existsSync } from "fs";
 import { CONCAT_DEFAULTS } from "./config";
-import { ok, runPipe } from "./ffmpeg/run";
+import { ok, runPipe, runFFmpeg } from "./ffmpeg/run";
 
 /** Esegue `ffprobe` restituendo l'output JSON parsed oppure `null`. */
 export function ffprobeJson(file: string): any | null {
@@ -32,12 +32,29 @@ export function ffprobeJson(file: string): any | null {
 export function canOpenMp4(file: string): boolean {
   const j = ffprobeJson(file);
   const hasVideo = j?.streams?.some((s: any) => s.codec_type === "video");
-  const hasAudio = j?.streams?.some((s: any) => s.codec_type === "audio");
   return !!(
     hasVideo &&
-    hasAudio &&
     Number(j?.format?.duration) >= 0
   );
+}
+
+/**
+ * Ensure an MP4 file has at least one stereo audio track.
+ * If missing, a silent track is added and the new file path is returned.
+ */
+export function ensureAudioTrack(inputAbs: string): string {
+  const info = ffprobeJson(inputAbs);
+  const hasAudio = info?.streams?.some((s: any) => s.codec_type === "audio");
+  if (hasAudio) return inputAbs;
+  console.warn(`⚠️  Segmento senza traccia audio: ${inputAbs}`);
+  const { dir, name } = parsePath(inputAbs);
+  const out = resolve(dir, `${name}.silence.mp4`);
+  runFFmpeg([
+    "-y","-fflags","+genpts","-i",inputAbs,
+    "-f","lavfi","-i","anullsrc=channel_layout=stereo:sample_rate=44100",
+    "-c:v","copy","-c:a","aac","-shortest",out
+  ], "ffmpeg-SILENCE");
+  return out;
 }
 
 /**
@@ -62,16 +79,20 @@ export function tryRepairSegment(inputAbs: string): string | null {
 export function validateAndRepairSegments(inputs: string[]): string[] {
   const good: string[] = [];
   for (const f of inputs) {
-    if (canOpenMp4(f)) { good.push(f); continue; }
-    console.warn(`⚠️  Segmento illeggibile: ${f}`);
+    let file = ensureAudioTrack(f);
+    if (canOpenMp4(file)) { good.push(file); continue; }
+    console.warn(`⚠️  Segmento illeggibile: ${file}`);
     if (CONCAT_DEFAULTS.tryAutoRepair) {
       console.warn(`   → Provo autoriparazione …`);
-      const repaired = tryRepairSegment(f);
-      if (repaired && canOpenMp4(repaired)) { console.warn(`   ✅ Riparato: ${repaired}`); good.push(repaired); continue; }
+      const repaired = tryRepairSegment(file);
+      if (repaired) {
+        const fixed = ensureAudioTrack(repaired);
+        if (canOpenMp4(fixed)) { console.warn(`   ✅ Riparato: ${fixed}`); good.push(fixed); continue; }
+      }
       console.warn(`   ❌ Riparazione fallita`);
     }
-    if (!CONCAT_DEFAULTS.allowSkipBroken) { throw new Error(`Segmento corrotto e non skippabile: ${f}`); }
-    console.warn(`   ↷ Skipping ${f}`);
+    if (!CONCAT_DEFAULTS.allowSkipBroken) { throw new Error(`Segmento corrotto e non skippabile: ${file}`); }
+    console.warn(`   ↷ Skipping ${file}`);
   }
   if (!good.length) { throw new Error(`Nessun segmento valido dopo verifica/repair`); }
   console.log(`🔎 Segmenti validi (${good.length}):`); good.forEach((f) => console.log(" •", f));
