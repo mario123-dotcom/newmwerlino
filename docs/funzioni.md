@@ -43,8 +43,9 @@ semplice cosa fanno e quali parametri accettano.
 
 ## `src/templateLayout.ts`
 - **`loadSlideLayouts()`**
-  - Estrae dal template la disposizione degli elementi `image` e `text`
-    per ogni slide, restituendo un array di oggetti posizionati.
+  - Estrae dal template tutte le proprietà delle slide e dei loro elementi,
+    restituendo per ogni slide un oggetto con `props` (attributi della slide)
+    ed `elements` (array di elementi completi).
 
 ## `src/concat.ts`
 - **`concatAndFinalizeDemuxer(opts)`**

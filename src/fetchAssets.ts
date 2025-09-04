@@ -91,8 +91,8 @@ export async function fetchAssets(): Promise<Record<string, string>> {
   // Font
   const layouts = loadSlideLayouts();
   const families = new Set<string>();
-  Object.values(layouts).forEach((els) => {
-    els.forEach((el) => {
+  Object.values(layouts).forEach((lay) => {
+    lay.elements.forEach((el) => {
       if (el.type === "text" && el.font_family) families.add(el.font_family);
     });
   });

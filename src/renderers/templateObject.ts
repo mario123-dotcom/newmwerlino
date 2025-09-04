@@ -59,6 +59,8 @@ export interface TemplateElement {
   animations?: any[];
   file?: string; // for image
   fit?: string; // for image scaling
+
+  [key: string]: any; // preserva proprietà aggiuntive
 }
 
 /**
