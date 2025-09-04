@@ -40,8 +40,8 @@ export function concatAndFinalizeDemuxer({
   const haveAudio = probe?.streams?.some((s: any) => s.codec_type === "audio");
   const baseLabel = "mainaud"; // etichetta neutra per l'audio principale
   const baseAudio = haveAudio
-    ? `[0:a:0]aformat=channel_layouts=stereo:sample_rates=44100,aresample=async=1:first_pts=0,asetpts=PTS-STARTPTS[${baseLabel}]`
-    : `anullsrc=channel_layout=stereo:sample_rate=44100,asetpts=PTS-STARTPTS[${baseLabel}]`;
+    ? `[0:a:0]aformat=channel_layouts=stereo:sample_rates=44100[${baseLabel}]`
+    : `anullsrc=channel_layout=stereo:sample_rate=44100[${baseLabel}]`;
 
   const audioChain = haveBg
     ? [
