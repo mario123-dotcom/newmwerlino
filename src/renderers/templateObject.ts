@@ -242,7 +242,7 @@ export function renderTemplateElement(
       const zoom = ffmpegEscapeExpr(zoomExpr);
       const xPan = ffmpegEscapeExpr(xExpr);
       const yPan = ffmpegEscapeExpr(yExpr);
-      filter = `${src}scale=iw*${zoom}:ih*${zoom}:eval=frame,crop=${vw}:${vh}:x=${xPan}:y=${yPan},setsar=1[p0];`;
+      filter = `${src}scale=w=iw*${zoom}:h=ih*${zoom}:eval=frame,crop=${vw}:${vh}:x=${xPan}:y=${yPan},setsar=1[p0];`;
 
       imgLbl = "[p0]";
     } else if (w || h) {
@@ -453,7 +453,7 @@ export function renderTemplateSlide(
         const zoom = ffmpegEscapeExpr(zoomExpr);
         const xPan = ffmpegEscapeExpr(xExpr);
         const yPan = ffmpegEscapeExpr(yExpr);
-        filter += `${src}scale=iw*${zoom}:ih*${zoom}:eval=frame,crop=${vw}:${vh}:x=${xPan}:y=${yPan},setsar=1[s${idx}];`;
+        filter += `${src}scale=w=iw*${zoom}:h=ih*${zoom}:eval=frame,crop=${vw}:${vh}:x=${xPan}:y=${yPan},setsar=1[s${idx}];`;
 
         imgLbl = `[s${idx}]`;
       } else if (w || h) {
