@@ -4,6 +4,7 @@ export function ffmpegSafePath(p: string): string {
     .replace(/ /g, "\\ ")
     .replace(/'/g, "\\'")
     .replace(/:/g, "\\:")
+    .replace(/,/g, "\\,")
     .replace(/\[/g, "\\[")
     .replace(/\]/g, "\\]");
 }
