@@ -51,9 +51,9 @@ export const STAGGER = { base: 0.10, growth: 0.10, jitter: 0.015 };
 export const SHADE = {
   strength: 0.9,
   gamma: 1.0,
-  leftPower: 1.2,
+  leftPower: 0.5,
   vertPower: 1.0,
-  bias: 0.2,
+  bias: 0,
   enableOnFirstSlide: false,
 };
 

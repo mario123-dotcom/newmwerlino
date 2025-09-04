@@ -86,7 +86,7 @@ const TEMPLATE_MAP: Record<TemplateName, TemplateConf> = {
   },
   tmp2: {
     textTransition: "wiperight",
-    shadeColor: "red",
+    shadeColor: "black",
     fillColor: "red",
     barColor: "red",
     logoPosition: "top-left",
