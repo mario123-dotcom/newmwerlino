@@ -34,8 +34,8 @@ semplice cosa fanno e quali parametri accettano.
 - **`buildTimeline(mods, totalDuration?)`**
   - Trasforma le modifiche del template in una lista ordinata di segmenti,
     aggiungendo filler e outro dove necessario.
-  - Se viene fornita `totalDuration`, eventuali spazi vuoti finali sono
-    riempiti con un segmento filler.
+  - Il video termina sempre con l'outro; `totalDuration` viene usata solo per
+    inserire eventuali filler prima dell'outro.
 
 ## `src/template.ts`
 - **`loadTemplate()`**

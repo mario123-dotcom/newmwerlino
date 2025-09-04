@@ -10,8 +10,8 @@ import { Modifications, Segment } from "./types";
  * segmenti di riempimento per eventuali gap e aggiunge l'outro finale.
  *
  * @param mods Mappa chiave/valore proveniente dal template.
- * @param totalDuration Durata complessiva desiderata del video. Eventuali
- *        spazi vuoti finali verranno riempiti con un segmento filler.
+ * @param totalDuration Durata complessiva desiderata del video. Viene usata
+ *        solo per colmare eventuali gap prima dell'outro.
  * @returns Lista ordinata di segmenti da renderizzare.
  */
 export function buildTimeline(
@@ -93,19 +93,6 @@ export function buildTimeline(
     text: outroText,
   });
   cursorSched += outroDur;
-
-  if (totalDuration && totalDuration > cursorSched + MIN_FILLER_SEC) {
-    const tail = totalDuration - cursorSched;
-    timeline.push({
-      kind: "filler",
-      start: cursorSched,
-      duration: tail,
-      text: "",
-      tts: null,
-      img: null,
-    });
-    cursorSched += tail;
-  }
 
   return timeline;
 }
