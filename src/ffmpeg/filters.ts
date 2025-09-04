@@ -2,6 +2,7 @@
 import { autosizeAndWrap, Orientation } from "../utils/autosize";
 import { deriveOrientation, WRAP_TARGET, TEXT } from "../config";
 import type { TextTransition } from "../types";
+import { escDrawText } from "../utils/text";
 
 /**
  * Genera una catena di filtri FFmpeg che produce un layer di ombra
@@ -54,9 +55,6 @@ export function zoomExprFullClip(durationSec: number, fps: number): string {
   return `'min(${zStart.toFixed(3)}+on*${step.toFixed(6)},${zEnd.toFixed(3)})'`;
 }
 
-function escDrawText(s: string) {
-  return String(s).replace(/\\/g, "\\\\").replace(/:/g, "\\:").replace(/'/g, "\\'");
-}
 function djitter(i: number) { const x = Math.sin(i * 12.9898) * 43758.5453123; return x - Math.floor(x); }
 function lineOffset(i: number, segDur: number, animDur: number) {
   const STAGGER = { base: 0.10, growth: 0.10, jitter: 0.015 };

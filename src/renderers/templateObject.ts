@@ -1,13 +1,7 @@
 import { runFFmpeg } from "../ffmpeg/run";
 import { parsePercent } from "../utils/num";
 import { ffmpegSafePath } from "../utils/ffmpeg";
-
-function escDrawText(str: string): string {
-  return str
-    .replace(/\\/g, "\\\\")
-    .replace(/'/g, "\\'")
-    .replace(/:/g, "\\:");
-}
+import { escDrawText } from "../utils/text";
 
 function normalizeColor(c: string): string {
   const m = c.match(/rgba?\((\d+),(\d+),(\d+)(?:,(\d+(?:\.\d+)?))?\)/);
@@ -33,39 +27,6 @@ function dimToPx(
 ): number | undefined {
   if (val === undefined || val === null) return undefined;
   if (typeof val === "number") return Math.round(val);
-  if (/^\d+(\.\d+)?%$/.test(val)) return Math.round(parsePercent(val) * base);
-  const n = parseFloat(val);
-  return isNaN(n) ? undefined : Math.round(n);
-}
-
-function escDrawText(str: string): string {
-  return str
-    .replace(/\\/g, "\\\\")
-    .replace(/'/g, "\\'")
-    .replace(/:/g, "\\:");
-}
-
-function normalizeColor(c: string): string {
-  const m = c.match(/rgba?\((\d+),(\d+),(\d+)(?:,(\d+(?:\.\d+)?))?\)/);
-  if (m) {
-    const toHex = (n: string) => Number(n).toString(16).padStart(2, "0");
-    const r = toHex(m[1]!);
-    const g = toHex(m[2]!);
-    const b = toHex(m[3]!);
-    if (m[4]) {
-      const a = Math.round(parseFloat(m[4]!) * 255)
-        .toString(16)
-        .padStart(2, "0");
-      return `#${r}${g}${b}${a}`;
-    }
-    return `#${r}${g}${b}`;
-  }
-  return c;
-}
-
-
-function dimToPx(val: string | undefined, base: number): number | undefined {
-  if (!val) return undefined;
   if (/^\d+(\.\d+)?%$/.test(val)) return Math.round(parsePercent(val) * base);
   const n = parseFloat(val);
   return isNaN(n) ? undefined : Math.round(n);
