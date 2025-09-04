@@ -1,4 +1,5 @@
 import { runFFmpeg } from "../ffmpeg/run";
+import { shadeChain } from "../ffmpeg/filters";
 import { parsePercent } from "../utils/num";
 import { ffmpegSafePath, ffmpegEscapeExpr } from "../utils/ffmpeg";
 import { escDrawText, fitText } from "../utils/text";
@@ -52,7 +53,7 @@ function pickWipeDirection(anim: any): string {
 }
 
 export interface TemplateElement {
-  type: "text" | "image";
+  type: "text" | "image" | "shade";
   name?: string;
   text?: string;
   fill_color?: string;
@@ -281,6 +282,18 @@ export function renderTemplateElement(
       imgLbl = "[f0]";
     }
     filter += `[0:v]${imgLbl}overlay=x=${finalX}:y=${finalY}[v]`;
+  } else if (el.type === "shade") {
+    const strength = el.strength !== undefined ? Number(el.strength) : 0.5;
+    const gamma = el.gamma !== undefined ? Number(el.gamma) : undefined;
+    const leftPower = el.left_power !== undefined ? Number(el.left_power) : undefined;
+    const vertPower = el.vert_power !== undefined ? Number(el.vert_power) : undefined;
+    const bias = el.bias !== undefined ? Number(el.bias) : undefined;
+    let shadeColor = el.color ? normalizeColor(el.color) : "black";
+    shadeColor = shadeColor.split("@")[0];
+    const chain = shadeChain(strength, gamma, leftPower, vertPower, bias, shadeColor);
+    filter =
+      `color=c=black:s=${videoW}x${videoH}:r=${fps}:d=${duration},${chain}[sh];` +
+      `[0:v][sh]overlay=x=0:y=0[v]`;
   } else {
     throw new Error(`Unsupported element type: ${el.type}`);
   }
@@ -512,6 +525,17 @@ export function renderTemplateSlide(
       filter += `${cur}${imgLbl}overlay=x=${fx}:y=${fy}${outLbl};`;
 
       imgInput++;
+    } else if (el.type === "shade") {
+      const strength = el.strength !== undefined ? Number(el.strength) : 0.5;
+      const gamma = el.gamma !== undefined ? Number(el.gamma) : undefined;
+      const leftPower = el.left_power !== undefined ? Number(el.left_power) : undefined;
+      const vertPower = el.vert_power !== undefined ? Number(el.vert_power) : undefined;
+      const bias = el.bias !== undefined ? Number(el.bias) : undefined;
+      let shadeColor = el.color ? normalizeColor(el.color) : "black";
+      shadeColor = shadeColor.split("@")[0];
+      const chain = shadeChain(strength, gamma, leftPower, vertPower, bias, shadeColor);
+      filter += `color=c=black:s=${videoW}x${videoH}:r=${fps}:d=${duration},${chain}[sh${idx}];`;
+      filter += `${cur}[sh${idx}]overlay=x=0:y=0${outLbl};`;
     }
     cur = outLbl;
   });

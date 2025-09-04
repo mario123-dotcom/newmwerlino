@@ -260,3 +260,39 @@ test("pan animation escapes commas in ffmpeg expressions", (t) => {
   const fc = captured![idx + 1];
   assert.ok(fc.includes("min(max((t-0)/1\\,0)\\,1)"));
 });
+
+test("shade element uses shadeChain", (t) => {
+  let captured: string[] | undefined;
+  const runMod = require("../ffmpeg/run");
+  t.mock.method(runMod, "runFFmpeg", (args: string[]) => {
+    captured = args;
+  });
+
+  const filtersMod = require("../ffmpeg/filters");
+  let called = false;
+  t.mock.method(filtersMod, "shadeChain", (...args: any[]) => {
+    called = true;
+    return "format=rgba,geq=r='0':g='0':b='0':a='255'";
+  });
+
+  const { renderTemplateSlide } = require("./templateObject");
+  renderTemplateSlide(
+    [
+      {
+        type: "shade",
+        strength: 0.4,
+      },
+    ],
+    1,
+    "out.mp4",
+    { fps: 30, videoW: 100, videoH: 100, fonts: {} }
+  );
+
+  assert.ok(called);
+  assert.ok(captured);
+  const idx = captured!.indexOf("-filter_complex");
+  assert.notEqual(idx, -1);
+  const fc = captured![idx + 1];
+  assert.ok(fc.includes("geq"));
+  assert.ok(fc.includes("overlay"));
+});
