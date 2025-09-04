@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { writeFileSync, unlinkSync } from "fs";
+import { writeFileSync, unlinkSync, existsSync } from "fs";
 import { FOOTER } from "../config";
 
 // Ensure filler centers the logo when present
@@ -25,7 +25,7 @@ test("filler centers logo", (t) => {
       fillColor: "red",
     }
   );
-  unlinkSync("dummy.png");
+  if (existsSync("dummy.png")) unlinkSync("dummy.png");
 
   assert.ok(captured);
   const idx = captured!.indexOf("-filter_complex");
