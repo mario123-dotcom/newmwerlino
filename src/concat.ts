@@ -42,12 +42,14 @@ export function concatAndFinalizeDemuxer({
   const baseAudio = haveAudio
     ? `[0:a:0]aformat=channel_layouts=stereo:sample_rates=44100,aresample=async=1:first_pts=0,asetpts=PTS-STARTPTS[${baseLabel}]`
     : `anullsrc=channel_layout=stereo:sample_rate=44100,asetpts=PTS-STARTPTS[${baseLabel}]`;
+
   const audioChain = haveBg
     ? [
         baseAudio,
-        `[1:a:0]aformat=channel_layouts=stereo:sample_rates=44100,volume=${bgVolume}[bg]`,
-        `[bg][${baseLabel}]sidechaincompress=threshold=${DUCK.threshold}:ratio=${DUCK.ratio}:attack=${DUCK.attack}:release=${DUCK.release}:makeup=${DUCK.makeup}[bgduck]`,
-        `[${baseLabel}][bgduck]amix=inputs=2:normalize=0:duration=longest:dropout_transition=0[mix]`
+        `[${baseLabel}]asplit=2[mainsc][mainmix]`,
+        `[1:a:0][mainsc]sidechaincompress=threshold=${DUCK.threshold}:ratio=${DUCK.ratio}:attack=${DUCK.attack}:release=${DUCK.release}:makeup=${DUCK.makeup}[bgduck]`,
+        `[bgduck]aformat=channel_layouts=stereo:sample_rates=44100,volume=${bgVolume}[bg]`,
+        `[mainmix][bg]amix=inputs=2:normalize=0:duration=longest:dropout_transition=0[mix]`
       ].join(";")
     : `${baseAudio};[${baseLabel}]anull[mix]`;
 
