@@ -60,6 +60,8 @@ semplice cosa fanno e quali parametri accettano.
   - Componi una slide leggendo gli elementi posizionati dal template JSON.
   - Supporta elementi `image` e `text` in ordine di sovrapposizione,
     usando il font indicato da ciascun elemento.
+  - Converte le animazioni basilari (`fade`, `wipe` e `text-reveal`)
+    in catene di filtri FFmpeg applicate agli elementi.
 
 
 - **`renderFillerSegment(seg, outPath, opts)`**
