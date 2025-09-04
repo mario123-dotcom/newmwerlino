@@ -216,6 +216,8 @@ test("multiline wipe uses xfade per line", (t) => {
   const fc = captured![idx + 1];
   assert.ok(fc.includes("[L0_0_off][L0_0_on]xfade"));
   assert.ok(fc.includes("[L0_1_off][L0_1_on]xfade"));
+  assert.ok(fc.includes("offset=0.000[L0_0_wipe]"));
+  assert.ok(fc.includes("offset=0.600[L0_1_wipe]"));
 });
 
 

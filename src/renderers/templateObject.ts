@@ -177,6 +177,7 @@ export function renderTemplateElement(
         for (let i = 0; i < lines.length; i++) {
           const safe = escDrawText(lines[i]);
           const lineY = finalY + i * lineH;
+          const lineStart = start + i * dur;
           parts.push(`color=c=black@0.0:s=${videoW}x${lineH}:r=${fps}:d=${duration},format=rgba,setsar=1[L${i}_can]`);
           parts.push(
             `[L${i}_can]drawtext=fontfile='${font}':text='${safe}':x=${finalX}:y=h-text_h-1:fontsize=${fontsize}:fontcolor=${color}${extraLine}[L${i}_rgba]`
@@ -186,7 +187,7 @@ export function renderTemplateElement(
           parts.push(`color=c=black:s=${videoW}x${lineH}:r=${fps}:d=${duration},format=gray,setsar=1[L${i}_off]`);
           parts.push(`color=c=white:s=${videoW}x${lineH}:r=${fps}:d=${duration},format=gray,setsar=1[L${i}_on]`);
           parts.push(
-            `[L${i}_off][L${i}_on]xfade=transition=${dir}:duration=${dur.toFixed(3)}:offset=${start.toFixed(3)}[L${i}_wipe]`
+            `[L${i}_off][L${i}_on]xfade=transition=${dir}:duration=${dur.toFixed(3)}:offset=${lineStart.toFixed(3)}[L${i}_wipe]`
           );
           parts.push(`[L${i}_Aorig][L${i}_wipe]blend=all_mode=multiply[L${i}_A]`);
           parts.push(`[L${i}_rgb][L${i}_A]alphamerge[L${i}_ready]`);
@@ -208,14 +209,44 @@ export function renderTemplateElement(
           `[t_rgb][t_A]alphamerge[t_ready];` +
           `[0:v][t_ready]overlay=x=0:y=0[v]`;
       }
-    } else {
-      let alphaPart = "";
-      if (anim && anim.type === "fade") {
-        const start = typeof anim.time === "number" ? anim.time : 0;
-        const dur = typeof anim.duration === "number" ? anim.duration : 1;
-        const end = start + dur;
-        alphaPart = `:alpha='if(lt(t,${start.toFixed(3)}),0,if(lt(t,${end.toFixed(3)}),(t-${start.toFixed(3)})/${dur.toFixed(3)},1))'`;
+    } else if (anim && anim.type === "fade") {
+      const start = typeof anim.time === "number" ? anim.time : 0;
+      const dur = typeof anim.duration === "number" ? anim.duration : 1;
+      const lines = fitted.text.split("\n");
+      if (lines.length > 1) {
+        const lineH = fontsize + lineSpacing;
+        const extraLine =
+          (boxColor ? `:box=1:boxcolor=${boxColor}` : "") +
+          (shadowColor
+            ? `:shadowcolor=${shadowColor}:shadowx=${shadowX}:shadowy=${shadowY}`
+            : "") +
+          (letterSpacing ? `:spacing=${letterSpacing}` : "");
+        const parts: string[] = [];
+        let inLbl = "0:v";
+        for (let i = 0; i < lines.length; i++) {
+          const safe = escDrawText(lines[i]);
+          const lineY = finalY + i * lineH;
+          const lineStart = start + i * dur;
+          parts.push(`color=c=black@0.0:s=${videoW}x${lineH}:r=${fps}:d=${duration},format=rgba,setsar=1[L${i}_can]`);
+          parts.push(
+            `[L${i}_can]drawtext=fontfile='${font}':text='${safe}':x=${finalX}:y=h-text_h-1:fontsize=${fontsize}:fontcolor=${color}${extraLine}[L${i}_text]`
+          );
+          parts.push(
+            `[L${i}_text]format=rgba,fade=t=in:st=${lineStart.toFixed(3)}:d=${dur.toFixed(3)}:alpha=1[L${i}_ready]`
+          );
+          const outLbl = i === lines.length - 1 ? "[v]" : `[L${i}_out]`;
+          parts.push(`[${inLbl}][L${i}_ready]overlay=x=0:y=${lineY}${outLbl}`);
+          inLbl = i === lines.length - 1 ? "v" : `L${i}_out`;
+        }
+        filter = parts.join(";");
+      } else {
+        filter =
+          `color=c=black@0.0:s=${videoW}x${videoH}:r=${fps}:d=${duration},format=rgba,setsar=1[t_can];` +
+          `[t_can]drawtext=fontfile='${font}':text='${text}':x=${finalX}:y=${finalY}:fontsize=${fontsize}:fontcolor=${color}${extra}[t_text];` +
+          `[t_text]format=rgba,fade=t=in:st=${start.toFixed(3)}:d=${dur.toFixed(3)}:alpha=1[t_ready];` +
+          `[0:v][t_ready]overlay=x=0:y=0[v]`;
       }
+    } else {
       if (shadowColor && shadowBlur > 0) {
         const shadowExtra =
           (lineSpacing ? `:line_spacing=${lineSpacing}` : "") +
@@ -226,9 +257,9 @@ export function renderTemplateElement(
           `[sh_rgba]boxblur=${shadowBlur}:${shadowBlur}:${shadowBlur}[sh_blur];` +
 
           `[0:v][sh_blur]overlay=x=0:y=0[tmp_base];` +
-          `[tmp_base]drawtext=fontfile='${font}':text='${text}':x=${finalX}:y=${finalY}:fontsize=${fontsize}:fontcolor=${color}${baseExtra}${alphaPart}[v]`;
+          `[tmp_base]drawtext=fontfile='${font}':text='${text}':x=${finalX}:y=${finalY}:fontsize=${fontsize}:fontcolor=${color}${baseExtra}[v]`;
       } else {
-        filter = `[0:v]drawtext=fontfile='${font}':text='${text}':x=${finalX}:y=${finalY}:fontsize=${fontsize}:fontcolor=${color}${extra}${alphaPart}[v]`;
+        filter = `[0:v]drawtext=fontfile='${font}':text='${text}':x=${finalX}:y=${finalY}:fontsize=${fontsize}:fontcolor=${color}${extra}[v]`;
       }
     }
   } else if (el.type === "image") {
@@ -416,6 +447,7 @@ export function renderTemplateSlide(
           for (let i = 0; i < lines.length; i++) {
             const safe = escDrawText(lines[i]);
             const lineY = fy + i * lineH;
+            const lineStart = start + i * dur;
             parts.push(`color=c=black@0.0:s=${videoW}x${lineH}:r=${fps}:d=${duration},format=rgba,setsar=1[L${idx}_${i}_can]`);
             parts.push(
               `[L${idx}_${i}_can]drawtext=fontfile='${font}':text='${safe}':x=${fx}:y=h-text_h-1:fontsize=${fontsize}:fontcolor=${color}${extraLine}[L${idx}_${i}_rgba]`
@@ -425,7 +457,7 @@ export function renderTemplateSlide(
             parts.push(`color=c=black:s=${videoW}x${lineH}:r=${fps}:d=${duration},format=gray,setsar=1[L${idx}_${i}_off]`);
             parts.push(`color=c=white:s=${videoW}x${lineH}:r=${fps}:d=${duration},format=gray,setsar=1[L${idx}_${i}_on]`);
             parts.push(
-              `[L${idx}_${i}_off][L${idx}_${i}_on]xfade=transition=${dir}:duration=${dur.toFixed(3)}:offset=${start.toFixed(3)}[L${idx}_${i}_wipe]`
+              `[L${idx}_${i}_off][L${idx}_${i}_on]xfade=transition=${dir}:duration=${dur.toFixed(3)}:offset=${lineStart.toFixed(3)}[L${idx}_${i}_wipe]`
             );
             parts.push(`[L${idx}_${i}_Aorig][L${idx}_${i}_wipe]blend=all_mode=multiply[L${idx}_${i}_A]`);
             parts.push(`[L${idx}_${i}_rgb][L${idx}_${i}_A]alphamerge[L${idx}_${i}_ready]`);
@@ -433,7 +465,6 @@ export function renderTemplateSlide(
             parts.push(`[${inLbl}][L${idx}_${i}_ready]overlay=x=0:y=${lineY}${outTmp}`);
             inLbl = i === lines.length - 1 ? outLbl.slice(1, -1) : `L${idx}_${i}_out`;
           }
-          // ensure the text segment ends with a separator so following filters parse correctly
           filter += parts.join(";") + ";";
         } else {
           filter +=
@@ -448,14 +479,44 @@ export function renderTemplateSlide(
             `[t${idx}_rgb][t${idx}_A]alphamerge[t${idx}_ready];` +
             `${cur}[t${idx}_ready]overlay=x=0:y=0${outLbl};`;
         }
-      } else {
-        let alphaPart = "";
-        if (anim && anim.type === "fade") {
-          const start = typeof anim.time === "number" ? anim.time : 0;
-          const dur = typeof anim.duration === "number" ? anim.duration : 1;
-          const end = start + dur;
-          alphaPart = `:alpha='if(lt(t,${start.toFixed(3)}),0,if(lt(t,${end.toFixed(3)}),(t-${start.toFixed(3)})/${dur.toFixed(3)},1))'`;
+      } else if (anim && anim.type === "fade") {
+        const start = typeof anim.time === "number" ? anim.time : 0;
+        const dur = typeof anim.duration === "number" ? anim.duration : 1;
+        const lines = fitted.text.split("\n");
+        if (lines.length > 1) {
+          const lineH = fontsize + lineSpacing;
+          const extraLine =
+            (boxColor ? `:box=1:boxcolor=${boxColor}` : "") +
+            (shadowColor
+              ? `:shadowcolor=${shadowColor}:shadowx=${shadowX}:shadowy=${shadowY}`
+              : "") +
+            (letterSpacing ? `:spacing=${letterSpacing}` : "");
+          const parts: string[] = [];
+          let inLbl = cur.slice(1, -1);
+          for (let i = 0; i < lines.length; i++) {
+            const safe = escDrawText(lines[i]);
+            const lineY = fy + i * lineH;
+            const lineStart = start + i * dur;
+            parts.push(`color=c=black@0.0:s=${videoW}x${lineH}:r=${fps}:d=${duration},format=rgba,setsar=1[L${idx}_${i}_can]`);
+            parts.push(
+              `[L${idx}_${i}_can]drawtext=fontfile='${font}':text='${safe}':x=${fx}:y=h-text_h-1:fontsize=${fontsize}:fontcolor=${color}${extraLine}[L${idx}_${i}_text]`
+            );
+            parts.push(
+              `[L${idx}_${i}_text]format=rgba,fade=t=in:st=${lineStart.toFixed(3)}:d=${dur.toFixed(3)}:alpha=1[L${idx}_${i}_ready]`
+            );
+            const outTmp = i === lines.length - 1 ? outLbl : `[L${idx}_${i}_out]`;
+            parts.push(`[${inLbl}][L${idx}_${i}_ready]overlay=x=0:y=${lineY}${outTmp}`);
+            inLbl = i === lines.length - 1 ? outLbl.slice(1, -1) : `L${idx}_${i}_out`;
+          }
+          filter += parts.join(";") + ";";
+        } else {
+          filter +=
+            `color=c=black@0.0:s=${videoW}x${videoH}:r=${fps}:d=${duration},format=rgba,setsar=1[t${idx}_can];` +
+            `[t${idx}_can]drawtext=fontfile='${font}':text='${text}':x=${fx}:y=${fy}:fontsize=${fontsize}:fontcolor=${color}${extra}[t${idx}_text];` +
+            `[t${idx}_text]format=rgba,fade=t=in:st=${start.toFixed(3)}:d=${dur.toFixed(3)}:alpha=1[t${idx}_ready];` +
+            `${cur}[t${idx}_ready]overlay=x=0:y=0${outLbl};`;
         }
+      } else {
         if (shadowColor && shadowBlur > 0) {
           const shadowExtra =
             (lineSpacing ? `:line_spacing=${lineSpacing}` : "") +
@@ -466,9 +527,9 @@ export function renderTemplateSlide(
             `[sh${idx}_rgba]boxblur=${shadowBlur}:${shadowBlur}:${shadowBlur}[sh${idx}_blur];` +
 
             `${cur}[sh${idx}_blur]overlay=x=0:y=0[tmp${idx}_base];` +
-            `[tmp${idx}_base]drawtext=fontfile='${font}':text='${text}':x=${fx}:y=${fy}:fontsize=${fontsize}:fontcolor=${color}${baseExtra}${alphaPart}${outLbl};`;
+            `[tmp${idx}_base]drawtext=fontfile='${font}':text='${text}':x=${fx}:y=${fy}:fontsize=${fontsize}:fontcolor=${color}${baseExtra}${outLbl};`;
         } else {
-          filter += `${cur}drawtext=fontfile='${font}':text='${text}':x=${fx}:y=${fy}:fontsize=${fontsize}:fontcolor=${color}${extra}${alphaPart}${outLbl};`;
+          filter += `${cur}drawtext=fontfile='${font}':text='${text}':x=${fx}:y=${fy}:fontsize=${fontsize}:fontcolor=${color}${extra}${outLbl};`;
         }
       }
     } else if (el.type === "image") {
