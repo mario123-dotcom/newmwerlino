@@ -86,7 +86,16 @@ export function renderTemplateElement(
     const fontsize =
       dimToPx(el.font_size, videoH) ?? dimToPx(el.height, videoH) ?? 48;
     const font = ffmpegSafePath(pickFont(el.font_family));
-    filter = `[0:v]drawtext=fontfile='${font}':text='${text}':x=${finalX}:y=${finalY}:fontsize=${fontsize}:fontcolor=${color}[v]`;
+    // Support basic fade-in animation using `el.animations` metadata.
+    const anim = Array.isArray(el.animations) ? el.animations[0] : undefined;
+    let alphaPart = "";
+    if (anim && anim.type === "fade") {
+      const start = typeof anim.time === "number" ? anim.time : 0;
+      const dur = typeof anim.duration === "number" ? anim.duration : 1;
+      const end = start + dur;
+      alphaPart = `:alpha='if(lt(t,${start.toFixed(3)}),0,if(lt(t,${end.toFixed(3)}),(t-${start.toFixed(3)})/${dur.toFixed(3)},1))'`;
+    }
+    filter = `[0:v]drawtext=fontfile='${font}':text='${text}':x=${finalX}:y=${finalY}:fontsize=${fontsize}:fontcolor=${color}${alphaPart}[v]`;
   } else if (el.type === "image") {
     if (!el.file) throw new Error("image element missing file path");
     args.push("-loop", "1", "-t", `${duration}`, "-i", el.file);
@@ -160,7 +169,16 @@ export function renderTemplateSlide(
       const fontsize =
         dimToPx(el.font_size, videoH) ?? dimToPx(el.height, videoH) ?? 48;
       const font = ffmpegSafePath(pickFont(el.font_family));
-      filter += `${cur}drawtext=fontfile='${font}':text='${text}':x=${fx}:y=${fy}:fontsize=${fontsize}:fontcolor=${color}${outLbl};`;
+      // Apply a simple fade-in animation if present in `el.animations`.
+      const anim = Array.isArray(el.animations) ? el.animations[0] : undefined;
+      let alphaPart = "";
+      if (anim && anim.type === "fade") {
+        const start = typeof anim.time === "number" ? anim.time : 0;
+        const dur = typeof anim.duration === "number" ? anim.duration : 1;
+        const end = start + dur;
+        alphaPart = `:alpha='if(lt(t,${start.toFixed(3)}),0,if(lt(t,${end.toFixed(3)}),(t-${start.toFixed(3)})/${dur.toFixed(3)},1))'`;
+      }
+      filter += `${cur}drawtext=fontfile='${font}':text='${text}':x=${fx}:y=${fy}:fontsize=${fontsize}:fontcolor=${color}${alphaPart}${outLbl};`;
     } else if (el.type === "image") {
       if (!el.file) return; // skip if missing file
       args.push("-loop", "1", "-t", `${duration}`, "-i", el.file);
