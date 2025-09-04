@@ -22,7 +22,7 @@ export const TEXT = {
   MIN_SIZE: 28,
   MAX_SIZE: 84,
   TOP_MARGIN_P: {
-    landscape: 0.12,
+    landscape: 0.05,
     portrait: 0.08,
   },
   /** margine sx per allineamento left (solo landscape slide 1) */
