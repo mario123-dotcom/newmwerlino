@@ -43,8 +43,9 @@ semplice cosa fanno e quali parametri accettano.
 
 ## `src/templateLayout.ts`
 - **`loadSlideLayouts()`**
-  - Estrae dal template la disposizione degli elementi `image` e `text`
-    per ogni slide, restituendo un array di oggetti posizionati.
+  - Estrae dal template tutte le proprietà delle slide e dei loro elementi,
+    restituendo per ogni slide un oggetto con `props` (attributi della slide)
+    ed `elements` (array di elementi completi).
 
 ## `src/concat.ts`
 - **`concatAndFinalizeDemuxer(opts)`**
@@ -113,8 +114,9 @@ semplice cosa fanno e quali parametri accettano.
   - Calcola dimensione carattere e spezzatura testo in modo adattivo.
 - **`wrapParagraph(text, width?)`**
   - Suddivide un paragrafo in righe bilanciate.
-- **`fitText(text, boxW, boxH, baseSize)`**
-  - Ridimensiona il font e manda a capo il testo perché rientri nel riquadro.
+- **`fitText(text, boxW, boxH, baseSize, lineHeight?)`**
+  - Ridimensiona il font e manda a capo il testo perché rientri nel riquadro,
+    usando opzionalmente un fattore di interlinea personalizzato.
 - **`normalizeQuotes(s)`**
   - Converte gli apici in caratteri compatibili con FFmpeg.
 - **`escDrawText(s)`**

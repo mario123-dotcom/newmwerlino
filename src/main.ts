@@ -91,7 +91,8 @@ import { sendFinalVideo } from "./share";
     timeline.forEach((seg, idx) => {
       const out = join(paths.temp, `seg${idx}.mp4`);
       if (seg.kind === "image") {
-        const layout = layouts[seg.index ?? 0] || [];
+        const layoutObj = layouts[seg.index ?? 0];
+        const layout = layoutObj?.elements || [];
         const elements = layout
           .map((e) => {
             const el = { ...e };

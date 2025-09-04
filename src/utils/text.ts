@@ -53,15 +53,15 @@ export function fitText(
   text: string,
   boxW: number,
   boxH: number,
-  baseSize: number
+  baseSize: number,
+  lineHeight = 1.2,
 ): { text: string; fontSize: number } {
   let fontSize = Math.max(1, Math.round(baseSize));
-  const lineHFactor = 1.2;
   let lines = wrapParagraph(
     text,
     Math.max(1, Math.floor(boxW / (fontSize * 0.6)))
   );
-  while (lines.length * fontSize * lineHFactor > boxH && fontSize > 10) {
+  while (lines.length * fontSize * lineHeight > boxH && fontSize > 10) {
     fontSize -= 2;
     lines = wrapParagraph(
       text,
