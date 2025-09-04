@@ -127,6 +127,36 @@ test("vmin units use smaller viewport dimension as percent", (t) => {
   assert.ok(fc.includes("fontsize=2"));
 });
 
+test("shadow blur applies to alpha channel", (t) => {
+  let captured: string[] | undefined;
+  const runMod = require("../ffmpeg/run");
+  t.mock.method(runMod, "runFFmpeg", (args: string[]) => {
+    captured = args;
+  });
+
+  const { renderTemplateSlide } = require("./templateObject");
+  renderTemplateSlide(
+    [
+      {
+        type: "text",
+        text: "blurred",
+        shadow_color: "#000000",
+        shadow_blur: 4,
+        font_family: "Archivo",
+      },
+    ],
+    1,
+    "out.mp4",
+    { fps: 30, videoW: 200, videoH: 100, fonts: { Archivo: "C:/fonts/font.ttf" } }
+  );
+
+  assert.ok(captured);
+  const idx = captured!.indexOf("-filter_complex");
+  assert.notEqual(idx, -1);
+  const fc = captured![idx + 1];
+  assert.ok(fc.includes("boxblur=4:4:4"));
+});
+
 test("text includes letter spacing when specified", (t) => {
   let captured: string[] | undefined;
   const runMod = require("../ffmpeg/run");
