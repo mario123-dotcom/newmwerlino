@@ -37,7 +37,8 @@ function dimToPx(
   ) {
     const v = parseFloat(String(val));
     const ref = Math.min(videoW, videoH);
-    return Math.round(v * ref);
+    // CSS vmin units are percentages of the smaller viewport dimension
+    return Math.round((v / 100) * ref);
   }
   const n = parseFloat(String(val));
   return isNaN(n) ? undefined : Math.round(n);
