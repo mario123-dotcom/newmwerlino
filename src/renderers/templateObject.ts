@@ -32,6 +32,15 @@ function dimToPx(
   return isNaN(n) ? undefined : Math.round(n);
 }
 
+function pickWipeDirection(anim: any): string {
+  if (!anim) return "wipeup";
+  if (anim.x_anchor === "0%") return "wiperight";
+  if (anim.x_anchor === "100%") return "wipeleft";
+  if (anim.y_anchor === "0%") return "wipedown";
+  if (anim.y_anchor === "100%") return "wipeup";
+  return "wipeup";
+}
+
 export interface TemplateElement {
   type: "text" | "image";
   name?: string;
@@ -86,26 +95,54 @@ export function renderTemplateElement(
     const fontsize =
       dimToPx(el.font_size, videoH) ?? dimToPx(el.height, videoH) ?? 48;
     const font = ffmpegSafePath(pickFont(el.font_family));
-    // Support basic fade-in animation using `el.animations` metadata.
     const anim = Array.isArray(el.animations) ? el.animations[0] : undefined;
-    let alphaPart = "";
-    if (anim && anim.type === "fade") {
+    if (anim && (anim.type === "wipe" || anim.type === "text-reveal")) {
+      const dir = pickWipeDirection(anim);
       const start = typeof anim.time === "number" ? anim.time : 0;
-      const dur = typeof anim.duration === "number" ? anim.duration : 1;
-      const end = start + dur;
-      alphaPart = `:alpha='if(lt(t,${start.toFixed(3)}),0,if(lt(t,${end.toFixed(3)}),(t-${start.toFixed(3)})/${dur.toFixed(3)},1))'`;
+      const dur = typeof anim.duration === "number" ? anim.duration : 0.6;
+      filter =
+        `color=c=black@0.0:s=${videoW}x${videoH}:r=${fps}:d=${duration},format=rgba,setsar=1[t_can];` +
+        `[t_can]drawtext=fontfile='${font}':text='${text}':x=${finalX}:y=${finalY}:fontsize=${fontsize}:fontcolor=${color}[t_rgba];` +
+        `[t_rgba]split=2[t_rgb][t_forA];` +
+        `[t_forA]alphaextract,format=gray,setsar=1[t_Aorig];` +
+        `color=c=black:s=${videoW}x${videoH}:r=${fps}:d=${duration},format=gray,setsar=1[t_off];` +
+        `color=c=white:s=${videoW}x${videoH}:r=${fps}:d=${duration},format=gray,setsar=1[t_on];` +
+        `[t_off][t_on]xfade=transition=${dir}:duration=${dur.toFixed(3)}:offset=${start.toFixed(3)}[t_wipe];` +
+        `[t_Aorig][t_wipe]blend=all_mode=multiply[t_A];` +
+        `[t_rgb][t_A]alphamerge[t_ready];` +
+        `[0:v][t_ready]overlay=x=0:y=0[v]`;
+    } else {
+      let alphaPart = "";
+      if (anim && anim.type === "fade") {
+        const start = typeof anim.time === "number" ? anim.time : 0;
+        const dur = typeof anim.duration === "number" ? anim.duration : 1;
+        const end = start + dur;
+        alphaPart = `:alpha='if(lt(t,${start.toFixed(3)}),0,if(lt(t,${end.toFixed(3)}),(t-${start.toFixed(3)})/${dur.toFixed(3)},1))'`;
+      }
+      filter = `[0:v]drawtext=fontfile='${font}':text='${text}':x=${finalX}:y=${finalY}:fontsize=${fontsize}:fontcolor=${color}${alphaPart}[v]`;
     }
-    filter = `[0:v]drawtext=fontfile='${font}':text='${text}':x=${finalX}:y=${finalY}:fontsize=${fontsize}:fontcolor=${color}${alphaPart}[v]`;
   } else if (el.type === "image") {
     if (!el.file) throw new Error("image element missing file path");
     args.push("-loop", "1", "-t", `${duration}`, "-i", el.file);
+    const src = `[2:v]`;
+    let imgLbl = src;
     if (w || h) {
       const sw = w ?? -1;
       const sh = h ?? -1;
-      filter = `[2:v]scale=${sw}:${sh}[s0];[0:v][s0]overlay=x=${finalX}:y=${finalY}[v]`;
+      filter = `${src}scale=${sw}:${sh}[s0];`;
+      imgLbl = "[s0]";
     } else {
-      filter = `[2:v]scale=${videoW}:${videoH}:force_original_aspect_ratio=increase,crop=${videoW}:${videoH}[s0];[0:v][s0]overlay=x=${finalX}:y=${finalY}[v]`;
+      filter = `${src}scale=${videoW}:${videoH}:force_original_aspect_ratio=increase,crop=${videoW}:${videoH}[s0];`;
+      imgLbl = "[s0]";
     }
+    const anim = Array.isArray(el.animations) ? el.animations[0] : undefined;
+    if (anim && anim.type === "fade") {
+      const start = typeof anim.time === "number" ? anim.time : 0;
+      const dur = typeof anim.duration === "number" ? anim.duration : 1;
+      filter += `${imgLbl}format=rgba,fade=t=in:st=${start.toFixed(3)}:d=${dur.toFixed(3)}:alpha=1[f0];`;
+      imgLbl = "[f0]";
+    }
+    filter += `[0:v]${imgLbl}overlay=x=${finalX}:y=${finalY}[v]`;
   } else {
     throw new Error(`Unsupported element type: ${el.type}`);
   }
@@ -169,16 +206,32 @@ export function renderTemplateSlide(
       const fontsize =
         dimToPx(el.font_size, videoH) ?? dimToPx(el.height, videoH) ?? 48;
       const font = ffmpegSafePath(pickFont(el.font_family));
-      // Apply a simple fade-in animation if present in `el.animations`.
       const anim = Array.isArray(el.animations) ? el.animations[0] : undefined;
-      let alphaPart = "";
-      if (anim && anim.type === "fade") {
+      if (anim && (anim.type === "wipe" || anim.type === "text-reveal")) {
+        const dir = pickWipeDirection(anim);
         const start = typeof anim.time === "number" ? anim.time : 0;
-        const dur = typeof anim.duration === "number" ? anim.duration : 1;
-        const end = start + dur;
-        alphaPart = `:alpha='if(lt(t,${start.toFixed(3)}),0,if(lt(t,${end.toFixed(3)}),(t-${start.toFixed(3)})/${dur.toFixed(3)},1))'`;
+        const dur = typeof anim.duration === "number" ? anim.duration : 0.6;
+        filter +=
+          `color=c=black@0.0:s=${videoW}x${videoH}:r=${fps}:d=${duration},format=rgba,setsar=1[t${idx}_can];` +
+          `[t${idx}_can]drawtext=fontfile='${font}':text='${text}':x=${fx}:y=${fy}:fontsize=${fontsize}:fontcolor=${color}[t${idx}_rgba];` +
+          `[t${idx}_rgba]split=2[t${idx}_rgb][t${idx}_forA];` +
+          `[t${idx}_forA]alphaextract,format=gray,setsar=1[t${idx}_Aorig];` +
+          `color=c=black:s=${videoW}x${videoH}:r=${fps}:d=${duration},format=gray,setsar=1[t${idx}_off];` +
+          `color=c=white:s=${videoW}x${videoH}:r=${fps}:d=${duration},format=gray,setsar=1[t${idx}_on];` +
+          `[t${idx}_off][t${idx}_on]xfade=transition=${dir}:duration=${dur.toFixed(3)}:offset=${start.toFixed(3)}[t${idx}_wipe];` +
+          `[t${idx}_Aorig][t${idx}_wipe]blend=all_mode=multiply[t${idx}_A];` +
+          `[t${idx}_rgb][t${idx}_A]alphamerge[t${idx}_ready];` +
+          `${cur}[t${idx}_ready]overlay=x=0:y=0${outLbl};`;
+      } else {
+        let alphaPart = "";
+        if (anim && anim.type === "fade") {
+          const start = typeof anim.time === "number" ? anim.time : 0;
+          const dur = typeof anim.duration === "number" ? anim.duration : 1;
+          const end = start + dur;
+          alphaPart = `:alpha='if(lt(t,${start.toFixed(3)}),0,if(lt(t,${end.toFixed(3)}),(t-${start.toFixed(3)})/${dur.toFixed(3)},1))'`;
+        }
+        filter += `${cur}drawtext=fontfile='${font}':text='${text}':x=${fx}:y=${fy}:fontsize=${fontsize}:fontcolor=${color}${alphaPart}${outLbl};`;
       }
-      filter += `${cur}drawtext=fontfile='${font}':text='${text}':x=${fx}:y=${fy}:fontsize=${fontsize}:fontcolor=${color}${alphaPart}${outLbl};`;
     } else if (el.type === "image") {
       if (!el.file) return; // skip if missing file
       args.push("-loop", "1", "-t", `${duration}`, "-i", el.file);
@@ -193,6 +246,13 @@ export function renderTemplateSlide(
       } else {
         filter += `${src}scale=${videoW}:${videoH}:force_original_aspect_ratio=increase,crop=${videoW}:${videoH}[s${idx}];`;
         imgLbl = `[s${idx}]`;
+      }
+      const anim = Array.isArray(el.animations) ? el.animations[0] : undefined;
+      if (anim && anim.type === "fade") {
+        const start = typeof anim.time === "number" ? anim.time : 0;
+        const dur = typeof anim.duration === "number" ? anim.duration : 1;
+        filter += `${imgLbl}format=rgba,fade=t=in:st=${start.toFixed(3)}:d=${dur.toFixed(3)}:alpha=1[f${idx}];`;
+        imgLbl = `[f${idx}]`;
       }
       filter += `${cur}${imgLbl}overlay=x=${fx}:y=${fy}${outLbl};`;
 
