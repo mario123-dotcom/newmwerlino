@@ -3,7 +3,17 @@ import { autosizeAndWrap, Orientation } from "../utils/autosize";
 import { deriveOrientation, WRAP_TARGET, TEXT } from "../config";
 import type { TextTransition } from "../types";
 
-/** Ombra laterale: matte RGBA */
+/**
+ * Genera una catena di filtri FFmpeg che produce un layer di ombra
+ * sfumata da sovrapporre all'immagine di background.
+ *
+ * @param strength Intensità dell'ombra (0-1).
+ * @param gamma    Curva di gamma applicata alla sfumatura.
+ * @param leftPower Controlla la pendenza orizzontale.
+ * @param vertPower Controlla la pendenza verticale.
+ * @param bias     Offset per tagliare la parte più chiara.
+ * @param color    Colore dell'ombra.
+ */
 export function shadeChain(
   strength: number,
   gamma = 1.0,
@@ -36,7 +46,7 @@ export function shadeChain(
   return `format=rgba,geq=r='${rgb.r}':g='${rgb.g}':b='${rgb.b}':a='${aExpr}'`;
 }
 
-/** Zoom leggero (per zoompan) */
+/** Espressione per uno zoompan dolce sull'intera clip. */
 export function zoomExprFullClip(durationSec: number, fps: number): string {
   const frames = Math.max(1, Math.round(durationSec * fps));
   const zStart = 1.0, zEnd = 1.08;
@@ -56,7 +66,10 @@ function lineOffset(i: number, segDur: number, animDur: number) {
   return Number(off.toFixed(3));
 }
 
-/** FIRST — autosize + doppio box + wipe (righe coerenti) */
+/**
+ * Costruisce la catena `filter_complex` per la prima slide, includendo
+ * autosize del testo, doppio bordo e animazione di wipe.
+ */
 export function buildFirstSlideTextChain(
   txt: string,
   segDur: number,
@@ -68,6 +81,7 @@ export function buildFirstSlideTextChain(
   transition: TextTransition = "wipeup",
   align?: "left" | "center" | "right",
   extraLeftPx = 0,
+  barColor = "black",
 ): string {
   const orientation: Orientation = deriveOrientation(videoW, videoH);
 
@@ -106,7 +120,7 @@ export function buildFirstSlideTextChain(
     const barW = Math.max(4, Math.round(auto.fontSize * 0.5));
     const barX = Math.max(0, margin - barW - auto.padPx);
     const barH = videoH - auto.y0;
-    parts.push(`color=c=black:s=${barW}x${barH}:r=${fps}:d=${segDur},format=rgba,setsar=1[bar_can]`);
+    parts.push(`color=c=${barColor}:s=${barW}x${barH}:r=${fps}:d=${segDur},format=rgba,setsar=1[bar_can]`);
     parts.push(`[bar_can]split=2[bar_rgb][bar_forA]`);
     parts.push(`[bar_forA]alphaextract,format=gray,setsar=1[bar_Aorig]`);
     parts.push(`color=c=black:s=${barW}x${barH}:r=${fps}:d=${segDur},format=gray,setsar=1[bar_off]`);
@@ -147,7 +161,11 @@ export function buildFirstSlideTextChain(
   return parts.join(";");
 }
 
-/** OTHER — autosize + XFADE centrato (righe coerenti) */
+/**
+ * Catena `filter_complex` per le slide successive alla prima: esegue
+ * autosize, genera le righe e applica una transizione di rivelazione
+ * basata su `xfade`.
+ */
 export function buildRevealTextChain_XFADE(
   txt: string,
   segDur: number,
@@ -159,6 +177,7 @@ export function buildRevealTextChain_XFADE(
   transition: TextTransition = "wipeup",
   align: "left" | "center" | "right" = "center",
   extraLeftPx = 0,
+  barColor = "black",
 ): string {
   const orientation: Orientation = deriveOrientation(videoW, videoH);
   const baseCols = WRAP_TARGET[orientation].OTHER;
@@ -191,7 +210,7 @@ export function buildRevealTextChain_XFADE(
     const barW = Math.max(4, Math.round(auto.fontSize * 0.5));
     const barX = Math.max(0, margin - barW - auto.padPx);
     const barH = videoH - auto.y0;
-    parts.push(`color=c=black:s=${barW}x${barH}:r=${fps}:d=${segDur},format=rgba,setsar=1[bar_can]`);
+    parts.push(`color=c=${barColor}:s=${barW}x${barH}:r=${fps}:d=${segDur},format=rgba,setsar=1[bar_can]`);
     parts.push(`[bar_can]split=2[bar_rgb][bar_forA]`);
     parts.push(`[bar_forA]alphaextract,format=gray,setsar=1[bar_Aorig]`);
     parts.push(`color=c=black:s=${barW}x${barH}:r=${fps}:d=${segDur},format=gray,setsar=1[bar_off]`);

@@ -1,6 +1,10 @@
 import { join } from "path";
 import { ensureDir } from "./utils/fsx";
 
+/**
+ * Raccoglie i percorsi principali utilizzati dal progetto (asset scaricati,
+ * cartelle temporanee e output). Le directory vengono create se mancanti.
+ */
 export const projectRoot = join(__dirname, "..");
 export const downloadDir  = join(projectRoot, "download");
 

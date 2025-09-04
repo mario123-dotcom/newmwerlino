@@ -5,6 +5,18 @@ import { DUCK } from "./config";
 import { runFFmpeg } from "./ffmpeg/run";
 import { ffprobeJson } from "./validate";
 
+/**
+ * Concatena i segmenti video generati e produce il file finale in formato MP4
+ * utilizzando il demuxer `concat`. Può mixare un'eventuale traccia audio di
+ * background applicando un effetto di ducking rispetto all'audio dei segmenti.
+ *
+ * @param segments      Lista di percorsi ai segmenti da unire nell'ordine corretto.
+ * @param bgAudioPath   Percorso opzionale dell'audio di sottofondo da riprodurre in loop.
+ * @param outPath       Percorso di output del video finale.
+ * @param concatTxtPath File temporaneo con la lista dei segmenti per il demuxer.
+ * @param fps           Frame rate del video finale.
+ * @param bgVolume      Volume relativo del sottofondo (0–1).
+ */
 export function concatAndFinalizeDemuxer({
   segments, bgAudioPath, outPath, concatTxtPath, fps, bgVolume
 }: {

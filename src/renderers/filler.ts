@@ -2,6 +2,14 @@ import { existsSync } from "fs";
 import { FOOTER } from "../config";
 import { runFFmpeg } from "../ffmpeg/run";
 
+/**
+ * Genera un segmento "filler" (frame colorato opzionalmente con logo)
+ * utilizzato per colmare gli spazi tra una slide e l'altra.
+ *
+ * @param seg      Oggetto con la sola durata del segmento.
+ * @param outPath  Percorso del file video da creare.
+ * @param opts     Parametri video e colore di riempimento.
+ */
 export function renderFillerSegment(
   seg: { duration: number },
   outPath: string,

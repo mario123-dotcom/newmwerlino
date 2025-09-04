@@ -23,7 +23,7 @@ export type AutoSizeResult = {
   xExpr: string; // drawtext x
 };
 
-/** split “pulito” in parole (spazi multipli normalizzati) */
+/** Split "pulito" in parole eliminando spazi multipli e vuoti. */
 function tokenize(text: string): string[] {
   return String(text ?? "")
     .replace(/\s+/g, " ")
@@ -33,7 +33,7 @@ function tokenize(text: string): string[] {
 }
 
 
-/** wrap “greedy” su target colonne */
+/** Effettua un word-wrap greedy fino a un certo numero di colonne. */
 function greedyWrapByCols(words: string[], cols: number): string[] {
   const lines: string[] = [];
   let line: string[] = [];
@@ -53,14 +53,18 @@ function greedyWrapByCols(words: string[], cols: number): string[] {
   return lines;
 }
 
-/** numero massimo di colonne in slide verticale in base alla larghezza disponibile */
+/** Numero massimo di colonne per slide verticale dato lo spazio disponibile. */
 function maxColsForPortrait(videoW: number, fontSize: number, padPx: number): number {
   const margin = Math.round(videoW * TEXT.LEFT_MARGIN_P);
   const maxWidth = videoW - margin * 2;
   return Math.floor((maxWidth - padPx * 2) / (fontSize * TEXT.CHAR_WIDTH_K));
 }
 
-/** calcola fontSize/lineH/y0/xExpr coerenti e restituisce righe “bilanciate” */
+/**
+ * Calcola la dimensione del font e l'impaginazione del testo in modo
+ * adattivo rispetto alle dimensioni del video e alle impostazioni di layout.
+ * Restituisce le righe ottenute e le coordinate necessarie al disegno.
+ */
 export function autosizeAndWrap(text: string, opts: AutoOpts): AutoSizeResult {
   const { videoW, videoH, orientation, isFirstSlide, align, targetColsOverride } = opts;
 

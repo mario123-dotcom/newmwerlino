@@ -4,6 +4,14 @@ import { parseSec } from "./utils/time";
 import { GetLocalAsset } from "./assets";
 import { Modifications, Segment } from "./types";
 
+/**
+ * Costruisce la sequenza temporale dei segmenti a partire dalle
+ * "modifiche" presenti nel template JSON. Inserisce automaticamente
+ * segmenti di riempimento per eventuali gap e aggiunge l'outro finale.
+ *
+ * @param mods Mappa chiave/valore proveniente dal template.
+ * @returns Lista ordinata di segmenti da renderizzare.
+ */
 export function buildTimeline(mods: Modifications): Segment[] {
   const slidesRaw: Segment[] = [];
   for (let i = 0; ; i++) {

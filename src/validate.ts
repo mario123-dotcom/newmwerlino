@@ -3,6 +3,7 @@ import { existsSync } from "fs";
 import { CONCAT_DEFAULTS } from "./config";
 import { ok, runPipe } from "./ffmpeg/run";
 
+/** Esegue `ffprobe` restituendo l'output JSON parsed oppure `null`. */
 export function ffprobeJson(file: string): any | null {
   const r = runPipe(
     "ffprobe",
@@ -27,6 +28,7 @@ export function ffprobeJson(file: string): any | null {
   }
 }
 
+/** Verifica rapidamente se un MP4 contiene tracce video e audio valide. */
 export function canOpenMp4(file: string): boolean {
   const j = ffprobeJson(file);
   const hasVideo = j?.streams?.some((s: any) => s.codec_type === "video");
@@ -38,6 +40,10 @@ export function canOpenMp4(file: string): boolean {
   );
 }
 
+/**
+ * Tenta di riparare un segmento MP4 corrotto prima con remux, poi con
+ * ricodifica. Restituisce il percorso del file riparato oppure `null`.
+ */
 export function tryRepairSegment(inputAbs: string): string | null {
   const { dir, name } = parsePath(inputAbs);
   const out1 = resolve(dir, `${name}.remux.mp4`);
@@ -49,6 +55,10 @@ export function tryRepairSegment(inputAbs: string): string | null {
   return null;
 }
 
+/**
+ * Controlla ogni segmento, prova l'autoriparazione se necessario e restituisce
+ * solo i file validi, sollevando errore se nessuno è utilizzabile.
+ */
 export function validateAndRepairSegments(inputs: string[]): string[] {
   const good: string[] = [];
   for (const f of inputs) {
