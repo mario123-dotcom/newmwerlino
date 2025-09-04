@@ -1,11 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { writeFileSync, unlinkSync } from "fs";
-import { FOOTER, TEXT } from "../config";
+import { TEXT } from "../config";
 
 
-// Ensure template2 landscape places logo below text
-test("template2 landscape logo below text", (t) => {
+// Ensure template2 landscape places logo at top-left aligned with bar
+test("template2 landscape logo top-left", (t) => {
   let captured: string[] | undefined;
   const runMod = require("../ffmpeg/run");
   t.mock.method(runMod, "runFFmpeg", (args: string[]) => {
@@ -39,11 +39,8 @@ test("template2 landscape logo below text", (t) => {
   assert.notEqual(idx, -1);
   const fchain = captured![idx + 1];
   const margin = Math.round(1920 * TEXT.LEFT_MARGIN_P);
-  assert.ok(
-    fchain.includes(
-      `overlay=x=${margin}:y=H-h-${FOOTER.MARGIN_BOTTOM}`
-    )
-  );
+  const top = Math.round(1080 * TEXT.TOP_MARGIN_P.landscape);
+  assert.ok(fchain.includes(`overlay=x=${margin}:y=${top}`));
 
 });
 
