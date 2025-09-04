@@ -58,6 +58,7 @@ export interface TemplateElement {
   font_size?: string | number;
   animations?: any[];
   file?: string; // for image
+  fit?: string; // for image scaling
 }
 
 /**
@@ -129,9 +130,14 @@ export function renderTemplateElement(
     const src = `[2:v]`;
     let imgLbl = src;
     if (w || h) {
-      const sw = w ?? -1;
-      const sh = h ?? -1;
-      filter = `${src}scale=${sw}:${sh}[s0];`;
+      const fit = el.fit;
+      if (fit === "contain" && w && h) {
+        filter = `${src}scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2[s0];`;
+      } else {
+        const sw = w ?? -1;
+        const sh = h ?? -1;
+        filter = `${src}scale=${sw}:${sh}[s0];`;
+      }
       imgLbl = "[s0]";
     } else {
       filter = `${src}scale=${videoW}:${videoH}:force_original_aspect_ratio=increase,crop=${videoW}:${videoH}[s0];`;
@@ -243,9 +249,14 @@ export function renderTemplateSlide(
       const src = `[${imgInput}:v]`;
       let imgLbl = src;
       if (w || h) {
-        const sw = w ?? -1;
-        const sh = h ?? -1;
-        filter += `${src}scale=${sw}:${sh}[s${idx}];`;
+        const fit = el.fit;
+        if (fit === "contain" && w && h) {
+          filter += `${src}scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2[s${idx}];`;
+        } else {
+          const sw = w ?? -1;
+          const sh = h ?? -1;
+          filter += `${src}scale=${sw}:${sh}[s${idx}];`;
+        }
         imgLbl = `[s${idx}]`;
       } else {
         filter += `${src}scale=${videoW}:${videoH}:force_original_aspect_ratio=increase,crop=${videoW}:${videoH}[s${idx}];`;

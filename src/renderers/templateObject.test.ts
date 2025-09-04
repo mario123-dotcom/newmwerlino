@@ -55,3 +55,40 @@ test("renderTemplateSlide overlays image and text", (t) => {
   assert.ok(fc.includes("overlay=x=864:y=432"));
 
 });
+
+test("image fit contain scales with aspect ratio", (t) => {
+  let captured: string[] | undefined;
+  const runMod = require("../ffmpeg/run");
+  t.mock.method(runMod, "runFFmpeg", (args: string[]) => {
+    captured = args;
+  });
+
+  writeFileSync("dummy.png", "");
+  const { renderTemplateSlide } = require("./templateObject");
+  renderTemplateSlide(
+    [
+      {
+        type: "image",
+        file: "dummy.png",
+        width: "50%",
+        height: "50%",
+        fit: "contain",
+        x: 0,
+        y: 0,
+      },
+    ],
+    1,
+    "out.mp4",
+    { fps: 30, videoW: 200, videoH: 100, fonts: {} }
+  );
+  unlinkSync("dummy.png");
+
+  assert.ok(captured);
+  const idx = captured!.indexOf("-filter_complex");
+  assert.notEqual(idx, -1);
+  const fchain = captured![idx + 1];
+  assert.equal(
+    fchain,
+    `[1:v]scale=100:50:force_original_aspect_ratio=decrease,pad=100:50:(ow-iw)/2:(oh-ih)/2[s0];[0:v][s0]overlay=x=0:y=0[v1]`
+  );
+});
