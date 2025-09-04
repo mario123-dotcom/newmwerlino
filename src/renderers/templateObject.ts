@@ -38,6 +38,39 @@ function dimToPx(
   return isNaN(n) ? undefined : Math.round(n);
 }
 
+function escDrawText(str: string): string {
+  return str
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'")
+    .replace(/:/g, "\\:");
+}
+
+function normalizeColor(c: string): string {
+  const m = c.match(/rgba?\((\d+),(\d+),(\d+)(?:,(\d+(?:\.\d+)?))?\)/);
+  if (m) {
+    const toHex = (n: string) => Number(n).toString(16).padStart(2, "0");
+    const r = toHex(m[1]!);
+    const g = toHex(m[2]!);
+    const b = toHex(m[3]!);
+    if (m[4]) {
+      const a = Math.round(parseFloat(m[4]!) * 255)
+        .toString(16)
+        .padStart(2, "0");
+      return `#${r}${g}${b}${a}`;
+    }
+    return `#${r}${g}${b}`;
+  }
+  return c;
+}
+
+
+function dimToPx(val: string | undefined, base: number): number | undefined {
+  if (!val) return undefined;
+  if (/^\d+(\.\d+)?%$/.test(val)) return Math.round(parsePercent(val) * base);
+  const n = parseFloat(val);
+  return isNaN(n) ? undefined : Math.round(n);
+}
+
 export interface TemplateElement {
   type: "text" | "image";
   name?: string;
@@ -49,6 +82,7 @@ export interface TemplateElement {
   height?: string | number;
   x_anchor?: string | number;
   y_anchor?: string | number;
+
   font_family?: string;
   font_weight?: string;
   file?: string; // for image
@@ -77,6 +111,7 @@ export function renderTemplateElement(
   const ay = h && el.y_anchor ? parsePercent(el.y_anchor) * h : 0;
   const finalX = x - ax;
   const finalY = y - ay;
+
   const baseArgs = ["-y", "-f", "lavfi", "-t", `${duration}`, "-r", `${fps}`, "-i", `color=c=black:s=${videoW}x${videoH}:r=${fps}`];
   const audioArgs = ["-f", "lavfi", "-t", `${duration}`, "-i", "anullsrc=channel_layout=stereo:sample_rate=44100"];
   const args: string[] = baseArgs.concat(audioArgs);
@@ -97,6 +132,7 @@ export function renderTemplateElement(
       filter = `[2:v]scale=${sw}:${sh}[s0];[0:v][s0]overlay=x=${finalX}:y=${finalY}[v]`;
     } else {
       filter = `[0:v][2:v]overlay=x=${finalX}:y=${finalY}[v]`;
+
     }
   } else {
     throw new Error(`Unsupported element type: ${el.type}`);
@@ -122,6 +158,7 @@ export function renderTemplateSlide(
     const f = family && fonts[family];
     return f || Object.values(fonts)[0] || "";
   };
+
   const args: string[] = [
     "-y",
     "-f",
@@ -146,6 +183,7 @@ export function renderTemplateSlide(
     const ay = h && el.y_anchor ? parsePercent(el.y_anchor) * h : 0;
     const fx = x - ax;
     const fy = y - ay;
+
     const outLbl = `[v${idx + 1}]`;
     if (el.type === "text") {
       const text = escDrawText(el.text || "");
@@ -156,6 +194,7 @@ export function renderTemplateSlide(
     } else if (el.type === "image") {
       if (!el.file) return; // skip if missing file
       args.push("-loop", "1", "-t", `${duration}`, "-i", el.file);
+
       const src = `[${imgInput}:v]`;
       let imgLbl = src;
       if (w || h) {
@@ -165,6 +204,7 @@ export function renderTemplateSlide(
         imgLbl = `[s${idx}]`;
       }
       filter += `${cur}${imgLbl}overlay=x=${fx}:y=${fy}${outLbl};`;
+
       imgInput++;
     }
     cur = outLbl;

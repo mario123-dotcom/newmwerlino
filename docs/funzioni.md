@@ -61,6 +61,7 @@ semplice cosa fanno e quali parametri accettano.
   - Supporta elementi `image` e `text` in ordine di sovrapposizione,
     usando il font indicato da ciascun elemento.
 
+
 - **`renderFillerSegment(seg, outPath, opts)`**
   - Crea un segmento di colore pieno (con logo opzionale) per colmare i gap.
 - **`renderOutroSegment(seg, outPath, opts)`**

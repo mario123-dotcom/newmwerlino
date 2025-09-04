@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { writeFileSync, unlinkSync, existsSync } from "fs";
 
+
 // capture ffmpeg args
 
 test("renderTemplateSlide overlays image and text", (t) => {
@@ -24,6 +25,7 @@ test("renderTemplateSlide overlays image and text", (t) => {
         height: "20%",
         x_anchor: "50%",
         y_anchor: "50%",
+
       },
       {
         type: "text",
@@ -41,6 +43,7 @@ test("renderTemplateSlide overlays image and text", (t) => {
   );
   if (existsSync("dummy.png")) unlinkSync("dummy.png");
 
+
   assert.ok(captured);
   const idx = captured!.indexOf("-filter_complex");
   assert.notEqual(idx, -1);
@@ -50,4 +53,5 @@ test("renderTemplateSlide overlays image and text", (t) => {
   assert.ok(fc.includes("scale=192:216"));
   assert.ok(fc.includes("fontfile=C\\:/fonts/font.ttf"));
   assert.ok(fc.includes("overlay=x=864:y=432"));
+
 });
