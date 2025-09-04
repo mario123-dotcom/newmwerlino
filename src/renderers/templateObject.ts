@@ -79,6 +79,7 @@ export interface TemplateElement {
   shadow_y?: string | number;
   shadow_blur?: string | number;
 
+
   [key: string]: any; // preserva proprietà aggiuntive
 }
 
