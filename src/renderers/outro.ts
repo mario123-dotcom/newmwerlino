@@ -2,6 +2,7 @@ import { existsSync } from "fs";
 import { FOOTER, SCALES } from "../config";
 import { runFFmpeg } from "../ffmpeg/run";
 import { escDrawText } from "../utils/text";
+import { ffmpegSafePath } from "../utils/ffmpeg";
 import { deriveOrientation } from "../config";
 
 /**
@@ -65,13 +66,15 @@ export function renderOutroSegment(
   if (haveLogo) {
     const logoY = Math.round((videoH - FOOTER.LOGO_HEIGHT) / 2);
     const textY = logoY - OUTRO_GAP - 1;
+    const safeFont = ffmpegSafePath(fontPath);
     fchain +=
-      `[base]drawtext=fontfile='${fontPath}':fontsize=${fontSize}:fontcolor=white:` +
+      `[base]drawtext=fontfile='${safeFont}':fontsize=${fontSize}:fontcolor=white:` +
       `x=(w-text_w)/2:y=${textY}:text='${escDrawText(text)}'[pre]`;
     fchain += `;[2:v]scale=-1:${FOOTER.LOGO_HEIGHT},format=rgba[lg];[pre][lg]overlay=x=(W-w)/2:y=${logoY}[v]`;
   } else {
+    const safeFont = ffmpegSafePath(fontPath);
     fchain +=
-      `[base]drawtext=fontfile='${fontPath}':fontsize=${fontSize}:fontcolor=white:` +
+      `[base]drawtext=fontfile='${safeFont}':fontsize=${fontSize}:fontcolor=white:` +
       `x=(w-text_w)/2:y=${textCenterY}:text='${escDrawText(text)}'[v]`;
 
   }

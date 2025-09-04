@@ -31,6 +31,9 @@ export function loadSlideLayouts(
         y: child.y,
         width: child.width,
         height: child.height,
+        x_anchor: child.x_anchor,
+        y_anchor: child.y_anchor,
+
         fill_color: child.fill_color,
         font_family: child.font_family,
         font_weight: child.font_weight,

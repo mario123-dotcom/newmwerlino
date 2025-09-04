@@ -113,6 +113,10 @@ semplice cosa fanno e quali parametri accettano.
   - Converte gli apici in caratteri compatibili con FFmpeg.
 - **`escDrawText(s)`**
   - Escapa una stringa per il filtro `drawtext`.
+- **`ffmpegSafePath(p)`**
+  - Normalizza un percorso file sostituendo i caratteri problematici
+    (backslash, due punti, parentesi quadre) con equivalenti compatibili con
+    le catene `filter_complex` di FFmpeg.
 - **`parseSec(v, def?)`**
   - Converte valori in secondi numerici.
 - **`lineOffset(i, segDur, animDur)`**

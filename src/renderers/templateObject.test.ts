@@ -19,10 +19,13 @@ test("renderTemplateSlide overlays image and text", (t) => {
       {
         type: "image",
         file: "dummy.png",
-        x: "0%",
-        y: "0%",
+        x: "50%",
+        y: "50%",
         width: "10%",
         height: "20%",
+        x_anchor: "50%",
+        y_anchor: "50%",
+
       },
       {
         type: "text",
@@ -48,6 +51,7 @@ test("renderTemplateSlide overlays image and text", (t) => {
   assert.ok(fc.includes("overlay"));
   assert.ok(fc.includes("drawtext"));
   assert.ok(fc.includes("scale=192:216"));
-  assert.ok(fc.includes("fontfile='C\\:/fonts/font.ttf'"));
+  assert.ok(fc.includes("fontfile=C\\:/fonts/font.ttf"));
+  assert.ok(fc.includes("overlay=x=864:y=432"));
 
 });
