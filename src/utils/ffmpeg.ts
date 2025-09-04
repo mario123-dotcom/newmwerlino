@@ -8,3 +8,7 @@ export function ffmpegSafePath(p: string): string {
     .replace(/\[/g, "\\[")
     .replace(/\]/g, "\\]");
 }
+
+export function ffmpegEscapeExpr(expr: string): string {
+  return expr.replace(/,/g, "\\,");
+}
