@@ -122,6 +122,7 @@ export function renderTemplateSlide(
         imgLbl = `[s${idx}]`;
       }
       filter += `${cur}${imgLbl}overlay=x=${x}:y=${y}${outLbl};`;
+
       imgInput++;
     }
     cur = outLbl;

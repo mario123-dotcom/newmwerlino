@@ -31,6 +31,7 @@ test("renderTemplateSlide overlays image and text", (t) => {
         height: "10%",
         fill_color: "red",
       },
+
     ],
     1,
     "out.mp4",
@@ -46,4 +47,5 @@ test("renderTemplateSlide overlays image and text", (t) => {
   assert.ok(fc.includes("drawtext"));
   assert.ok(fc.includes("scale=192:216"));
   assert.ok(fc.includes("fontfile='C:/fonts/font.ttf'"));
+
 });

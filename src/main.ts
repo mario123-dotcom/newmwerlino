@@ -102,6 +102,7 @@ import { sendFinalVideo } from "./share";
               (el.type !== "image" || !!el.file) &&
               (el.type !== "text" || !!el.text)
           );
+
         renderTemplateSlide(elements, seg.duration, out, {
           fps,
           videoW,

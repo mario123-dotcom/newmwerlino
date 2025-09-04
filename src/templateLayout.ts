@@ -5,7 +5,7 @@ import type { TemplateElement } from "./renderers/templateObject";
 
 /**
  * Load slide layouts from the main JSON template. Each layout contains
- * the positioned `text` and `image` elements for a slide.
+
  */
 export function loadSlideLayouts(
   file: string = "template_horizontal.json"
@@ -33,6 +33,7 @@ export function loadSlideLayouts(
         fill_color: child.fill_color,
       };
       arr.push(t);
+
     });
     layouts[idx] = arr;
   });
