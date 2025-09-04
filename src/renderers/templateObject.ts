@@ -182,7 +182,28 @@ export function renderTemplateElement(
     args.push("-loop", "1", "-t", `${duration}`, "-i", el.file);
     const src = `[2:v]`;
     let imgLbl = src;
-    if (w || h) {
+    const anims = Array.isArray(el.animations) ? el.animations : [];
+    const pan = anims.find((a) => a.type === "pan");
+    const fade = anims.find((a) => a.type === "fade");
+
+    if (pan) {
+      const start = typeof pan.time === "number" ? pan.time : 0;
+      const dur = typeof pan.duration === "number" ? pan.duration : duration;
+      const vw = w ?? videoW;
+      const vh = h ?? videoH;
+      const prog = `(min(max((t-${start})/${dur},0),1))`;
+      const sx = parsePercent(pan.start_x ?? "50%");
+      const sy = parsePercent(pan.start_y ?? "50%");
+      const ex = parsePercent(pan.end_x ?? pan.start_x ?? "50%");
+      const ey = parsePercent(pan.end_y ?? pan.start_y ?? "50%");
+      const ss = parsePercent(pan.start_scale ?? "100%");
+      const es = parsePercent(pan.end_scale ?? pan.start_scale ?? "100%");
+      const zoom = `(${ss}+(${es - ss})*${prog})`;
+      const xExpr = `(iw*${zoom}-${vw})*(${sx}+(${ex - sx})*${prog})`;
+      const yExpr = `(ih*${zoom}-${vh})*(${sy}+(${ey - sy})*${prog})`;
+      filter = `${src}scale=iw*${zoom}:ih*${zoom}:eval=frame,crop=${vw}:${vh}:x=${xExpr}:y=${yExpr},setsar=1[p0];`;
+      imgLbl = "[p0]";
+    } else if (w || h) {
       const fit = el.fit;
       if (fit === "contain" && w && h) {
         filter = `${src}scale=${w}:${h}:force_original_aspect_ratio=decrease,format=rgba,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2:color=black@0[s0];`;
@@ -196,10 +217,9 @@ export function renderTemplateElement(
       filter = `${src}scale=${videoW}:${videoH}:force_original_aspect_ratio=increase,crop=${videoW}:${videoH}[s0];`;
       imgLbl = "[s0]";
     }
-    const anim = Array.isArray(el.animations) ? el.animations[0] : undefined;
-    if (anim && anim.type === "fade") {
-      const start = typeof anim.time === "number" ? anim.time : 0;
-      const dur = typeof anim.duration === "number" ? anim.duration : 1;
+    if (fade) {
+      const start = typeof fade.time === "number" ? fade.time : 0;
+      const dur = typeof fade.duration === "number" ? fade.duration : 1;
       filter += `${imgLbl}format=rgba,fade=t=in:st=${start.toFixed(3)}:d=${dur.toFixed(3)}:alpha=1[f0];`;
       imgLbl = "[f0]";
     }
@@ -331,7 +351,28 @@ export function renderTemplateSlide(
 
       const src = `[${imgInput}:v]`;
       let imgLbl = src;
-      if (w || h) {
+      const anims = Array.isArray(el.animations) ? el.animations : [];
+      const pan = anims.find((a) => a.type === "pan");
+      const fade = anims.find((a) => a.type === "fade");
+
+      if (pan) {
+        const start = typeof pan.time === "number" ? pan.time : 0;
+        const dur = typeof pan.duration === "number" ? pan.duration : duration;
+        const vw = w ?? videoW;
+        const vh = h ?? videoH;
+        const prog = `(min(max((t-${start})/${dur},0),1))`;
+        const sx = parsePercent(pan.start_x ?? "50%");
+        const sy = parsePercent(pan.start_y ?? "50%");
+        const ex = parsePercent(pan.end_x ?? pan.start_x ?? "50%");
+        const ey = parsePercent(pan.end_y ?? pan.start_y ?? "50%");
+        const ss = parsePercent(pan.start_scale ?? "100%");
+        const es = parsePercent(pan.end_scale ?? pan.start_scale ?? "100%");
+        const zoom = `(${ss}+(${es - ss})*${prog})`;
+        const xExpr = `(iw*${zoom}-${vw})*(${sx}+(${ex - sx})*${prog})`;
+        const yExpr = `(ih*${zoom}-${vh})*(${sy}+(${ey - sy})*${prog})`;
+        filter += `${src}scale=iw*${zoom}:ih*${zoom}:eval=frame,crop=${vw}:${vh}:x=${xExpr}:y=${yExpr},setsar=1[s${idx}];`;
+        imgLbl = `[s${idx}]`;
+      } else if (w || h) {
         const fit = el.fit;
         if (fit === "contain" && w && h) {
           filter += `${src}scale=${w}:${h}:force_original_aspect_ratio=decrease,format=rgba,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2:color=black@0[s${idx}];`;
@@ -345,10 +386,9 @@ export function renderTemplateSlide(
         filter += `${src}scale=${videoW}:${videoH}:force_original_aspect_ratio=increase,crop=${videoW}:${videoH}[s${idx}];`;
         imgLbl = `[s${idx}]`;
       }
-      const anim = Array.isArray(el.animations) ? el.animations[0] : undefined;
-      if (anim && anim.type === "fade") {
-        const start = typeof anim.time === "number" ? anim.time : 0;
-        const dur = typeof anim.duration === "number" ? anim.duration : 1;
+      if (fade) {
+        const start = typeof fade.time === "number" ? fade.time : 0;
+        const dur = typeof fade.duration === "number" ? fade.duration : 1;
         filter += `${imgLbl}format=rgba,fade=t=in:st=${start.toFixed(3)}:d=${dur.toFixed(3)}:alpha=1[f${idx}];`;
         imgLbl = `[f${idx}]`;
       }
