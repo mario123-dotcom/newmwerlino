@@ -75,3 +75,10 @@ test('fitText wraps and shrinks text to fit box', () => {
   assert.ok(res.text.includes('\n'));
   assert.ok(res.fontSize < 40);
 });
+
+test('fitText accepts custom line height', () => {
+  const sample = 'uno due tre quattro cinque sei sette otto nove dieci';
+  const defaultRes = fitText(sample, 100, 60, 40);
+  const tallRes = fitText(sample, 100, 60, 40, 2);
+  assert.ok(tallRes.fontSize <= defaultRes.fontSize);
+});

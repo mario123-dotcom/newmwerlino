@@ -114,8 +114,9 @@ semplice cosa fanno e quali parametri accettano.
   - Calcola dimensione carattere e spezzatura testo in modo adattivo.
 - **`wrapParagraph(text, width?)`**
   - Suddivide un paragrafo in righe bilanciate.
-- **`fitText(text, boxW, boxH, baseSize)`**
-  - Ridimensiona il font e manda a capo il testo perché rientri nel riquadro.
+- **`fitText(text, boxW, boxH, baseSize, lineHeight?)`**
+  - Ridimensiona il font e manda a capo il testo perché rientri nel riquadro,
+    usando opzionalmente un fattore di interlinea personalizzato.
 - **`normalizeQuotes(s)`**
   - Converte gli apici in caratteri compatibili con FFmpeg.
 - **`escDrawText(s)`**

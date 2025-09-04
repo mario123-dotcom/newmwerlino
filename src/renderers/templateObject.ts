@@ -24,11 +24,22 @@ function normalizeColor(c: string): string {
 function dimToPx(
   val: string | number | undefined,
   base: number,
+  videoW?: number,
+  videoH?: number,
 ): number | undefined {
   if (val === undefined || val === null) return undefined;
   if (typeof val === "number") return Math.round(val);
   if (/^\d+(\.\d+)?%$/.test(val)) return Math.round(parsePercent(val) * base);
-  const n = parseFloat(val);
+  if (
+    /^\d+(\.\d+)?\s*vmin$/.test(String(val)) &&
+    typeof videoW === "number" &&
+    typeof videoH === "number"
+  ) {
+    const v = parseFloat(String(val));
+    const ref = Math.min(videoW, videoH);
+    return Math.round(v * ref);
+  }
+  const n = parseFloat(String(val));
   return isNaN(n) ? undefined : Math.round(n);
 }
 
@@ -56,9 +67,18 @@ export interface TemplateElement {
   font_family?: string;
   font_weight?: string;
   font_size?: string | number;
+  font_size_minimum?: string | number;
+  font_size_maximum?: string | number;
+  line_height?: string;
   animations?: any[];
   file?: string; // for image
   fit?: string; // for image scaling
+  background_color?: string;
+  shadow_color?: string;
+  shadow_x?: string | number;
+  shadow_y?: string | number;
+  shadow_blur?: string | number;
+
 
   [key: string]: any; // preserva proprietà aggiuntive
 }
@@ -78,10 +98,10 @@ export function renderTemplateElement(
     const f = family && fonts[family];
     return f || Object.values(fonts)[0] || "";
   };
-  const w = dimToPx(el.width, videoW);
-  const h = dimToPx(el.height, videoH);
-  const x = dimToPx(el.x, videoW) ?? 0;
-  const y = dimToPx(el.y, videoH) ?? 0;
+  const w = dimToPx(el.width, videoW, videoW, videoH);
+  const h = dimToPx(el.height, videoH, videoW, videoH);
+  const x = dimToPx(el.x, videoW, videoW, videoH) ?? 0;
+  const y = dimToPx(el.y, videoH, videoW, videoH) ?? 0;
   const ax = w && el.x_anchor ? parsePercent(el.x_anchor) * w : 0;
   const ay = h && el.y_anchor ? parsePercent(el.y_anchor) * h : 0;
   const finalX = x - ax;
@@ -95,11 +115,41 @@ export function renderTemplateElement(
   if (el.type === "text") {
     const color = normalizeColor(el.fill_color || "white");
     const baseSize =
-      dimToPx(el.font_size, videoH) ?? dimToPx(el.height, videoH) ?? 48;
-    const fitted = fitText(el.text || "", w ?? videoW, h ?? videoH, baseSize);
+      dimToPx(el.font_size, videoH, videoW, videoH) ??
+      dimToPx(el.height, videoH, videoW, videoH) ??
+      48;
+    const minFont = dimToPx(el.font_size_minimum, videoH, videoW, videoH);
+    const maxFont = dimToPx(el.font_size_maximum, videoH, videoW, videoH);
+    const lineFactor = el.line_height
+      ? parsePercent(el.line_height)
+      : 1.2;
+    const fitted = fitText(
+      el.text || "",
+      w ?? videoW,
+      h ?? videoH,
+      baseSize,
+      lineFactor,
+    );
+    let fontsize = fitted.fontSize;
+    if (minFont !== undefined) fontsize = Math.max(fontsize, minFont);
+    if (maxFont !== undefined) fontsize = Math.min(fontsize, maxFont);
     const text = escDrawText(fitted.text);
-    const fontsize = fitted.fontSize;
     const font = ffmpegSafePath(pickFont(el.font_family));
+    const boxColor = el.background_color
+      ? normalizeColor(el.background_color)
+      : undefined;
+    const shadowColor = el.shadow_color
+      ? normalizeColor(el.shadow_color)
+      : undefined;
+    const shadowX = dimToPx(el.shadow_x, videoW, videoW, videoH) ?? 0;
+    const shadowY = dimToPx(el.shadow_y, videoH, videoW, videoH) ?? 0;
+    const lineSpacing = Math.round(fontsize * (lineFactor - 1));
+    const extra =
+      (boxColor ? `:box=1:boxcolor=${boxColor}` : "") +
+      (shadowColor
+        ? `:shadowcolor=${shadowColor}:shadowx=${shadowX}:shadowy=${shadowY}`
+        : "") +
+      (lineSpacing ? `:line_spacing=${lineSpacing}` : "");
     const anim = Array.isArray(el.animations) ? el.animations[0] : undefined;
     if (anim && (anim.type === "wipe" || anim.type === "text-reveal")) {
       const dir = pickWipeDirection(anim);
@@ -107,7 +157,7 @@ export function renderTemplateElement(
       const dur = typeof anim.duration === "number" ? anim.duration : 0.6;
       filter =
         `color=c=black@0.0:s=${videoW}x${videoH}:r=${fps}:d=${duration},format=rgba,setsar=1[t_can];` +
-        `[t_can]drawtext=fontfile='${font}':text='${text}':x=${finalX}:y=${finalY}:fontsize=${fontsize}:fontcolor=${color}[t_rgba];` +
+        `[t_can]drawtext=fontfile='${font}':text='${text}':x=${finalX}:y=${finalY}:fontsize=${fontsize}:fontcolor=${color}${extra}[t_rgba];` +
         `[t_rgba]split=2[t_rgb][t_forA];` +
         `[t_forA]alphaextract,format=gray,setsar=1[t_Aorig];` +
         `color=c=black:s=${videoW}x${videoH}:r=${fps}:d=${duration},format=gray,setsar=1[t_off];` +
@@ -124,7 +174,7 @@ export function renderTemplateElement(
         const end = start + dur;
         alphaPart = `:alpha='if(lt(t,${start.toFixed(3)}),0,if(lt(t,${end.toFixed(3)}),(t-${start.toFixed(3)})/${dur.toFixed(3)},1))'`;
       }
-      filter = `[0:v]drawtext=fontfile='${font}':text='${text}':x=${finalX}:y=${finalY}:fontsize=${fontsize}:fontcolor=${color}${alphaPart}[v]`;
+      filter = `[0:v]drawtext=fontfile='${font}':text='${text}':x=${finalX}:y=${finalY}:fontsize=${fontsize}:fontcolor=${color}${extra}${alphaPart}[v]`;
     }
   } else if (el.type === "image") {
     if (!el.file) throw new Error("image element missing file path");
@@ -200,10 +250,10 @@ export function renderTemplateSlide(
   let cur = "[0:v]";
   let imgInput = 1;
   elements.forEach((el, idx) => {
-    const w = dimToPx(el.width, videoW);
-    const h = dimToPx(el.height, videoH);
-    const x = dimToPx(el.x, videoW) ?? 0;
-    const y = dimToPx(el.y, videoH) ?? 0;
+    const w = dimToPx(el.width, videoW, videoW, videoH);
+    const h = dimToPx(el.height, videoH, videoW, videoH);
+    const x = dimToPx(el.x, videoW, videoW, videoH) ?? 0;
+    const y = dimToPx(el.y, videoH, videoW, videoH) ?? 0;
     const ax = w && el.x_anchor ? parsePercent(el.x_anchor) * w : 0;
     const ay = h && el.y_anchor ? parsePercent(el.y_anchor) * h : 0;
     const fx = x - ax;
@@ -212,12 +262,42 @@ export function renderTemplateSlide(
     const outLbl = `[v${idx + 1}]`;
     if (el.type === "text") {
       const baseSize =
-        dimToPx(el.font_size, videoH) ?? dimToPx(el.height, videoH) ?? 48;
-      const fitted = fitText(el.text || "", w ?? videoW, h ?? videoH, baseSize);
+        dimToPx(el.font_size, videoH, videoW, videoH) ??
+        dimToPx(el.height, videoH, videoW, videoH) ??
+        48;
+      const minFont = dimToPx(el.font_size_minimum, videoH, videoW, videoH);
+      const maxFont = dimToPx(el.font_size_maximum, videoH, videoW, videoH);
+      const lineFactor = el.line_height
+        ? parsePercent(el.line_height)
+        : 1.2;
+      const fitted = fitText(
+        el.text || "",
+        w ?? videoW,
+        h ?? videoH,
+        baseSize,
+        lineFactor,
+      );
+      let fontsize = fitted.fontSize;
+      if (minFont !== undefined) fontsize = Math.max(fontsize, minFont);
+      if (maxFont !== undefined) fontsize = Math.min(fontsize, maxFont);
       const text = escDrawText(fitted.text);
       const color = normalizeColor(el.fill_color || "white");
-      const fontsize = fitted.fontSize;
       const font = ffmpegSafePath(pickFont(el.font_family));
+      const boxColor = el.background_color
+        ? normalizeColor(el.background_color)
+        : undefined;
+      const shadowColor = el.shadow_color
+        ? normalizeColor(el.shadow_color)
+        : undefined;
+      const shadowX = dimToPx(el.shadow_x, videoW, videoW, videoH) ?? 0;
+      const shadowY = dimToPx(el.shadow_y, videoH, videoW, videoH) ?? 0;
+      const lineSpacing = Math.round(fontsize * (lineFactor - 1));
+      const extra =
+        (boxColor ? `:box=1:boxcolor=${boxColor}` : "") +
+        (shadowColor
+          ? `:shadowcolor=${shadowColor}:shadowx=${shadowX}:shadowy=${shadowY}`
+          : "") +
+        (lineSpacing ? `:line_spacing=${lineSpacing}` : "");
       const anim = Array.isArray(el.animations) ? el.animations[0] : undefined;
       if (anim && (anim.type === "wipe" || anim.type === "text-reveal")) {
         const dir = pickWipeDirection(anim);
@@ -225,7 +305,7 @@ export function renderTemplateSlide(
         const dur = typeof anim.duration === "number" ? anim.duration : 0.6;
         filter +=
           `color=c=black@0.0:s=${videoW}x${videoH}:r=${fps}:d=${duration},format=rgba,setsar=1[t${idx}_can];` +
-          `[t${idx}_can]drawtext=fontfile='${font}':text='${text}':x=${fx}:y=${fy}:fontsize=${fontsize}:fontcolor=${color}[t${idx}_rgba];` +
+          `[t${idx}_can]drawtext=fontfile='${font}':text='${text}':x=${fx}:y=${fy}:fontsize=${fontsize}:fontcolor=${color}${extra}[t${idx}_rgba];` +
           `[t${idx}_rgba]split=2[t${idx}_rgb][t${idx}_forA];` +
           `[t${idx}_forA]alphaextract,format=gray,setsar=1[t${idx}_Aorig];` +
           `color=c=black:s=${videoW}x${videoH}:r=${fps}:d=${duration},format=gray,setsar=1[t${idx}_off];` +
@@ -242,7 +322,7 @@ export function renderTemplateSlide(
           const end = start + dur;
           alphaPart = `:alpha='if(lt(t,${start.toFixed(3)}),0,if(lt(t,${end.toFixed(3)}),(t-${start.toFixed(3)})/${dur.toFixed(3)},1))'`;
         }
-        filter += `${cur}drawtext=fontfile='${font}':text='${text}':x=${fx}:y=${fy}:fontsize=${fontsize}:fontcolor=${color}${alphaPart}${outLbl};`;
+        filter += `${cur}drawtext=fontfile='${font}':text='${text}':x=${fx}:y=${fy}:fontsize=${fontsize}:fontcolor=${color}${extra}${alphaPart}${outLbl};`;
       }
     } else if (el.type === "image") {
       if (!el.file) return; // skip if missing file
