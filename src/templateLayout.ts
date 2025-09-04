@@ -37,6 +37,8 @@ export function loadSlideLayouts(
         fill_color: child.fill_color,
         font_family: child.font_family,
         font_weight: child.font_weight,
+        font_size: child.font_size,
+        animations: child.animations,
       };
       arr.push(t);
 
