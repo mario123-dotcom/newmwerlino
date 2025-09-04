@@ -46,6 +46,8 @@ export interface TemplateElement {
 
   font_family?: string;
   font_weight?: string;
+  font_size?: string | number;
+  animations?: any[];
   file?: string; // for image
 }
 
@@ -81,7 +83,8 @@ export function renderTemplateElement(
   if (el.type === "text") {
     const text = escDrawText(el.text || "");
     const color = normalizeColor(el.fill_color || "white");
-    const fontsize = dimToPx(el.height, videoH) ?? 48;
+    const fontsize =
+      dimToPx(el.font_size, videoH) ?? dimToPx(el.height, videoH) ?? 48;
     const font = ffmpegSafePath(pickFont(el.font_family));
     filter = `[0:v]drawtext=fontfile='${font}':text='${text}':x=${finalX}:y=${finalY}:fontsize=${fontsize}:fontcolor=${color}[v]`;
   } else if (el.type === "image") {
@@ -154,7 +157,8 @@ export function renderTemplateSlide(
     if (el.type === "text") {
       const text = escDrawText(el.text || "");
       const color = normalizeColor(el.fill_color || "white");
-      const fontsize = dimToPx(el.height, videoH) ?? 48;
+      const fontsize =
+        dimToPx(el.font_size, videoH) ?? dimToPx(el.height, videoH) ?? 48;
       const font = ffmpegSafePath(pickFont(el.font_family));
       filter += `${cur}drawtext=fontfile='${font}':text='${text}':x=${fx}:y=${fy}:fontsize=${fontsize}:fontcolor=${color}${outLbl};`;
     } else if (el.type === "image") {
