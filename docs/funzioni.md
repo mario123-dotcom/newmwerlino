@@ -40,6 +40,11 @@ semplice cosa fanno e quali parametri accettano.
 - **`loadTemplate()`**
   - Carica il file di template `risposta_*.json` (orizzontale o verticale).
 
+## `src/templateLayout.ts`
+- **`loadSlideLayouts()`**
+  - Estrae dal template la disposizione degli elementi `image` e `text`
+    per ogni slide, restituendo un array di oggetti posizionati.
+
 ## `src/concat.ts`
 - **`concatAndFinalizeDemuxer(opts)`**
   - Unisce i segmenti generati e, se presente, mixa l'audio di sottofondo

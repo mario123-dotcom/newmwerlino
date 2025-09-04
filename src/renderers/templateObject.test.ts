@@ -15,12 +15,27 @@ test("renderTemplateSlide overlays image and text", (t) => {
   const { renderTemplateSlide } = require("./templateObject");
   renderTemplateSlide(
     [
-      { type: "image", file: "dummy.png", x: "0%", y: "0%" },
-      { type: "text", text: "hello", x: "10%", y: "20%", height: "10%", fill_color: "red" },
+      {
+        type: "image",
+        file: "dummy.png",
+        x: "0%",
+        y: "0%",
+        width: "10%",
+        height: "20%",
+      },
+      {
+        type: "text",
+        text: "hello",
+        x: "10%",
+        y: "20%",
+        height: "10%",
+        fill_color: "red",
+      },
+
     ],
     1,
     "out.mp4",
-    { fps: 30, videoW: 1920, videoH: 1080, fontPath: "font.ttf" }
+    { fps: 30, videoW: 1920, videoH: 1080, fontPath: "C:/fonts/font.ttf" }
   );
   unlinkSync("dummy.png");
 
@@ -30,4 +45,7 @@ test("renderTemplateSlide overlays image and text", (t) => {
   const fc = captured![idx + 1];
   assert.ok(fc.includes("overlay"));
   assert.ok(fc.includes("drawtext"));
+  assert.ok(fc.includes("scale=192:216"));
+  assert.ok(fc.includes("fontfile='C:/fonts/font.ttf'"));
+
 });

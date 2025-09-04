@@ -5,7 +5,7 @@ import type { TemplateElement } from "./renderers/templateObject";
 
 /**
  * Load slide layouts from the main JSON template. Each layout contains
- * the positioned elements (Logo, Immagine-i, Testo-i) for a slide.
+
  */
 export function loadSlideLayouts(
   file: string = "template_horizontal.json"
@@ -22,23 +22,18 @@ export function loadSlideLayouts(
     const idx = parseInt(m[1]!, 10);
     const arr: TemplateElement[] = [];
     (el.elements || []).forEach((child: any) => {
-      const cname: string = child.name || "";
-      if (
-        cname === "Logo" ||
-        cname === `Immagine-${idx}` ||
-        cname === `Testo-${idx}`
-      ) {
-        const t: TemplateElement = {
-          type: child.type === "image" ? "image" : "text",
-          name: cname,
-          x: child.x,
-          y: child.y,
-          width: child.width,
-          height: child.height,
-          fill_color: child.fill_color,
-        };
-        arr.push(t);
-      }
+      if (child.type !== "image" && child.type !== "text") return;
+      const t: TemplateElement = {
+        type: child.type === "image" ? "image" : "text",
+        name: child.name,
+        x: child.x,
+        y: child.y,
+        width: child.width,
+        height: child.height,
+        fill_color: child.fill_color,
+      };
+      arr.push(t);
+
     });
     layouts[idx] = arr;
   });

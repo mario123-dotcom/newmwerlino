@@ -39,9 +39,7 @@ import { sendFinalVideo } from "./share";
     console.error("[ERROR] No fonts in fonts/");
     process.exit(1);
   }
-  let fontPath = join(paths.fonts, fontFiles[0]).replace(/\\/g, "/");
-  if (process.platform === "win32")
-    fontPath = fontPath.replace(/^([A-Za-z]):\//, (_, d) => `${d}\\:/`);
+  const fontPath = join(paths.fonts, fontFiles[0]).replace(/\\/g, "/");
   console.log("[LOG] Using font:", fontPath);
 
   // logo
@@ -87,13 +85,24 @@ import { sendFinalVideo } from "./share";
       const out = join(paths.temp, `seg${idx}.mp4`);
       if (seg.kind === "image") {
         const layout = layouts[seg.index ?? 0] || [];
-        const elements = layout.map((e) => {
-          const el = { ...e };
-          if (e.name === "Logo" && logoPath) el.file = logoPath;
-          else if (e.name?.startsWith("Immagine") && seg.img) el.file = seg.img;
-          else if (e.name?.startsWith("Testo")) el.text = seg.text || "";
-          return el;
-        }).filter((el) => el.type !== "image" || !!el.file);
+        const elements = layout
+          .map((e) => {
+            const el = { ...e };
+            if (el.type === "image") {
+              if (e.name === "Logo" && logoPath) el.file = logoPath;
+              else if (seg.img && e.name?.startsWith("Immagine")) el.file = seg.img;
+            } else if (el.type === "text") {
+              if (e.name?.startsWith("Testo")) el.text = seg.text || "";
+              else if (mods[e.name]) el.text = String(mods[e.name]);
+            }
+            return el;
+          })
+          .filter(
+            (el) =>
+              (el.type !== "image" || !!el.file) &&
+              (el.type !== "text" || !!el.text)
+          );
+
         renderTemplateSlide(elements, seg.duration, out, {
           fps,
           videoW,

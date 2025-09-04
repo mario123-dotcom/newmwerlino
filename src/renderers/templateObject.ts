@@ -1,6 +1,20 @@
 import { runFFmpeg } from "../ffmpeg/run";
 import { parsePercent } from "../utils/num";
 
+function escDrawText(str: string): string {
+  return str
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'")
+    .replace(/:/g, "\\:");
+}
+
+function dimToPx(val: string | undefined, base: number): number | undefined {
+  if (!val) return undefined;
+  if (/^\d+(\.\d+)?%$/.test(val)) return Math.round(parsePercent(val) * base);
+  const n = parseFloat(val);
+  return isNaN(n) ? undefined : Math.round(n);
+}
+
 export interface TemplateElement {
   type: "text" | "image";
   name?: string;
@@ -32,14 +46,23 @@ export function renderTemplateElement(
 
   let filter = "";
   if (el.type === "text") {
-    const text = (el.text || "").replace(/:/g, '\\:');
+    const text = escDrawText(el.text || "");
     const color = el.fill_color || "white";
     const fontsize = el.height ? Math.round(parsePercent(el.height) * videoH) : 48;
-    filter = `[0:v]drawtext=fontfile=${fontPath}:text='${text}':x=${x}:y=${y}:fontsize=${fontsize}:fontcolor=${color}[v]`;
+    const font = `'${fontPath.replace(/'/g, "\\'")}'`;
+    filter = `[0:v]drawtext=fontfile=${font}:text='${text}':x=${x}:y=${y}:fontsize=${fontsize}:fontcolor=${color}[v]`;
   } else if (el.type === "image") {
     if (!el.file) throw new Error("image element missing file path");
     args.push("-loop", "1", "-t", `${duration}`, "-i", el.file);
-    filter = `[0:v][2:v]overlay=x=${x}:y=${y}[v]`;
+    const w = dimToPx(el.width, videoW);
+    const h = dimToPx(el.height, videoH);
+    if (w || h) {
+      const sw = w ?? -1;
+      const sh = h ?? -1;
+      filter = `[2:v]scale=${sw}:${sh}[s0];[0:v][s0]overlay=x=${x}:y=${y}[v]`;
+    } else {
+      filter = `[0:v][2:v]overlay=x=${x}:y=${y}[v]`;
+    }
   } else {
     throw new Error(`Unsupported element type: ${el.type}`);
   }
@@ -80,14 +103,26 @@ export function renderTemplateSlide(
     const y = el.y ? Math.round(parsePercent(el.y) * videoH) : 0;
     const outLbl = `[v${idx + 1}]`;
     if (el.type === "text") {
-      const text = (el.text || "").replace(/:/g, '\\:');
+      const text = escDrawText(el.text || "");
       const color = el.fill_color || "white";
       const fontsize = el.height ? Math.round(parsePercent(el.height) * videoH) : 48;
-      filter += `${cur}drawtext=fontfile=${fontPath}:text='${text}':x=${x}:y=${y}:fontsize=${fontsize}:fontcolor=${color}${outLbl};`;
+      const font = `'${fontPath.replace(/'/g, "\\'")}'`;
+      filter += `${cur}drawtext=fontfile=${font}:text='${text}':x=${x}:y=${y}:fontsize=${fontsize}:fontcolor=${color}${outLbl};`;
     } else if (el.type === "image") {
       if (!el.file) return; // skip if missing file
       args.push("-loop", "1", "-t", `${duration}`, "-i", el.file);
-      filter += `${cur}[${imgInput}:v]overlay=x=${x}:y=${y}${outLbl};`;
+      const w = dimToPx(el.width, videoW);
+      const h = dimToPx(el.height, videoH);
+      const src = `[${imgInput}:v]`;
+      let imgLbl = src;
+      if (w || h) {
+        const sw = w ?? -1;
+        const sh = h ?? -1;
+        filter += `${src}scale=${sw}:${sh}[s${idx}];`;
+        imgLbl = `[s${idx}]`;
+      }
+      filter += `${cur}${imgLbl}overlay=x=${x}:y=${y}${outLbl};`;
+
       imgInput++;
     }
     cur = outLbl;
