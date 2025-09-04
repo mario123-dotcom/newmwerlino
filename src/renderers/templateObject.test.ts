@@ -93,6 +93,40 @@ test("image fit contain scales with aspect ratio", (t) => {
   );
 });
 
+test("image shadow is rendered with blur and offset", (t) => {
+  let captured: string[] | undefined;
+  const runMod = require("../ffmpeg/run");
+  t.mock.method(runMod, "runFFmpeg", (args: string[]) => {
+    captured = args;
+  });
+
+  writeFileSync("dummy.png", "");
+  const { renderTemplateSlide } = require("./templateObject");
+  renderTemplateSlide(
+    [
+      {
+        type: "image",
+        file: "dummy.png",
+        shadow_color: "#000000",
+        shadow_x: 5,
+        shadow_y: 6,
+        shadow_blur: 4,
+      },
+    ],
+    1,
+    "out.mp4",
+    { fps: 30, videoW: 200, videoH: 100, fonts: {} }
+  );
+  unlinkSync("dummy.png");
+
+  assert.ok(captured);
+  const idx = captured!.indexOf("-filter_complex");
+  assert.notEqual(idx, -1);
+  const fc = captured![idx + 1];
+  assert.ok(fc.includes("boxblur=4:4:4"));
+  assert.ok(fc.includes("overlay=x=5:y=6"));
+});
+
 test("vmin units use smaller viewport dimension as percent", (t) => {
   let captured: string[] | undefined;
   const runMod = require("../ffmpeg/run");

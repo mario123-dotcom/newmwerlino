@@ -312,7 +312,27 @@ export function renderTemplateElement(
       filter += `${imgLbl}format=rgba,fade=t=in:st=${start.toFixed(3)}:d=${dur.toFixed(3)}:alpha=1[f0];`;
       imgLbl = "[f0]";
     }
-    filter += `[0:v]${imgLbl}overlay=x=${finalX}:y=${finalY}[v]`;
+    const shadowColor = el.shadow_color
+      ? normalizeColor(el.shadow_color)
+      : undefined;
+    const shadowX = dimToPx(el.shadow_x, videoW, videoW, videoH) ?? 0;
+    const shadowY = dimToPx(el.shadow_y, videoH, videoW, videoH) ?? 0;
+    const shadowBlur =
+      dimToPx(el.shadow_blur, Math.min(videoW, videoH), videoW, videoH) ?? 0;
+    if (shadowColor) {
+      const shW = w ?? videoW;
+      const shH = h ?? videoH;
+      filter += `color=c=${shadowColor}:s=${shW}x${shH}[sh0];`;
+      if (shadowBlur > 0) {
+        filter += `[sh0]boxblur=${shadowBlur}:${shadowBlur}:${shadowBlur}[shb];`;
+        filter += `[0:v][shb]overlay=x=${finalX + shadowX}:y=${finalY + shadowY}[tmp0];`;
+      } else {
+        filter += `[0:v][sh0]overlay=x=${finalX + shadowX}:y=${finalY + shadowY}[tmp0];`;
+      }
+      filter += `[tmp0]${imgLbl}overlay=x=${finalX}:y=${finalY}[v]`;
+    } else {
+      filter += `[0:v]${imgLbl}overlay=x=${finalX}:y=${finalY}[v]`;
+    }
   } else if (el.type === "shade") {
     const strength = el.strength !== undefined ? Number(el.strength) : 0.5;
     const gamma = el.gamma !== undefined ? Number(el.gamma) : undefined;
@@ -583,7 +603,27 @@ export function renderTemplateSlide(
         filter += `${imgLbl}format=rgba,fade=t=in:st=${start.toFixed(3)}:d=${dur.toFixed(3)}:alpha=1[f${idx}];`;
         imgLbl = `[f${idx}]`;
       }
-      filter += `${cur}${imgLbl}overlay=x=${fx}:y=${fy}${outLbl};`;
+      const shadowColor = el.shadow_color
+        ? normalizeColor(el.shadow_color)
+        : undefined;
+      const shadowX = dimToPx(el.shadow_x, videoW, videoW, videoH) ?? 0;
+      const shadowY = dimToPx(el.shadow_y, videoH, videoW, videoH) ?? 0;
+      const shadowBlur =
+        dimToPx(el.shadow_blur, Math.min(videoW, videoH), videoW, videoH) ?? 0;
+      if (shadowColor) {
+        const shW = w ?? videoW;
+        const shH = h ?? videoH;
+        filter += `color=c=${shadowColor}:s=${shW}x${shH}[sh${idx}_base];`;
+        if (shadowBlur > 0) {
+          filter += `[sh${idx}_base]boxblur=${shadowBlur}:${shadowBlur}:${shadowBlur}[sh${idx}_blur];`;
+          filter += `${cur}[sh${idx}_blur]overlay=x=${fx + shadowX}:y=${fy + shadowY}[tmp${idx}];`;
+        } else {
+          filter += `${cur}[sh${idx}_base]overlay=x=${fx + shadowX}:y=${fy + shadowY}[tmp${idx}];`;
+        }
+        filter += `[tmp${idx}]${imgLbl}overlay=x=${fx}:y=${fy}${outLbl};`;
+      } else {
+        filter += `${cur}${imgLbl}overlay=x=${fx}:y=${fy}${outLbl};`;
+      }
 
       imgInput++;
     } else if (el.type === "shade") {

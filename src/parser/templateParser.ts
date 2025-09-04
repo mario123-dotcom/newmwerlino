@@ -49,6 +49,10 @@ export interface ImageElement extends BaseVisual {
   type: "image";
   source: string;
   fit?: string;
+  shadow_color?: string;
+  shadow_blur?: string;
+  shadow_x?: string;
+  shadow_y?: string;
 }
 
 export interface GradientStop {
@@ -126,7 +130,16 @@ function mapVisual(el: any): VisualElement | null {
     case "video":
       return { ...common, type: "video", source: el.source } as VideoElement;
     case "image":
-      return { ...common, type: "image", source: el.source, fit: el.fit } as ImageElement;
+      return {
+        ...common,
+        type: "image",
+        source: el.source,
+        fit: el.fit,
+        shadow_color: el.shadow_color,
+        shadow_blur: el.shadow_blur,
+        shadow_x: el.shadow_x,
+        shadow_y: el.shadow_y,
+      } as ImageElement;
     case "shape":
       return {
         ...common,
