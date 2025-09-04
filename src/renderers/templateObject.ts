@@ -145,12 +145,16 @@ export function renderTemplateElement(
     const shadowX = dimToPx(el.shadow_x, videoW, videoW, videoH) ?? 0;
     const shadowY = dimToPx(el.shadow_y, videoH, videoW, videoH) ?? 0;
     const lineSpacing = Math.round(fontsize * (lineFactor - 1));
+    const letterSpacing = el.letter_spacing
+      ? Math.round((parsePercent(el.letter_spacing) - 1) * fontsize)
+      : 0;
     const extra =
       (boxColor ? `:box=1:boxcolor=${boxColor}` : "") +
       (shadowColor
         ? `:shadowcolor=${shadowColor}:shadowx=${shadowX}:shadowy=${shadowY}`
         : "") +
-      (lineSpacing ? `:line_spacing=${lineSpacing}` : "");
+      (lineSpacing ? `:line_spacing=${lineSpacing}` : "") +
+      (letterSpacing ? `:spacing=${letterSpacing}` : "");
     const anim = Array.isArray(el.animations) ? el.animations[0] : undefined;
     if (anim && (anim.type === "wipe" || anim.type === "text-reveal")) {
       const dir = pickWipeDirection(anim);
@@ -317,12 +321,16 @@ export function renderTemplateSlide(
       const shadowX = dimToPx(el.shadow_x, videoW, videoW, videoH) ?? 0;
       const shadowY = dimToPx(el.shadow_y, videoH, videoW, videoH) ?? 0;
       const lineSpacing = Math.round(fontsize * (lineFactor - 1));
+      const letterSpacing = el.letter_spacing
+        ? Math.round((parsePercent(el.letter_spacing) - 1) * fontsize)
+        : 0;
       const extra =
         (boxColor ? `:box=1:boxcolor=${boxColor}` : "") +
         (shadowColor
           ? `:shadowcolor=${shadowColor}:shadowx=${shadowX}:shadowy=${shadowY}`
           : "") +
-        (lineSpacing ? `:line_spacing=${lineSpacing}` : "");
+        (lineSpacing ? `:line_spacing=${lineSpacing}` : "") +
+        (letterSpacing ? `:spacing=${letterSpacing}` : "");
       const anim = Array.isArray(el.animations) ? el.animations[0] : undefined;
       if (anim && (anim.type === "wipe" || anim.type === "text-reveal")) {
         const dir = pickWipeDirection(anim);
