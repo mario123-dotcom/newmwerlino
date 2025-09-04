@@ -1,4 +1,5 @@
 import { runFFmpeg } from "../ffmpeg/run";
+import { shadeChain } from "../ffmpeg/filters";
 import { parsePercent } from "../utils/num";
 import { ffmpegSafePath, ffmpegEscapeExpr } from "../utils/ffmpeg";
 import { escDrawText, fitText } from "../utils/text";
@@ -11,10 +12,8 @@ function normalizeColor(c: string): string {
     const g = toHex(m[2]!);
     const b = toHex(m[3]!);
     if (m[4]) {
-      const a = Math.round(parseFloat(m[4]!) * 255)
-        .toString(16)
-        .padStart(2, "0");
-      return `#${r}${g}${b}${a}`;
+      const a = parseFloat(m[4]!).toString();
+      return `#${r}${g}${b}@${a}`;
     }
     return `#${r}${g}${b}`;
   }
@@ -54,7 +53,7 @@ function pickWipeDirection(anim: any): string {
 }
 
 export interface TemplateElement {
-  type: "text" | "image";
+  type: "text" | "image" | "shade";
   name?: string;
   text?: string;
   fill_color?: string;
@@ -144,17 +143,21 @@ export function renderTemplateElement(
       : undefined;
     const shadowX = dimToPx(el.shadow_x, videoW, videoW, videoH) ?? 0;
     const shadowY = dimToPx(el.shadow_y, videoH, videoW, videoH) ?? 0;
+    const shadowBlur =
+      dimToPx(el.shadow_blur, Math.min(videoW, videoH), videoW, videoH) ?? 0;
     const lineSpacing = Math.round(fontsize * (lineFactor - 1));
     const letterSpacing = el.letter_spacing
       ? Math.round((parsePercent(el.letter_spacing) - 1) * fontsize)
       : 0;
-    const extra =
+    const baseExtra =
       (boxColor ? `:box=1:boxcolor=${boxColor}` : "") +
-      (shadowColor
-        ? `:shadowcolor=${shadowColor}:shadowx=${shadowX}:shadowy=${shadowY}`
-        : "") +
       (lineSpacing ? `:line_spacing=${lineSpacing}` : "") +
       (letterSpacing ? `:spacing=${letterSpacing}` : "");
+    const extra =
+      baseExtra +
+      (shadowColor
+        ? `:shadowcolor=${shadowColor}:shadowx=${shadowX}:shadowy=${shadowY}`
+        : "");
     const anim = Array.isArray(el.animations) ? el.animations[0] : undefined;
     if (anim && (anim.type === "wipe" || anim.type === "text-reveal")) {
       const dir = pickWipeDirection(anim);
@@ -213,7 +216,19 @@ export function renderTemplateElement(
         const end = start + dur;
         alphaPart = `:alpha='if(lt(t,${start.toFixed(3)}),0,if(lt(t,${end.toFixed(3)}),(t-${start.toFixed(3)})/${dur.toFixed(3)},1))'`;
       }
-      filter = `[0:v]drawtext=fontfile='${font}':text='${text}':x=${finalX}:y=${finalY}:fontsize=${fontsize}:fontcolor=${color}${extra}${alphaPart}[v]`;
+      if (shadowColor && shadowBlur > 0) {
+        const shadowExtra =
+          (lineSpacing ? `:line_spacing=${lineSpacing}` : "") +
+          (letterSpacing ? `:spacing=${letterSpacing}` : "");
+        filter =
+          `color=c=black@0.0:s=${videoW}x${videoH}:r=${fps}:d=${duration},format=rgba,setsar=1[sh_can];` +
+          `[sh_can]drawtext=fontfile='${font}':text='${text}':x=${finalX + shadowX}:y=${finalY + shadowY}:fontsize=${fontsize}:fontcolor=${shadowColor}${shadowExtra}[sh_rgba];` +
+          `[sh_rgba]boxblur=${shadowBlur}:${shadowBlur}:${shadowBlur}[sh_blur];` +
+          `[0:v][sh_blur]overlay=x=0:y=0[tmp_base];` +
+          `[tmp_base]drawtext=fontfile='${font}':text='${text}':x=${finalX}:y=${finalY}:fontsize=${fontsize}:fontcolor=${color}${baseExtra}${alphaPart}[v]`;
+      } else {
+        filter = `[0:v]drawtext=fontfile='${font}':text='${text}':x=${finalX}:y=${finalY}:fontsize=${fontsize}:fontcolor=${color}${extra}${alphaPart}[v]`;
+      }
     }
   } else if (el.type === "image") {
     if (!el.file) throw new Error("image element missing file path");
@@ -266,6 +281,18 @@ export function renderTemplateElement(
       imgLbl = "[f0]";
     }
     filter += `[0:v]${imgLbl}overlay=x=${finalX}:y=${finalY}[v]`;
+  } else if (el.type === "shade") {
+    const strength = el.strength !== undefined ? Number(el.strength) : 0.5;
+    const gamma = el.gamma !== undefined ? Number(el.gamma) : undefined;
+    const leftPower = el.left_power !== undefined ? Number(el.left_power) : undefined;
+    const vertPower = el.vert_power !== undefined ? Number(el.vert_power) : undefined;
+    const bias = el.bias !== undefined ? Number(el.bias) : undefined;
+    let shadeColor = el.color ? normalizeColor(el.color) : "black";
+    shadeColor = shadeColor.split("@")[0];
+    const chain = shadeChain(strength, gamma, leftPower, vertPower, bias, shadeColor);
+    filter =
+      `color=c=black:s=${videoW}x${videoH}:r=${fps}:d=${duration},${chain}[sh];` +
+      `[0:v][sh]overlay=x=0:y=0[v]`;
   } else {
     throw new Error(`Unsupported element type: ${el.type}`);
   }
@@ -354,17 +381,21 @@ export function renderTemplateSlide(
         : undefined;
       const shadowX = dimToPx(el.shadow_x, videoW, videoW, videoH) ?? 0;
       const shadowY = dimToPx(el.shadow_y, videoH, videoW, videoH) ?? 0;
+      const shadowBlur =
+        dimToPx(el.shadow_blur, Math.min(videoW, videoH), videoW, videoH) ?? 0;
       const lineSpacing = Math.round(fontsize * (lineFactor - 1));
       const letterSpacing = el.letter_spacing
         ? Math.round((parsePercent(el.letter_spacing) - 1) * fontsize)
         : 0;
-      const extra =
+      const baseExtra =
         (boxColor ? `:box=1:boxcolor=${boxColor}` : "") +
-        (shadowColor
-          ? `:shadowcolor=${shadowColor}:shadowx=${shadowX}:shadowy=${shadowY}`
-          : "") +
         (lineSpacing ? `:line_spacing=${lineSpacing}` : "") +
         (letterSpacing ? `:spacing=${letterSpacing}` : "");
+      const extra =
+        baseExtra +
+        (shadowColor
+          ? `:shadowcolor=${shadowColor}:shadowx=${shadowX}:shadowy=${shadowY}`
+          : "");
       const anim = Array.isArray(el.animations) ? el.animations[0] : undefined;
       if (anim && (anim.type === "wipe" || anim.type === "text-reveal")) {
         const dir = pickWipeDirection(anim);
@@ -424,7 +455,19 @@ export function renderTemplateSlide(
           const end = start + dur;
           alphaPart = `:alpha='if(lt(t,${start.toFixed(3)}),0,if(lt(t,${end.toFixed(3)}),(t-${start.toFixed(3)})/${dur.toFixed(3)},1))'`;
         }
-        filter += `${cur}drawtext=fontfile='${font}':text='${text}':x=${fx}:y=${fy}:fontsize=${fontsize}:fontcolor=${color}${extra}${alphaPart}${outLbl};`;
+        if (shadowColor && shadowBlur > 0) {
+          const shadowExtra =
+            (lineSpacing ? `:line_spacing=${lineSpacing}` : "") +
+            (letterSpacing ? `:spacing=${letterSpacing}` : "");
+          filter +=
+            `color=c=black@0.0:s=${videoW}x${videoH}:r=${fps}:d=${duration},format=rgba,setsar=1[sh${idx}_can];` +
+            `[sh${idx}_can]drawtext=fontfile='${font}':text='${text}':x=${fx + shadowX}:y=${fy + shadowY}:fontsize=${fontsize}:fontcolor=${shadowColor}${shadowExtra}[sh${idx}_rgba];` +
+            `[sh${idx}_rgba]boxblur=${shadowBlur}:${shadowBlur}:${shadowBlur}[sh${idx}_blur];` +
+            `${cur}[sh${idx}_blur]overlay=x=0:y=0[tmp${idx}_base];` +
+            `[tmp${idx}_base]drawtext=fontfile='${font}':text='${text}':x=${fx}:y=${fy}:fontsize=${fontsize}:fontcolor=${color}${baseExtra}${alphaPart}${outLbl};`;
+        } else {
+          filter += `${cur}drawtext=fontfile='${font}':text='${text}':x=${fx}:y=${fy}:fontsize=${fontsize}:fontcolor=${color}${extra}${alphaPart}${outLbl};`;
+        }
       }
     } else if (el.type === "image") {
       if (!el.file) return; // skip if missing file
@@ -480,6 +523,17 @@ export function renderTemplateSlide(
       filter += `${cur}${imgLbl}overlay=x=${fx}:y=${fy}${outLbl};`;
 
       imgInput++;
+    } else if (el.type === "shade") {
+      const strength = el.strength !== undefined ? Number(el.strength) : 0.5;
+      const gamma = el.gamma !== undefined ? Number(el.gamma) : undefined;
+      const leftPower = el.left_power !== undefined ? Number(el.left_power) : undefined;
+      const vertPower = el.vert_power !== undefined ? Number(el.vert_power) : undefined;
+      const bias = el.bias !== undefined ? Number(el.bias) : undefined;
+      let shadeColor = el.color ? normalizeColor(el.color) : "black";
+      shadeColor = shadeColor.split("@")[0];
+      const chain = shadeChain(strength, gamma, leftPower, vertPower, bias, shadeColor);
+      filter += `color=c=black:s=${videoW}x${videoH}:r=${fps}:d=${duration},${chain}[sh${idx}];`;
+      filter += `${cur}[sh${idx}]overlay=x=0:y=0${outLbl};`;
     }
     cur = outLbl;
   });
