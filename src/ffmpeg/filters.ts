@@ -3,7 +3,17 @@ import { autosizeAndWrap, Orientation } from "../utils/autosize";
 import { deriveOrientation, WRAP_TARGET, TEXT } from "../config";
 import type { TextTransition } from "../types";
 
-/** Ombra laterale: matte RGBA */
+/**
+ * Genera una catena di filtri FFmpeg che produce un layer di ombra
+ * sfumata da sovrapporre all'immagine di background.
+ *
+ * @param strength Intensità dell'ombra (0-1).
+ * @param gamma    Curva di gamma applicata alla sfumatura.
+ * @param leftPower Controlla la pendenza orizzontale.
+ * @param vertPower Controlla la pendenza verticale.
+ * @param bias     Offset per tagliare la parte più chiara.
+ * @param color    Colore dell'ombra.
+ */
 export function shadeChain(
   strength: number,
   gamma = 1.0,
@@ -36,7 +46,7 @@ export function shadeChain(
   return `format=rgba,geq=r='${rgb.r}':g='${rgb.g}':b='${rgb.b}':a='${aExpr}'`;
 }
 
-/** Zoom leggero (per zoompan) */
+/** Espressione per uno zoompan dolce sull'intera clip. */
 export function zoomExprFullClip(durationSec: number, fps: number): string {
   const frames = Math.max(1, Math.round(durationSec * fps));
   const zStart = 1.0, zEnd = 1.08;
@@ -56,7 +66,10 @@ function lineOffset(i: number, segDur: number, animDur: number) {
   return Number(off.toFixed(3));
 }
 
-/** FIRST — autosize + doppio box + wipe (righe coerenti) */
+/**
+ * Costruisce la catena `filter_complex` per la prima slide, includendo
+ * autosize del testo, doppio bordo e animazione di wipe.
+ */
 export function buildFirstSlideTextChain(
   txt: string,
   segDur: number,
@@ -147,7 +160,11 @@ export function buildFirstSlideTextChain(
   return parts.join(";");
 }
 
-/** OTHER — autosize + XFADE centrato (righe coerenti) */
+/**
+ * Catena `filter_complex` per le slide successive alla prima: esegue
+ * autosize, genera le righe e applica una transizione di rivelazione
+ * basata su `xfade`.
+ */
 export function buildRevealTextChain_XFADE(
   txt: string,
   segDur: number,

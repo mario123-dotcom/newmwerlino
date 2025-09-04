@@ -23,6 +23,7 @@ export async function sendFinalVideo(filePath: string): Promise<void> {
   }
 }
 
+/** Effettua materialmente l'invio del file allegato tramite SMTP. */
 async function sendViaEmail(filePath: string): Promise<void> {
   const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST!,

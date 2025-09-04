@@ -4,7 +4,11 @@ export type OrientationMode = "auto" | Orientation;
 
 export const ORIENTATION_MODE: OrientationMode = "auto"; // "auto" | "landscape" | "portrait"
 
-// Heuristics orientation dal template
+/**
+ * Determina l'orientamento (orizzontale/verticale) del video.
+ * Se `ORIENTATION_MODE` è impostato manualmente, viene rispettato; altrimenti
+ * l'orientamento viene dedotto confrontando larghezza e altezza del template.
+ */
 export function deriveOrientation(w: number, h: number): Orientation {
   if (ORIENTATION_MODE === "landscape" || ORIENTATION_MODE === "portrait") {
     return ORIENTATION_MODE;
