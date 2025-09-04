@@ -40,6 +40,11 @@ semplice cosa fanno e quali parametri accettano.
 - **`loadTemplate()`**
   - Carica il file di template `risposta_*.json` (orizzontale o verticale).
 
+## `src/templateLayout.ts`
+- **`loadSlideLayouts()`**
+  - Estrae dal template la disposizione degli elementi `image` e `text`
+    per ogni slide, restituendo un array di oggetti posizionati.
+
 ## `src/concat.ts`
 - **`concatAndFinalizeDemuxer(opts)`**
   - Unisce i segmenti generati e, se presente, mixa l'audio di sottofondo
@@ -52,11 +57,9 @@ semplice cosa fanno e quali parametri accettano.
     - `bgVolume`: volume relativo del background.
 
 ## `src/renderers`
-- **`renderImageSeg(seg, outPath, opts)`**
-  - Renderizza una slide con immagine, testo animato e voce TTS.
-  - `opts` consente di configurare transizione del testo, colori di ombra e
-    riempimento, posizione del logo e `barColor`, cioè il colore della
-    barretta verticale mostrata con la transizione `wiperight`.
+- **`renderTemplateSlide(elements, dur, out, opts)`**
+  - Componi una slide leggendo gli elementi posizionati dal template JSON.
+  - Supporta elementi `image` e `text` in ordine di sovrapposizione.
 
 - **`renderFillerSegment(seg, outPath, opts)`**
   - Crea un segmento di colore pieno (con logo opzionale) per colmare i gap.
