@@ -57,6 +57,7 @@ semplice cosa fanno e quali parametri accettano.
   - `opts` consente di configurare transizione del testo, colori di ombra e
     riempimento, posizione del logo e `barColor`, cioè il colore della
     barretta verticale mostrata con la transizione `wiperight`.
+
 - **`renderFillerSegment(seg, outPath, opts)`**
   - Crea un segmento di colore pieno (con logo opzionale) per colmare i gap.
 - **`renderOutroSegment(seg, outPath, opts)`**
@@ -97,6 +98,7 @@ semplice cosa fanno e quali parametri accettano.
 - **`buildRevealTextChain_XFADE(...)`**
   - Catena per le slide successive basata su `xfade`; gestisce `barColor` per
     la barretta verticale nelle transizioni `wiperight`.
+
 
 ## `src/utils`
 - **`autosizeAndWrap(text, opts)`**

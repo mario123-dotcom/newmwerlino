@@ -42,6 +42,7 @@ npm start               # build + esecuzione completa
 npm start -- --reuse-segs     # riusa segmenti esistenti in src/temp
 npm start -- --template tmp2  # usa il template alternativo
 npm start -- --barColor blue  # imposta il colore della barretta del testo
+
 ```
 I flag aggiuntivi sono descritti in `src/cli.ts`.
 
