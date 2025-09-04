@@ -1,6 +1,6 @@
 #!/usr/bin/env ts-node
 
-import { readdirSync, existsSync } from "fs";
+import { readdirSync } from "fs";
 import { join } from "path";
 
 import { DEFAULT_BG_VOL } from "./config";
@@ -20,7 +20,7 @@ import { sendFinalVideo } from "./share";
 
 (async () => {
   console.log("[LOG] Recupero asset dal template...");
-  await fetchAssets(); // <<--- scarica tutti i file prima
+  const fontMap = await fetchAssets(); // scarica tutti i file e ritorna i font
   console.log("[LOG] Asset pronti, procedo al rendering.");
 
   console.log("[LOG] Reading JSON template...");
@@ -32,15 +32,22 @@ import { sendFinalVideo } from "./share";
   const layouts = loadSlideLayouts();
 
   // font
-  const fontFiles = readdirSync(paths.fonts).filter((f) =>
-    /\.(ttf|otf)$/i.test(f)
-  );
-  if (!fontFiles.length) {
+  const fonts: Record<string, string> = { ...fontMap };
+  const fontFiles = readdirSync(paths.fonts).filter((f) => /\.(ttf|otf)$/i.test(f));
+  for (const f of fontFiles) {
+    const abs = join(paths.fonts, f).replace(/\\/g, "/");
+    if (!Object.values(fonts).includes(abs)) {
+      const name = f.replace(/\.[^.]+$/, "");
+      fonts[name] = abs;
+    }
+  }
+  if (!Object.keys(fonts).length) {
     console.error("[ERROR] No fonts in fonts/");
     process.exit(1);
   }
-  const fontPath = join(paths.fonts, fontFiles[0]).replace(/\\/g, "/");
-  console.log("[LOG] Using font:", fontPath);
+  const primaryFont = Object.values(fonts)[0];
+  console.log("[LOG] Using font:", primaryFont);
+
 
   // logo
   const logoPath = GetLocalAsset("logo") || "";
@@ -107,7 +114,8 @@ import { sendFinalVideo } from "./share";
           fps,
           videoW,
           videoH,
-          fontPath,
+          fonts,
+
         });
       }
       else if (seg.kind === "filler")
@@ -124,7 +132,7 @@ import { sendFinalVideo } from "./share";
           fps,
           videoW,
           videoH,
-          fontPath,
+          fontPath: primaryFont,
           logoPath,
           fillColor: FILL_COLOR,
 

@@ -11,11 +11,10 @@ semplice cosa fanno e quali parametri accettano.
 
 ## `src/fetchAssets.ts`
 - **`fetchAssets()`**
-  - Legge il template JSON e scarica logo, audio, immagini e TTS dalle URL
-    fornite, salvandole in `download/`.
+  - Legge il template JSON e scarica logo, audio, immagini, TTS **e font**
+    dalle URL fornite, salvandoli nelle rispettive cartelle.
 - Funzioni di supporto interne:
   - `ensureDir(dir)` crea una cartella se mancante.
-  - `clearDir(dir)` svuota ricorsivamente una directory.
   - `downloadFile(url, outPath)` scarica un singolo file.
 
 ## `src/cli.ts`
@@ -59,7 +58,9 @@ semplice cosa fanno e quali parametri accettano.
 ## `src/renderers`
 - **`renderTemplateSlide(elements, dur, out, opts)`**
   - Componi una slide leggendo gli elementi posizionati dal template JSON.
-  - Supporta elementi `image` e `text` in ordine di sovrapposizione.
+  - Supporta elementi `image` e `text` in ordine di sovrapposizione,
+    usando il font indicato da ciascun elemento.
+
 
 - **`renderFillerSegment(seg, outPath, opts)`**
   - Crea un segmento di colore pieno (con logo opzionale) per colmare i gap.

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { writeFileSync, unlinkSync } from "fs";
+import { writeFileSync, unlinkSync, existsSync } from "fs";
+
 
 // capture ffmpeg args
 
@@ -30,14 +31,15 @@ test("renderTemplateSlide overlays image and text", (t) => {
         y: "20%",
         height: "10%",
         fill_color: "red",
+        font_family: "Archivo",
       },
-
     ],
     1,
     "out.mp4",
-    { fps: 30, videoW: 1920, videoH: 1080, fontPath: "C:/fonts/font.ttf" }
+    { fps: 30, videoW: 1920, videoH: 1080, fonts: { Archivo: "C:/fonts/font.ttf" } }
   );
-  unlinkSync("dummy.png");
+  if (existsSync("dummy.png")) unlinkSync("dummy.png");
+
 
   assert.ok(captured);
   const idx = captured!.indexOf("-filter_complex");
@@ -46,6 +48,6 @@ test("renderTemplateSlide overlays image and text", (t) => {
   assert.ok(fc.includes("overlay"));
   assert.ok(fc.includes("drawtext"));
   assert.ok(fc.includes("scale=192:216"));
-  assert.ok(fc.includes("fontfile='C:/fonts/font.ttf'"));
+  assert.ok(fc.includes("fontfile='C\\:/fonts/font.ttf'"));
 
 });

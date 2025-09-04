@@ -8,6 +8,25 @@ function escDrawText(str: string): string {
     .replace(/:/g, "\\:");
 }
 
+function normalizeColor(c: string): string {
+  const m = c.match(/rgba?\((\d+),(\d+),(\d+)(?:,(\d+(?:\.\d+)?))?\)/);
+  if (m) {
+    const toHex = (n: string) => Number(n).toString(16).padStart(2, "0");
+    const r = toHex(m[1]!);
+    const g = toHex(m[2]!);
+    const b = toHex(m[3]!);
+    if (m[4]) {
+      const a = Math.round(parseFloat(m[4]!) * 255)
+        .toString(16)
+        .padStart(2, "0");
+      return `#${r}${g}${b}${a}`;
+    }
+    return `#${r}${g}${b}`;
+  }
+  return c;
+}
+
+
 function dimToPx(val: string | undefined, base: number): number | undefined {
   if (!val) return undefined;
   if (/^\d+(\.\d+)?%$/.test(val)) return Math.round(parsePercent(val) * base);
@@ -24,6 +43,8 @@ export interface TemplateElement {
   y?: string;
   width?: string;
   height?: string;
+  font_family?: string;
+  font_weight?: string;
   file?: string; // for image
 }
 
@@ -35,9 +56,13 @@ export function renderTemplateElement(
   el: TemplateElement,
   duration: number,
   outPath: string,
-  opts: { fps: number; videoW: number; videoH: number; fontPath: string }
+  opts: { fps: number; videoW: number; videoH: number; fonts: Record<string, string> }
 ) {
-  const { fps, videoW, videoH, fontPath } = opts;
+  const { fps, videoW, videoH, fonts } = opts;
+  const pickFont = (family?: string) => {
+    const f = family && fonts[family];
+    return (f || Object.values(fonts)[0] || "").replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "\\'");
+  };
   const x = el.x ? Math.round(parsePercent(el.x) * videoW) : 0;
   const y = el.y ? Math.round(parsePercent(el.y) * videoH) : 0;
   const baseArgs = ["-y", "-f", "lavfi", "-t", `${duration}`, "-r", `${fps}`, "-i", `color=c=black:s=${videoW}x${videoH}:r=${fps}`];
@@ -47,9 +72,10 @@ export function renderTemplateElement(
   let filter = "";
   if (el.type === "text") {
     const text = escDrawText(el.text || "");
-    const color = el.fill_color || "white";
+    const color = normalizeColor(el.fill_color || "white");
     const fontsize = el.height ? Math.round(parsePercent(el.height) * videoH) : 48;
-    const font = `'${fontPath.replace(/'/g, "\\'")}'`;
+    const font = `'${pickFont(el.font_family)}'`;
+
     filter = `[0:v]drawtext=fontfile=${font}:text='${text}':x=${x}:y=${y}:fontsize=${fontsize}:fontcolor=${color}[v]`;
   } else if (el.type === "image") {
     if (!el.file) throw new Error("image element missing file path");
@@ -80,9 +106,14 @@ export function renderTemplateSlide(
   elements: TemplateElement[],
   duration: number,
   outPath: string,
-  opts: { fps: number; videoW: number; videoH: number; fontPath: string }
+  opts: { fps: number; videoW: number; videoH: number; fonts: Record<string, string> }
 ) {
-  const { fps, videoW, videoH, fontPath } = opts;
+  const { fps, videoW, videoH, fonts } = opts;
+  const pickFont = (family?: string) => {
+    const f = family && fonts[family];
+    return (f || Object.values(fonts)[0] || "").replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "\\'");
+  };
+
   const args: string[] = [
     "-y",
     "-f",
@@ -104,9 +135,10 @@ export function renderTemplateSlide(
     const outLbl = `[v${idx + 1}]`;
     if (el.type === "text") {
       const text = escDrawText(el.text || "");
-      const color = el.fill_color || "white";
+      const color = normalizeColor(el.fill_color || "white");
       const fontsize = el.height ? Math.round(parsePercent(el.height) * videoH) : 48;
-      const font = `'${fontPath.replace(/'/g, "\\'")}'`;
+      const font = `'${pickFont(el.font_family)}'`;
+
       filter += `${cur}drawtext=fontfile=${font}:text='${text}':x=${x}:y=${y}:fontsize=${fontsize}:fontcolor=${color}${outLbl};`;
     } else if (el.type === "image") {
       if (!el.file) return; // skip if missing file

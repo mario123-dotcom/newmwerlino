@@ -5,6 +5,7 @@ import type { TemplateElement } from "./renderers/templateObject";
 
 /**
  * Load slide layouts from the main JSON template. Each layout contains
+ * the positioned `text` and `image` elements for a slide.
 
  */
 export function loadSlideLayouts(
@@ -31,6 +32,8 @@ export function loadSlideLayouts(
         width: child.width,
         height: child.height,
         fill_color: child.fill_color,
+        font_family: child.font_family,
+        font_weight: child.font_weight,
       };
       arr.push(t);
 

@@ -28,7 +28,7 @@ Assicurarsi che `ffmpeg` funzioni lanciando `ffmpeg -version` dal terminale.
 - `comandi.txt` – log con tutti i comandi FFmpeg eseguiti.
 
 ## Flusso di lavoro
-1. **Fetch degli asset** – `src/fetchAssets.ts` legge il template e scarica immagini, audio e TTS nella cartella `download/`.
+1. **Fetch degli asset** – `src/fetchAssets.ts` legge il template e scarica immagini, audio, TTS e font nelle relative cartelle.
 2. **Timeline** – `src/timeline.ts` converte il template in una sequenza di segmenti (intro, slide con immagine+testo, filler, outro).
 3. **Rendering segmenti** – ogni segmento viene trasformato in un piccolo video con `renderers/image.ts`, `renderers/filler.ts` o `renderers/outro.ts`.  
    Ogni funzione costruisce internamente un comando `ffmpeg` con filtri come `drawtext`, `overlay` e animazioni di transizione.  I comandi vengono lanciati da `runFFmpeg` (src/ffmpeg/run.ts), che salva anche il comando su `comandi.txt`.
