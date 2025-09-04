@@ -132,7 +132,7 @@ export function renderTemplateElement(
     if (w || h) {
       const fit = el.fit;
       if (fit === "contain" && w && h) {
-        filter = `${src}scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2[s0];`;
+        filter = `${src}scale=${w}:${h}:force_original_aspect_ratio=decrease,format=rgba,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2:color=black@0[s0];`;
       } else {
         const sw = w ?? -1;
         const sh = h ?? -1;
@@ -251,7 +251,7 @@ export function renderTemplateSlide(
       if (w || h) {
         const fit = el.fit;
         if (fit === "contain" && w && h) {
-          filter += `${src}scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2[s${idx}];`;
+          filter += `${src}scale=${w}:${h}:force_original_aspect_ratio=decrease,format=rgba,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2:color=black@0[s${idx}];`;
         } else {
           const sw = w ?? -1;
           const sh = h ?? -1;
