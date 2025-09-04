@@ -401,7 +401,8 @@ export function renderTemplateSlide(
             parts.push(`[${inLbl}][L${idx}_${i}_ready]overlay=x=0:y=${lineY}${outTmp}`);
             inLbl = i === lines.length - 1 ? outLbl.slice(1, -1) : `L${idx}_${i}_out`;
           }
-          filter += parts.join(";");
+          // ensure the text segment ends with a separator so following filters parse correctly
+          filter += parts.join(";") + ";";
         } else {
           filter +=
             `color=c=black@0.0:s=${videoW}x${videoH}:r=${fps}:d=${duration},format=rgba,setsar=1[t${idx}_can];` +
