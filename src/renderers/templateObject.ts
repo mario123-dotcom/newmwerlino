@@ -26,6 +26,7 @@ function normalizeColor(c: string): string {
   return c;
 }
 
+
 function dimToPx(val: string | undefined, base: number): number | undefined {
   if (!val) return undefined;
   if (/^\d+(\.\d+)?%$/.test(val)) return Math.round(parsePercent(val) * base);
@@ -74,6 +75,7 @@ export function renderTemplateElement(
     const color = normalizeColor(el.fill_color || "white");
     const fontsize = el.height ? Math.round(parsePercent(el.height) * videoH) : 48;
     const font = `'${pickFont(el.font_family)}'`;
+
     filter = `[0:v]drawtext=fontfile=${font}:text='${text}':x=${x}:y=${y}:fontsize=${fontsize}:fontcolor=${color}[v]`;
   } else if (el.type === "image") {
     if (!el.file) throw new Error("image element missing file path");
@@ -111,6 +113,7 @@ export function renderTemplateSlide(
     const f = family && fonts[family];
     return (f || Object.values(fonts)[0] || "").replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "\\'");
   };
+
   const args: string[] = [
     "-y",
     "-f",
@@ -135,6 +138,7 @@ export function renderTemplateSlide(
       const color = normalizeColor(el.fill_color || "white");
       const fontsize = el.height ? Math.round(parsePercent(el.height) * videoH) : 48;
       const font = `'${pickFont(el.font_family)}'`;
+
       filter += `${cur}drawtext=fontfile=${font}:text='${text}':x=${x}:y=${y}:fontsize=${fontsize}:fontcolor=${color}${outLbl};`;
     } else if (el.type === "image") {
       if (!el.file) return; // skip if missing file
@@ -150,6 +154,7 @@ export function renderTemplateSlide(
         imgLbl = `[s${idx}]`;
       }
       filter += `${cur}${imgLbl}overlay=x=${x}:y=${y}${outLbl};`;
+
       imgInput++;
     }
     cur = outLbl;
