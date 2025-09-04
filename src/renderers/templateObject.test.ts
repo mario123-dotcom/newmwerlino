@@ -92,3 +92,37 @@ test("image fit contain scales with aspect ratio", (t) => {
     `[1:v]scale=100:50:force_original_aspect_ratio=decrease,format=rgba,pad=100:50:(ow-iw)/2:(oh-ih)/2:color=black@0[s0];[0:v][s0]overlay=x=0:y=0[v1]`
   );
 });
+
+test("vmin units use smaller viewport dimension as percent", (t) => {
+  let captured: string[] | undefined;
+  const runMod = require("../ffmpeg/run");
+  t.mock.method(runMod, "runFFmpeg", (args: string[]) => {
+    captured = args;
+  });
+
+  const { renderTemplateSlide } = require("./templateObject");
+  renderTemplateSlide(
+    [
+      {
+        type: "text",
+        text: "copy",
+        shadow_color: "#000000",
+        shadow_x: "1 vmin",
+        shadow_y: "1 vmin",
+        font_size_minimum: "1 vmin",
+        font_size_maximum: "2 vmin",
+        font_family: "Archivo",
+      },
+    ],
+    1,
+    "out.mp4",
+    { fps: 30, videoW: 200, videoH: 100, fonts: { Archivo: "C:/fonts/font.ttf" } }
+  );
+
+  assert.ok(captured);
+  const idx = captured!.indexOf("-filter_complex");
+  assert.notEqual(idx, -1);
+  const fc = captured![idx + 1];
+  assert.ok(fc.includes("shadowx=1:shadowy=1"));
+  assert.ok(fc.includes("fontsize=2"));
+});
