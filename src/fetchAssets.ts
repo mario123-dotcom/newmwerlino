@@ -4,11 +4,12 @@ import fetch from "node-fetch"; // npm install node-fetch
 import { paths } from "./paths";
 import { loadTemplate } from "./template";
 
+/** Assicura l'esistenza di una directory creando eventuali cartelle mancanti. */
 function ensureDir(dir: string) {
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 }
 
-// Cancella tutto il contenuto di una cartella
+/** Cancella ricorsivamente il contenuto di una cartella. */
 function clearDir(dir: string) {
   if (!existsSync(dir)) return;
   for (const file of readdirSync(dir)) {
@@ -16,6 +17,7 @@ function clearDir(dir: string) {
   }
 }
 
+/** Scarica un file da `url` e lo salva in `outPath`. */
 async function downloadFile(url: string, outPath: string) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Errore download ${url} -> ${res.statusText}`);
@@ -25,6 +27,11 @@ async function downloadFile(url: string, outPath: string) {
   console.log(`Scaricato: ${outPath}`);
 }
 
+/**
+ * Scarica tutti gli asset remoti (immagini, audio, TTS, logo) definiti nel
+ * template JSON e li organizza nella cartella `download/` pronta per il
+ * rendering.
+ */
 export async function fetchAssets() {
   const data = loadTemplate();
   const mods = data.modifications || {};

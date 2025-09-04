@@ -2,6 +2,16 @@ import { existsSync, readdirSync } from "fs";
 import { join } from "path";
 import { paths } from "./paths";
 
+/**
+ * Restituisce il percorso locale di un asset precedentemente scaricato.
+ * L'asset viene cercato nelle sottocartelle di `download/` in base al tipo
+ * richiesto e all'indice, seguendo le convenzioni di denominazione
+ * (`img0.jpg`, `tts-3.mp3`, `bg.mp3`, `logo.png`).
+ *
+ * @param type Tipo di asset da cercare: immagine, tts, audio di background o logo.
+ * @param idx  Indice numerico dell'asset (solo per immagini e TTS).
+ * @returns Percorso assoluto del file se trovato, altrimenti `null`.
+ */
 export function GetLocalAsset(
   type: "img" | "tts" | "audio" | "logo",
   idx?: number

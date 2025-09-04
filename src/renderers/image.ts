@@ -10,6 +10,15 @@ import {
 import type { TextTransition, LogoPosition } from "../types";
 import { autosizeAndWrap } from "../utils/autosize";
 
+/**
+ * Renderizza una slide immagine con testo e audio TTS opzionale.
+ * Gestisce animazioni di rivelazione del testo, shading, logo e zoom lento
+ * sull'immagine di background.
+ *
+ * @param seg  Dati della slide (indice, durata, percorsi immagine/TTS/testo).
+ * @param outPath File video generato per la slide.
+ * @param opts Parametri globali di rendering e configurazioni grafiche.
+ */
 export function renderImageSeg(
   seg: { index?: number; duration: number; img?: string | null; tts?: string | null; text?: string; },
   outPath: string,

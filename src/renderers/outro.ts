@@ -4,6 +4,13 @@ import { runFFmpeg } from "../ffmpeg/run";
 import { escDrawText } from "../utils/text";
 import { deriveOrientation } from "../config";
 
+/**
+ * Crea il segmento finale (outro) con colore pieno, testo centrale e logo.
+ *
+ * @param seg     Durata e testo da visualizzare nell'outro.
+ * @param outPath Percorso del video generato.
+ * @param opts    Parametri video e risorse grafiche.
+ */
 export function renderOutroSegment(
   seg: { duration: number; text?: string },
   outPath: string,

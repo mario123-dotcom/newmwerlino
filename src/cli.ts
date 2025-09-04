@@ -3,6 +3,7 @@ import { TEXT } from "./config";
 
 const ARGV = process.argv.slice(2);
 
+/** Legge una variabile d'ambiente gestendo anche i nomi usati da npm. */
 function readEnv(name: string) {
   return (
     process.env[name.toUpperCase()] ??
@@ -11,6 +12,7 @@ function readEnv(name: string) {
   );
 }
 
+/** Estrae l'argomento dalla variabile d'ambiente `npm_config_argv`. */
 function readFromNpmArgv(name: string): string | undefined {
   try {
     const raw = process.env.npm_config_argv;
@@ -33,10 +35,19 @@ function readFromNpmArgv(name: string): string | undefined {
 
 
 
+/** Verifica la presenza di un flag booleano passato via CLI o env. */
 export function hasFlag(name: string) {
   const env = readEnv(name);
   return ARGV.includes(`--${name}`) || env === "1" || env === "true";
 }
+/**
+ * Restituisce il valore di un'opzione stringa. L'ordine di ricerca è:
+ * 1. flag CLI `--nome val`
+ * 2. variabili d'ambiente/`npm_config`
+ * 3. argomenti residui di npm (`npm_config_argv`)
+ * 4. primo argomento non flag se la variabile è booleana
+ * 5. valore di default
+ */
 export function getOpt(name: string, def?: string) {
   const i = ARGV.indexOf(`--${name}`);
   if (i >= 0 && ARGV[i + 1] && !ARGV[i + 1].startsWith("--"))

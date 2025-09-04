@@ -4,6 +4,10 @@ import { projectRoot } from "./paths";
 import { FullData } from "./types";
 import { getOpt, hasFlag } from "./cli";
 
+/**
+ * Carica il file di template JSON (versione orizzontale o verticale) e lo
+ * deserializza in un oggetto `FullData`.
+ */
 export function loadTemplate(): FullData {
   const fmtOpt = getOpt("format");
   const isVertical = fmtOpt === "vertical" || hasFlag("vertical");

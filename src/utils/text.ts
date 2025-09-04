@@ -1,3 +1,8 @@
+/**
+ * Suddivide un paragrafo in righe di lunghezza massima `width`,
+ * cercando di bilanciare le ultime righe e gestendo piccole parole
+ * da "appendere" (es. preposizioni).
+ */
 export function wrapParagraph(text: string, width = 30): string[] {
   const words = String(text ?? "").split(/\s+/).filter(Boolean);
   const lines: string[] = [];
@@ -38,5 +43,9 @@ export function wrapParagraph(text: string, width = 30): string[] {
 
   return lines.filter(Boolean);
 }
+
+/** Normalizza gli apici semplici rendendoli compatibili con FFmpeg. */
 export function normalizeQuotes(s: string): string { return String(s).replace(/'/g, "’"); }
+
+/** Escapa stringhe per l'uso nel filtro `drawtext` di FFmpeg. */
 export function escDrawText(s: string): string { return s.replace(/\\/g, "\\\\").replace(/:/g, "\\:").replace(/'/g, "\\'"); }
