@@ -34,7 +34,7 @@ function gatherShapes(node: any, acc: any[]) {
 
 /** Generate a simplified template with only used elements and export SVGs. */
 export function generateFilteredTemplate() {
-  const tplPath = join(projectRoot, "template", "creatomate_template_news_horizontal.json");
+  const tplPath = join(projectRoot, "template", "template_horizontal.json");
   const respPath = join(projectRoot, "template", "risposta_horizontal.json");
 
   const tpl = JSON.parse(readFileSync(tplPath, "utf8"));
@@ -44,38 +44,15 @@ export function generateFilteredTemplate() {
   const usedSlides = collectUsedSlides(mods);
   const filtered: Record<string, any> = {};
 
-  // copy generic modifications
-  const genericKeys = [
-    "Logo",
-    "Audio",
-    "Testo-intro",
-    "Testo-outro",
-    "Intro.time",
-    "Outro.time",
-    "Outro.duration",
-    "Audio.volume",
-  ];
-  genericKeys.forEach((k) => {
-    if (mods[k] != null) filtered[k] = mods[k];
-  });
-
-  // copy slide specific data
-  usedSlides.forEach((i) => {
-    const keys = [
-      `Immagine-${i}`,
-      `Testo-${i}`,
-      `TTS-${i}`,
-      `TTS-${i}.time`,
-      `TTS-${i}.duration`,
-      `TTS-${i}.volume`,
-      `Slide_${i}.time`,
-      `Slide_${i}.duration`,
-      `Copyright-${i}`,
-    ];
-    keys.forEach((k) => {
-      if (mods[k] != null) filtered[k] = mods[k];
-    });
-  });
+  // copia tutte le modifiche mantenendo soltanto quelle relative alle slide effettivamente usate
+  for (const [key, val] of Object.entries(mods)) {
+    const m = key.match(/-(\d+)/) || key.match(/_(\d+)\./);
+    if (m) {
+      const idx = parseInt(m[1]!, 10);
+      if (!usedSlides.includes(idx)) continue;
+    }
+    filtered[key] = val;
+  }
 
   const outPath = join(projectRoot, "template", "risposta_horizontal_filtered.json");
   const newData = { ...resp, modifications: filtered };
