@@ -11,11 +11,10 @@ semplice cosa fanno e quali parametri accettano.
 
 ## `src/fetchAssets.ts`
 - **`fetchAssets()`**
-  - Legge il template JSON e scarica logo, audio, immagini e TTS dalle URL
-    fornite, salvandole in `download/`.
+  - Legge il template JSON e scarica logo, audio, immagini, TTS **e font**
+    dalle URL fornite, salvandoli nelle rispettive cartelle.
 - Funzioni di supporto interne:
   - `ensureDir(dir)` crea una cartella se mancante.
-  - `clearDir(dir)` svuota ricorsivamente una directory.
   - `downloadFile(url, outPath)` scarica un singolo file.
 
 ## `src/cli.ts`
@@ -40,6 +39,11 @@ semplice cosa fanno e quali parametri accettano.
 - **`loadTemplate()`**
   - Carica il file di template `risposta_*.json` (orizzontale o verticale).
 
+## `src/templateLayout.ts`
+- **`loadSlideLayouts()`**
+  - Estrae dal template la disposizione degli elementi `image` e `text`
+    per ogni slide, restituendo un array di oggetti posizionati.
+
 ## `src/concat.ts`
 - **`concatAndFinalizeDemuxer(opts)`**
   - Unisce i segmenti generati e, se presente, mixa l'audio di sottofondo
@@ -52,11 +56,10 @@ semplice cosa fanno e quali parametri accettano.
     - `bgVolume`: volume relativo del background.
 
 ## `src/renderers`
-- **`renderImageSeg(seg, outPath, opts)`**
-  - Renderizza una slide con immagine, testo animato e voce TTS.
-  - `opts` consente di configurare transizione del testo, colori di ombra e
-    riempimento, posizione del logo e `barColor`, cioè il colore della
-    barretta verticale mostrata con la transizione `wiperight`.
+- **`renderTemplateSlide(elements, dur, out, opts)`**
+  - Componi una slide leggendo gli elementi posizionati dal template JSON.
+  - Supporta elementi `image` e `text` in ordine di sovrapposizione,
+    usando il font indicato da ciascun elemento.
 
 - **`renderFillerSegment(seg, outPath, opts)`**
   - Crea un segmento di colore pieno (con logo opzionale) per colmare i gap.
@@ -109,6 +112,10 @@ semplice cosa fanno e quali parametri accettano.
   - Converte gli apici in caratteri compatibili con FFmpeg.
 - **`escDrawText(s)`**
   - Escapa una stringa per il filtro `drawtext`.
+- **`ffmpegSafePath(p)`**
+  - Normalizza un percorso file sostituendo i caratteri problematici
+    (backslash, due punti, parentesi quadre) con equivalenti compatibili con
+    le catene `filter_complex` di FFmpeg.
 - **`parseSec(v, def?)`**
   - Converte valori in secondi numerici.
 - **`lineOffset(i, segDur, animDur)`**

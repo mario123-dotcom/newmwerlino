@@ -38,17 +38,19 @@ export function concatAndFinalizeDemuxer({
 
   const probe = ffprobeJson(segments[0]);
   const haveAudio = probe?.streams?.some((s: any) => s.codec_type === "audio");
+  // Usa un'etichetta neutra per l'audio principale per evitare collisioni con gli
+  // stream specifier di FFmpeg (es. "acat").
   const baseAudio = haveAudio
-    ? `[0:a:0]aformat=channel_layouts=stereo:sample_rates=44100,aresample=async=1:first_pts=0,asetpts=PTS-STARTPTS[acat]`
-    : `anullsrc=channel_layout=stereo:sample_rate=44100,asetpts=PTS-STARTPTS[acat]`;
+    ? `[0:a:0]aformat=channel_layouts=stereo:sample_rates=44100,aresample=async=1:first_pts=0,asetpts=PTS-STARTPTS[main]`
+    : `anullsrc=channel_layout=stereo:sample_rate=44100,asetpts=PTS-STARTPTS[main]`;
   const audioChain = haveBg
     ? [
         baseAudio,
         `[1:a:0]aformat=channel_layouts=stereo:sample_rates=44100,volume=${bgVolume}[bg]`,
-        `[bg][acat]sidechaincompress=threshold=${DUCK.threshold}:ratio=${DUCK.ratio}:attack=${DUCK.attack}:release=${DUCK.release}:makeup=${DUCK.makeup}[bgduck]`,
-        `[acat][bgduck]amix=inputs=2:normalize=0:duration=longest:dropout_transition=0[mix]`
+        `[bg][main]sidechaincompress=threshold=${DUCK.threshold}:ratio=${DUCK.ratio}:attack=${DUCK.attack}:release=${DUCK.release}:makeup=${DUCK.makeup}[bgduck]`,
+        `[main][bgduck]amix=inputs=2:normalize=0:duration=longest:dropout_transition=0[mix]`
       ].join(";")
-    : `${baseAudio};[acat]anull[mix]`;
+    : `${baseAudio};[main]anull[mix]`;
 
   args.push(
     "-filter_complex", audioChain,
