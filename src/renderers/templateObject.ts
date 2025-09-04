@@ -83,7 +83,7 @@ export function renderTemplateElement(
     const color = normalizeColor(el.fill_color || "white");
     const fontsize = dimToPx(el.height, videoH) ?? 48;
     const font = ffmpegSafePath(pickFont(el.font_family));
-    filter = `[0:v]drawtext=fontfile=${font}:text='${text}':x=${finalX}:y=${finalY}:fontsize=${fontsize}:fontcolor=${color}[v]`;
+    filter = `[0:v]drawtext=fontfile='${font}':text='${text}':x=${finalX}:y=${finalY}:fontsize=${fontsize}:fontcolor=${color}[v]`;
   } else if (el.type === "image") {
     if (!el.file) throw new Error("image element missing file path");
     args.push("-loop", "1", "-t", `${duration}`, "-i", el.file);
@@ -156,7 +156,7 @@ export function renderTemplateSlide(
       const color = normalizeColor(el.fill_color || "white");
       const fontsize = dimToPx(el.height, videoH) ?? 48;
       const font = ffmpegSafePath(pickFont(el.font_family));
-      filter += `${cur}drawtext=fontfile=${font}:text='${text}':x=${fx}:y=${fy}:fontsize=${fontsize}:fontcolor=${color}${outLbl};`;
+      filter += `${cur}drawtext=fontfile='${font}':text='${text}':x=${fx}:y=${fy}:fontsize=${fontsize}:fontcolor=${color}${outLbl};`;
     } else if (el.type === "image") {
       if (!el.file) return; // skip if missing file
       args.push("-loop", "1", "-t", `${duration}`, "-i", el.file);

@@ -51,7 +51,7 @@ test("renderTemplateSlide overlays image and text", (t) => {
   assert.ok(fc.includes("overlay"));
   assert.ok(fc.includes("drawtext"));
   assert.ok(fc.includes("scale=192:216"));
-  assert.ok(fc.includes("fontfile=C\\:/fonts/font.ttf"));
+  assert.ok(fc.includes("fontfile='C\\:/fonts/font.ttf'"));
   assert.ok(fc.includes("overlay=x=864:y=432"));
 
 });
