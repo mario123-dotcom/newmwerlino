@@ -3,17 +3,18 @@
 import { readdirSync, existsSync } from "fs";
 import { join } from "path";
 
-import { TEXT, DEFAULT_BG_VOL } from "./config";
+import { DEFAULT_BG_VOL } from "./config";
 import { paths } from "./paths";
 import { loadTemplate } from "./template";
+import { loadSlideLayouts } from "./templateLayout";
 import { buildTimeline } from "./timeline";
 import { GetLocalAsset } from "./assets";
-import { renderImageSeg } from "./renderers/image";
+import { renderTemplateSlide } from "./renderers/templateObject";
 import { renderFillerSegment } from "./renderers/filler";
 import { renderOutroSegment } from "./renderers/outro";
 import { validateAndRepairSegments } from "./validate";
 import { concatAndFinalizeDemuxer } from "./concat";
-import { REUSE_SEGS, SEGS_DIR, TEXT_TRANSITION, FILL_COLOR, SHADE_COLOR, LOGO_POSITION, BAR_COLOR } from "./cli";
+import { REUSE_SEGS, SEGS_DIR, FILL_COLOR } from "./cli";
 import { fetchAssets } from "./fetchAssets";
 import { sendFinalVideo } from "./share";
 
@@ -28,6 +29,7 @@ import { sendFinalVideo } from "./share";
   const videoW = data.width || 1920;
   const videoH = data.height || 1080;
   const fps = data.frame_rate || 30;
+  const layouts = loadSlideLayouts();
 
   // font
   const fontFiles = readdirSync(paths.fonts).filter((f) =>
@@ -83,19 +85,22 @@ import { sendFinalVideo } from "./share";
   } else {
     timeline.forEach((seg, idx) => {
       const out = join(paths.temp, `seg${idx}.mp4`);
-      if (seg.kind === "image")
-        renderImageSeg(seg, out, {
+      if (seg.kind === "image") {
+        const layout = layouts[seg.index ?? 0] || [];
+        const elements = layout.map((e) => {
+          const el = { ...e };
+          if (e.name === "Logo" && logoPath) el.file = logoPath;
+          else if (e.name?.startsWith("Immagine") && seg.img) el.file = seg.img;
+          else if (e.name?.startsWith("Testo")) el.text = seg.text || "";
+          return el;
+        }).filter((el) => el.type !== "image" || !!el.file);
+        renderTemplateSlide(elements, seg.duration, out, {
           fps,
           videoW,
           videoH,
           fontPath,
-          logoPath,
-          textTransition: TEXT_TRANSITION,
-          shadeColor: SHADE_COLOR,
-          fillColor: FILL_COLOR,
-          logoPosition: LOGO_POSITION,
-          barColor: BAR_COLOR,
         });
+      }
       else if (seg.kind === "filler")
         renderFillerSegment(seg, out, {
           fps,
