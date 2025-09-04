@@ -188,6 +188,7 @@ test("multiline wipe uses xfade per line", (t) => {
   assert.ok(fc.includes("[L0_1_off][L0_1_on]xfade"));
 });
 
+
 test("pan animation escapes commas in ffmpeg expressions", (t) => {
   let captured: string[] | undefined;
   const runMod = require("../ffmpeg/run");
