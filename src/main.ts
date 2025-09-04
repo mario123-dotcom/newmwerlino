@@ -13,7 +13,7 @@ import { renderFillerSegment } from "./renderers/filler";
 import { renderOutroSegment } from "./renderers/outro";
 import { validateAndRepairSegments } from "./validate";
 import { concatAndFinalizeDemuxer } from "./concat";
-import { REUSE_SEGS, SEGS_DIR, TEXT_TRANSITION, FILL_COLOR, SHADE_COLOR, LOGO_POSITION } from "./cli";
+import { REUSE_SEGS, SEGS_DIR, TEXT_TRANSITION, FILL_COLOR, SHADE_COLOR, LOGO_POSITION, BAR_COLOR } from "./cli";
 import { fetchAssets } from "./fetchAssets";
 import { sendFinalVideo } from "./share";
 
@@ -94,6 +94,7 @@ import { sendFinalVideo } from "./share";
           shadeColor: SHADE_COLOR,
           fillColor: FILL_COLOR,
           logoPosition: LOGO_POSITION,
+          barColor: BAR_COLOR,
         });
       else if (seg.kind === "filler")
         renderFillerSegment(seg, out, {

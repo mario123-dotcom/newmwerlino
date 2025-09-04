@@ -54,6 +54,10 @@ semplice cosa fanno e quali parametri accettano.
 ## `src/renderers`
 - **`renderImageSeg(seg, outPath, opts)`**
   - Renderizza una slide con immagine, testo animato e voce TTS.
+  - `opts` consente di configurare transizione del testo, colori di ombra e
+    riempimento, posizione del logo e `barColor`, cioè il colore della
+    barretta verticale mostrata con la transizione `wiperight`.
+
 - **`renderFillerSegment(seg, outPath, opts)`**
   - Crea un segmento di colore pieno (con logo opzionale) per colmare i gap.
 - **`renderOutroSegment(seg, outPath, opts)`**
@@ -89,9 +93,12 @@ semplice cosa fanno e quali parametri accettano.
 - **`zoomExprFullClip(dur, fps)`**
   - Espressione di zoom per il filtro `zoompan`.
 - **`buildFirstSlideTextChain(...)`**
-  - Catena di filtri per la prima slide con doppio bordo e wipe.
+  - Catena di filtri per la prima slide con doppio bordo e wipe. Se la
+    transizione è `wiperight` usa `barColor` per disegnare la barretta laterale.
 - **`buildRevealTextChain_XFADE(...)`**
-  - Catena per le slide successive basata su `xfade`.
+  - Catena per le slide successive basata su `xfade`; gestisce `barColor` per
+    la barretta verticale nelle transizioni `wiperight`.
+
 
 ## `src/utils`
 - **`autosizeAndWrap(text, opts)`**

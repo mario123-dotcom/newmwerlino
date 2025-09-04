@@ -72,6 +72,7 @@ interface TemplateConf {
   textTransition: TextTransition;
   shadeColor: string;
   fillColor: string;
+  barColor: string;
   logoPosition: "bottom" | "top-left";
 }
 
@@ -80,12 +81,14 @@ const TEMPLATE_MAP: Record<TemplateName, TemplateConf> = {
     textTransition: "wipeup",
     shadeColor: "black",
     fillColor: "black",
+    barColor: "black",
     logoPosition: "bottom",
   },
   tmp2: {
     textTransition: "wiperight",
     shadeColor: "red",
     fillColor: "red",
+    barColor: "red",
     logoPosition: "top-left",
   },
 };
@@ -103,4 +106,6 @@ export const TEXT_TRANSITION = TEMPLATE_CONF.textTransition;
 export const SHADE_COLOR = TEMPLATE_CONF.shadeColor;
 export const FILL_COLOR = TEMPLATE_CONF.fillColor;
 export const LOGO_POSITION = TEMPLATE_CONF.logoPosition;
+const barColorOpt = getOpt("barColor");
+export const BAR_COLOR = barColorOpt || TEMPLATE_CONF.barColor;
 

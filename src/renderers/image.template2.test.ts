@@ -28,6 +28,7 @@ test("template2 landscape logo below text", (t) => {
       shadeColor: "red",
       fillColor: "red",
       logoPosition: "top-left",
+      barColor: "red",
     }
   );
   unlinkSync("dummy_img.png");

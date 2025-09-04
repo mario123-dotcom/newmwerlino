@@ -81,6 +81,7 @@ export function buildFirstSlideTextChain(
   transition: TextTransition = "wipeup",
   align?: "left" | "center" | "right",
   extraLeftPx = 0,
+  barColor = "black",
 ): string {
   const orientation: Orientation = deriveOrientation(videoW, videoH);
 
@@ -119,7 +120,7 @@ export function buildFirstSlideTextChain(
     const barW = Math.max(4, Math.round(auto.fontSize * 0.5));
     const barX = Math.max(0, margin - barW - auto.padPx);
     const barH = videoH - auto.y0;
-    parts.push(`color=c=black:s=${barW}x${barH}:r=${fps}:d=${segDur},format=rgba,setsar=1[bar_can]`);
+    parts.push(`color=c=${barColor}:s=${barW}x${barH}:r=${fps}:d=${segDur},format=rgba,setsar=1[bar_can]`);
     parts.push(`[bar_can]split=2[bar_rgb][bar_forA]`);
     parts.push(`[bar_forA]alphaextract,format=gray,setsar=1[bar_Aorig]`);
     parts.push(`color=c=black:s=${barW}x${barH}:r=${fps}:d=${segDur},format=gray,setsar=1[bar_off]`);
@@ -176,6 +177,7 @@ export function buildRevealTextChain_XFADE(
   transition: TextTransition = "wipeup",
   align: "left" | "center" | "right" = "center",
   extraLeftPx = 0,
+  barColor = "black",
 ): string {
   const orientation: Orientation = deriveOrientation(videoW, videoH);
   const baseCols = WRAP_TARGET[orientation].OTHER;
@@ -208,7 +210,7 @@ export function buildRevealTextChain_XFADE(
     const barW = Math.max(4, Math.round(auto.fontSize * 0.5));
     const barX = Math.max(0, margin - barW - auto.padPx);
     const barH = videoH - auto.y0;
-    parts.push(`color=c=black:s=${barW}x${barH}:r=${fps}:d=${segDur},format=rgba,setsar=1[bar_can]`);
+    parts.push(`color=c=${barColor}:s=${barW}x${barH}:r=${fps}:d=${segDur},format=rgba,setsar=1[bar_can]`);
     parts.push(`[bar_can]split=2[bar_rgb][bar_forA]`);
     parts.push(`[bar_forA]alphaextract,format=gray,setsar=1[bar_Aorig]`);
     parts.push(`color=c=black:s=${barW}x${barH}:r=${fps}:d=${segDur},format=gray,setsar=1[bar_off]`);
