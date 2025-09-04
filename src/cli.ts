@@ -1,5 +1,8 @@
 import type { TextTransition } from "./types";
 import { TEXT } from "./config";
+import { readFileSync } from "fs";
+import { join } from "path";
+import { projectRoot } from "./paths";
 
 const ARGV = process.argv.slice(2);
 
@@ -65,47 +68,50 @@ export function getOpt(name: string, def?: string) {
 export const REUSE_SEGS = hasFlag("reuse-segs") || hasFlag("reuseSegs") || hasFlag("reuse");
 export const SEGS_DIR = getOpt("segsDir");
 
-// Template-based configuration
-type TemplateName = "tmp1" | "tmp2";
-
-interface TemplateConf {
-  textTransition: TextTransition;
-  shadeColor: string;
-  fillColor: string;
-  barColor: string;
-  logoPosition: "bottom" | "top-left";
+// Configuration derived from Creatomate template
+function findFirstWipe(node: any): any | undefined {
+  if (!node) return undefined;
+  if (Array.isArray(node.animations)) {
+    const wipe = node.animations.find((a: any) => a.type === "wipe");
+    if (wipe) return wipe;
+  }
+  if (Array.isArray(node.elements)) {
+    for (const el of node.elements) {
+      const res = findFirstWipe(el);
+      if (res) return res;
+    }
+  }
+  return undefined;
 }
 
-const TEMPLATE_MAP: Record<TemplateName, TemplateConf> = {
-  tmp1: {
-    textTransition: "wipeup",
-    shadeColor: "black",
-    fillColor: "black",
-    barColor: "black",
-    logoPosition: "bottom",
-  },
-  tmp2: {
-    textTransition: "wiperight",
-    shadeColor: "black",
-    fillColor: "red",
-    barColor: "red",
-    logoPosition: "top-left",
-  },
-};
-
-const templateOpt = getOpt("template", "tmp1") as TemplateName;
-const TEMPLATE_CONF = TEMPLATE_MAP[templateOpt] || TEMPLATE_MAP.tmp1;
-
-if (templateOpt === "tmp2") {
-  TEXT.LEFT_MARGIN_P += 0.02;
-  TEXT.TOP_MARGIN_P.landscape += 0.02;
-  TEXT.TOP_MARGIN_P.portrait += 0.02;
+function readTemplateSettings() {
+  try {
+    const raw = readFileSync(
+      join(projectRoot, "template", "creatomate_template_news_horizontal.json"),
+      "utf8"
+    );
+    const data = JSON.parse(raw);
+    const wipe = findFirstWipe(data);
+    let textTransition: TextTransition = "wipeup";
+    if (wipe) {
+      if (wipe.x_anchor === "0%") textTransition = "wiperight";
+      else if (wipe.x_anchor === "100%") textTransition = "wipeleft";
+      else if (wipe.y_anchor === "0%") textTransition = "wipedown";
+      else if (wipe.y_anchor === "100%") textTransition = "wipeup";
+    }
+    const fillColor = data.fill_color || "black";
+    return { textTransition, fillColor };
+  } catch {
+    return { textTransition: "wipeup" as TextTransition, fillColor: "black" };
+  }
 }
 
-export const TEXT_TRANSITION = TEMPLATE_CONF.textTransition;
-export const SHADE_COLOR = TEMPLATE_CONF.shadeColor;
-export const FILL_COLOR = TEMPLATE_CONF.fillColor;
-export const LOGO_POSITION = TEMPLATE_CONF.logoPosition;
+const tpl = readTemplateSettings();
+
+export const TEXT_TRANSITION: TextTransition = tpl.textTransition;
+export const SHADE_COLOR = "black";
+export const FILL_COLOR = tpl.fillColor;
+export const LOGO_POSITION = "bottom";
 const barColorOpt = getOpt("barColor");
-export const BAR_COLOR = barColorOpt || TEMPLATE_CONF.barColor;
+export const BAR_COLOR = barColorOpt || tpl.fillColor;
 
