@@ -8,7 +8,8 @@
     "start": "npm run build && node dist/main.js",
     "start:reuse": "npm run build && node dist/main.js --reuse-segs",
     "start:reuse:dir": "npm run build && node dist/main.js --reuse-segs --segsDir src/temp",
-      "test": "npm run build && node --test dist/**/*.test.js"
+      "test": "npm run build && node --test dist/**/*.test.js",
+    "gen-template": "npm run build && node dist/tools/genTemplate.js"
   },
   "dependencies": {
     "node-fetch": "^3.3.2",
