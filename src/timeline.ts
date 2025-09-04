@@ -10,9 +10,14 @@ import { Modifications, Segment } from "./types";
  * segmenti di riempimento per eventuali gap e aggiunge l'outro finale.
  *
  * @param mods Mappa chiave/valore proveniente dal template.
+ * @param totalDuration Durata complessiva desiderata del video. Eventuali
+ *        spazi vuoti finali verranno riempiti con un segmento filler.
  * @returns Lista ordinata di segmenti da renderizzare.
  */
-export function buildTimeline(mods: Modifications): Segment[] {
+export function buildTimeline(
+  mods: Modifications,
+  totalDuration?: number,
+): Segment[] {
   const slidesRaw: Segment[] = [];
   for (let i = 0; ; i++) {
     const imgKey = `Immagine-${i}`;
@@ -80,12 +85,27 @@ export function buildTimeline(mods: Modifications): Segment[] {
     });
     cursorSched = outroTimePlanned;
   }
+  const outroDur = parseSec(mods["Outro.duration"], 5);
   timeline.push({
     kind: "outro",
     start: cursorSched,
-    duration: parseSec(mods["Outro.duration"], 5),
+    duration: outroDur,
     text: outroText,
   });
+  cursorSched += outroDur;
+
+  if (totalDuration && totalDuration > cursorSched + MIN_FILLER_SEC) {
+    const tail = totalDuration - cursorSched;
+    timeline.push({
+      kind: "filler",
+      start: cursorSched,
+      duration: tail,
+      text: "",
+      tts: null,
+      img: null,
+    });
+    cursorSched += tail;
+  }
 
   return timeline;
 }

@@ -61,7 +61,7 @@ import { sendFinalVideo } from "./share";
   })();
 
   // timeline
-  const timeline = buildTimeline(mods);
+  const timeline = buildTimeline(mods, data.duration);
   console.log("[LOG] Timeline:");
   timeline.forEach((seg) => {
     const label = seg.kind === "image" ? `image #${seg.index}` : seg.kind;
