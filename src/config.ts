@@ -81,7 +81,6 @@ export const DUCK = {
 
 // Altro
 export const HOLD_EXTRA_MS = 250;
-export const MIN_FILLER_SEC = 0.08;
 export const EASE: "linear" | "cubicOut" | "quartOut" = "quartOut";
 export const CONCAT_DEFAULTS = {
   allowSkipBroken: true,

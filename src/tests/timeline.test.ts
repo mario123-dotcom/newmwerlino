@@ -120,7 +120,7 @@ test("wrapText splits by length", () => {
   assert.deepEqual(lines, ["uno due", "tre", "quattro", "cinque"]);
 });
 
-test("buildTimelineFromLayout adds filler and outro", () => {
+test("buildTimelineFromLayout extends slide and adds outro", () => {
   const tpl: TemplateDoc = {
     width: 100,
     height: 100,
@@ -158,9 +158,13 @@ test("buildTimelineFromLayout adds filler and outro", () => {
   const mods = { "TTS-0": "foo", "TTS-0.duration": 1 };
   paths.images = "/tmp/no_img";
   paths.tts = "/tmp/no_tts";
-  const slides = buildTimelineFromLayout(mods, tpl, { videoW: 100, videoH: 100, fps: 30, defaultDur: 2 });
-  assert.equal(slides.length, 3); // slide, filler, outro
-  assert.equal(slides[0].durationSec, 1);
-  assert.equal(slides[1].durationSec, 1); // filler
-  assert.equal(slides[2].durationSec, 1); // outro
+  const slides = buildTimelineFromLayout(mods, tpl, {
+    videoW: 100,
+    videoH: 100,
+    fps: 30,
+    defaultDur: 2,
+  });
+  assert.equal(slides.length, 2); // slide + outro
+  assert.equal(slides[0].durationSec, 2); // extended to slide duration
+  assert.equal(slides[1].durationSec, 1); // outro
 });

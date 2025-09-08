@@ -1,7 +1,6 @@
 import { join } from "path";
 import { existsSync, mkdirSync, writeFileSync, readdirSync } from "fs";
 import { paths } from "./paths";
-import { MIN_FILLER_SEC } from "./config";
 import {
   TemplateDoc,
   findComposition,
@@ -289,8 +288,8 @@ export function buildTimelineFromLayout(
         }]
       : [];
 
-    const ttsDur = parseSec(mods[`TTS-${i}.duration`], slideDur);
-    const contentDur = Math.min(slideDur, ttsDur);
+    const ttsDur = parseSec(mods[`TTS-${i}.duration`], 0);
+    const contentDur = Math.max(slideDur, ttsDur);
 
     const slide: SlideSpec = {
       width: videoW,
@@ -318,24 +317,6 @@ export function buildTimelineFromLayout(
     );
 
     slides.push(slide);
-
-    const fillerDur = slideDur - contentDur;
-    if (fillerDur > MIN_FILLER_SEC) {
-      const fw = logoBox.w ?? 240;
-      const fh = logoBox.h ?? 140;
-      slides.push({
-        width: videoW,
-        height: videoH,
-        fps,
-        durationSec: fillerDur,
-        outPath: "",
-        logoPath: join(paths.images, "logo.png"),
-        logoWidth: fw,
-        logoHeight: fh,
-        logoX: Math.round((videoW - fw) / 2),
-        logoY: Math.round((videoH - fh) / 2),
-      });
-    }
   }
 
   // Outro

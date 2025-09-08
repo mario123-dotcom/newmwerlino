@@ -34,7 +34,7 @@ semplice cosa fanno e quali parametri accettano.
 ## `src/timeline.ts`
 - **`buildTimeline(mods)`**
   - Trasforma le modifiche del template in una lista ordinata di segmenti,
-    aggiungendo filler e outro dove necessario.
+    aggiungendo l'outro dove necessario.
 
 ## `src/template.ts`
 - **`loadTemplate()`**
