@@ -7,7 +7,8 @@ Questa applicazione Node.js crea brevi video partendo da un *template* JSON e da
 - **Node.js** >= 18
 - **npm** per installare le dipendenze
 - **FFmpeg** installato e raggiungibile dal PATH (in alternativa impostare
-  la variabile d'ambiente `FFMPEG_PATH` con il percorso completo dell'eseguibile)
+  la variabile d'ambiente `FFMPEG_PATH` con il percorso completo dell'eseguibile,
+  oppure aggiungere la dipendenza opzionale [`ffmpeg-static`](https://www.npmjs.com/package/ffmpeg-static))
 - Facoltativo: variabili d'ambiente SMTP per l'invio automatico del video finale via email
 
 ## Installazione
