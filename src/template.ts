@@ -1,5 +1,4 @@
 import { readFileSync, existsSync } from "fs";
-import { join } from "path";
 import { paths } from "./paths";
 
 /** Elemento generico del template Creatomate */
@@ -46,9 +45,8 @@ export type TemplateDoc = {
 
 /** Carica il template JSON (layout/posizioni) */
 export function loadTemplate(): TemplateDoc {
-  // Percorso standard; adatta se nel tuo repo è altrove
-  const p = join(paths.root, "template_horizontal.json");
-  const raw = readFileSync(p, "utf8");
+  // Percorso standard nella cartella template/
+  const raw = readFileSync(paths.template, "utf8");
   const json = JSON.parse(raw);
   // normalizzazione minima
   if (!json || typeof json !== "object" || !Array.isArray(json.elements)) {
@@ -59,8 +57,8 @@ export function loadTemplate(): TemplateDoc {
 
 /** Carica le modifications (risposta) da risposta_horizontal.json */
 export function loadModifications(): Record<string, any> {
-  // Prima prova: file separato risposta_horizontal.json
-  const rp = join(paths.root, "risposta_horizontal.json");
+  // Prima prova: file separato risposta_horizontal.json nella cartella template/
+  const rp = paths.modifications;
   if (existsSync(rp)) {
     const raw = readFileSync(rp, "utf8");
     const json = JSON.parse(raw);
