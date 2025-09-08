@@ -1,5 +1,5 @@
 import { join } from "path";
-import { existsSync, mkdirSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, writeFileSync, readdirSync } from "fs";
 import { paths } from "./paths";
 import {
   TemplateDoc,
@@ -92,6 +92,16 @@ function findTTSForSlide(i: number): string | undefined {
   return cand.find(existsSync);
 }
 
+function findFontPath(family: string): string | undefined {
+  const base = family.replace(/\s+/g, "").toLowerCase();
+  try {
+    for (const f of readdirSync(paths.fonts)) {
+      if (f.toLowerCase().startsWith(base)) return join(paths.fonts, f);
+    }
+  } catch {}
+  return undefined;
+}
+
 /* ---------- fallback testo se il template manca lo slot ---------- */
 function defaultTextBlock(x = 120, y = 160): TextBlockSpec {
   return {
@@ -174,6 +184,13 @@ export function getLogoBoxFromTemplate(
   };
 }
 
+export function getFontFamilyFromTemplate(tpl: TemplateDoc, slideIndex: number): string | undefined {
+  const comp = findComposition(tpl, `Slide_${slideIndex}`);
+  const txtEl = findChildByName(comp, `Testo-${slideIndex}`) as any;
+  const fam = txtEl?.font_family;
+  return typeof fam === "string" ? fam : undefined;
+}
+
 const DEFAULT_CHARS_PER_LINE = 40;
 
 export function wrapText(text: string, maxPerLine: number): string[] {
@@ -234,6 +251,8 @@ export function buildTimelineFromLayout(
     const textFiles = lines.length ? writeTextFilesForSlide(i, [lines.join("\n")]) : [];
 
     const logoBox = getLogoBoxFromTemplate(template, i);
+    const fontFamily = getFontFamilyFromTemplate(template, i);
+    const fontPath = fontFamily ? findFontPath(fontFamily) : undefined;
 
     const texts: TextBlockSpec[] = textFiles.length
       ? [{
@@ -258,6 +277,8 @@ export function buildTimelineFromLayout(
       bgImagePath: findImageForSlide(i),
       logoPath: join(paths.images, "logo.png"),
       ttsPath: findTTSForSlide(i),
+
+      fontFile: fontPath,
 
       logoWidth: logoBox.w ?? 240,
       logoHeight: logoBox.h ?? 140,

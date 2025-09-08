@@ -1,6 +1,6 @@
 # Generatore video Merlino
 
-Questa applicazione Node.js crea brevi video partendo da un *template* JSON e da alcuni asset (immagini, audio e font).  
+Questa applicazione Node.js crea brevi video partendo da un *template* JSON e da alcuni asset (immagini e audio). I font indicati dal template vengono scaricati automaticamente.
 È pensata per essere usata anche da chi non ha familiarità con FFmpeg: tutto il lavoro "sporco" viene svolto da script già pronti.
 
 ## Prerequisiti
@@ -25,8 +25,7 @@ Assicurarsi che `ffmpeg` funzioni lanciando `ffmpeg -version` dal terminale.
   - `ffmpeg/` wrapper e filtri personalizzati.
   - `timeline.ts`, `concat.ts`, `validate.ts` gestiscono l'ordine dei segmenti e l'unione finale.
 - `template/` – esempi di template JSON con la descrizione degli asset da scaricare.
-- `fonts/` – font usati per il testo.
-- `download/` – cartella dove vengono salvati gli asset scaricati.
+- `download/` – cartella dove vengono salvati gli asset scaricati (immagini, audio, TTS e font).
 - `comandi.txt` – log con tutti i comandi FFmpeg eseguiti.
 
 ## Flusso di lavoro
@@ -62,7 +61,6 @@ Non è necessario conoscere in dettaglio i comandi: `runFFmpeg` si occupa di cos
 
 ## Troubleshooting
 - **Manca FFmpeg** – installarlo dal sito ufficiale o tramite il gestore pacchetti del proprio sistema. È possibile specificare il percorso esatto tramite la variabile d'ambiente `FFMPEG_PATH`.
-- **Font non trovato** – assicurarsi di mettere almeno un file `.ttf` o `.otf` dentro `fonts/`.
 - **Errore di concatenazione** – verificare che ogni segmento abbia audio (anche silenzioso) e che il file audio di background esista.
 - **Email non inviata** – controllare le variabili `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `SMTP_PORT` e `EMAIL_FROM`.
 

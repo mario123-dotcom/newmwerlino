@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { getTextBoxFromTemplate, getLogoBoxFromTemplate, wrapText } from "../timeline";
+import { getTextBoxFromTemplate, getLogoBoxFromTemplate, getFontFamilyFromTemplate, wrapText } from "../timeline";
 import type { TemplateDoc } from "../template";
 
 test("getTextBoxFromTemplate uses anchors and keeps box inside canvas", () => {
@@ -90,6 +90,28 @@ test("getLogoBoxFromTemplate uses anchors and clamps", () => {
   assert.equal(box.y, 25);
   assert.equal(box.w, 100);
   assert.equal(box.h, 50);
+});
+
+test("getFontFamilyFromTemplate reads font family", () => {
+  const tpl: TemplateDoc = {
+    width: 100,
+    height: 100,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            font_family: "Roboto",
+          },
+        ],
+      },
+    ],
+  };
+  const fam = getFontFamilyFromTemplate(tpl, 0);
+  assert.equal(fam, "Roboto");
 });
 
 test("wrapText splits by length", () => {
