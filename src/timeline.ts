@@ -37,7 +37,8 @@ export type SlideSpec = {
   ttsPath?: string;
   fontFile?: string;
 
-  // Posizionamento logo (px), altezza fissa se vuoi preservare AR
+  // Posizionamento e dimensione logo (px)
+  logoWidth?: number;
   logoHeight?: number;
   logoX?: number;
   logoY?: number;
@@ -103,18 +104,14 @@ function defaultTextBlock(x = 120, y = 160): TextBlockSpec {
 }
 
 /**
- * Ricava la posizione di partenza (in pixel) del blocco di testo “Testo-i”
- * all'interno della composition "Slide_i" del template.
- *
- * Il template Creatomate descrive il testo tramite x/y, larghezza/altezza e
- * ancore x/y in percentuale.  Per ottenere il punto in alto a sinistra del
- * blocco testuale basta sottrarre al centro l'offset dato dalle ancore e
- * infine assicurarsi che il riquadro risultante resti dentro il canvas.
+ * Ricava posizione e dimensioni del blocco di testo "Testo-i".
+ * Restituisce coordinate del punto in alto a sinistra (clampate) e larghezza/
+ * altezza in px.
  */
-export function getTextXYFromTemplate(
+export function getTextBoxFromTemplate(
   tpl: TemplateDoc,
   slideIndex: number
-): { x: number; y: number } | undefined {
+): { x: number; y: number; w: number; h: number } | undefined {
   const comp = findComposition(tpl, `Slide_${slideIndex}`);
   const txtEl = findChildByName(comp, `Testo-${slideIndex}`);
   if (!comp || !txtEl) return undefined;
@@ -128,36 +125,75 @@ export function getTextXYFromTemplate(
 
   const w = pctToPx(txtEl.width, W) || 0;
   const h = pctToPx(txtEl.height, H) || 0;
-  const xAnchor = (pctToPx(txtEl.x_anchor, 100) || 0) / 100; // 0..1
-  const yAnchor = (pctToPx(txtEl.y_anchor, 100) || 0) / 100; // 0..1
+  const xAnchor = (pctToPx(txtEl.x_anchor, 100) || 0) / 100;
+  const yAnchor = (pctToPx(txtEl.y_anchor, 100) || 0) / 100;
 
-  // Punto in alto a sinistra prima del clamp
   let left = x - w * xAnchor;
   let top = y - h * yAnchor;
 
-  // Mantieni l'intero box dentro il canvas
   if (w > 0) left = Math.max(0, Math.min(W - w, left));
   else left = Math.max(0, Math.min(W - 10, left));
   if (h > 0) top = Math.max(0, Math.min(H - h, top));
   else top = Math.max(0, Math.min(H - 10, top));
 
-  return { x: Math.round(left), y: Math.round(top) };
+  return { x: Math.round(left), y: Math.round(top), w: Math.round(w), h: Math.round(h) };
 }
 
-/** Ricava posizionamento del logo dalla composition “Slide_i” */
-function getLogoXYHFromTemplate(tpl: TemplateDoc, slideIndex: number): { x?: number; y?: number; h?: number } {
+/** Ricava posizione e dimensione del logo dalla composition "Slide_i" */
+export function getLogoBoxFromTemplate(
+  tpl: TemplateDoc,
+  slideIndex: number
+): { x?: number; y?: number; w?: number; h?: number } {
   const comp = findComposition(tpl, `Slide_${slideIndex}`);
   const lg = findChildByName(comp, "Logo");
   if (!comp || !lg) return {};
-  const W = tpl.width, H = tpl.height;
+  const W = tpl.width,
+    H = tpl.height;
   const x = pctToPx(lg.x, W);
   const y = pctToPx(lg.y, H);
-  const h = pctToPx(lg.height, H);
+  const w = pctToPx(lg.width, W) || 0;
+  const h = pctToPx(lg.height, H) || 0;
+  const xAnchor = (pctToPx(lg.x_anchor, 100) || 50) / 100;
+  const yAnchor = (pctToPx(lg.y_anchor, 100) || 50) / 100;
+
+  let left = typeof x === "number" ? x - w * xAnchor : undefined;
+  let top = typeof y === "number" ? y - h * yAnchor : undefined;
+
+  if (typeof left === "number") {
+    left = Math.max(0, Math.min(W - w, left));
+  }
+  if (typeof top === "number") {
+    top = Math.max(0, Math.min(H - h, top));
+  }
+
   return {
-    x: typeof x === "number" ? Math.round(x) : undefined,
-    y: typeof y === "number" ? Math.round(y) : undefined,
-    h: typeof h === "number" ? Math.round(h) : undefined,
+    x: typeof left === "number" ? Math.round(left) : undefined,
+    y: typeof top === "number" ? Math.round(top) : undefined,
+    w: w > 0 ? Math.round(w) : undefined,
+    h: h > 0 ? Math.round(h) : undefined,
   };
+}
+
+const DEFAULT_CHARS_PER_LINE = 40;
+
+export function wrapText(text: string, maxPerLine: number): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let line = "";
+  for (const w of words) {
+    const candidate = line ? `${line} ${w}` : w;
+    if (candidate.length > maxPerLine && line) {
+      lines.push(line);
+      line = w;
+    } else if (candidate.length > maxPerLine) {
+      lines.push(w);
+      line = "";
+    } else {
+      line = candidate;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
 }
 
 /* ============================================================
@@ -187,17 +223,21 @@ export function buildTimelineFromLayout(
 
   for (let i = 0; i < n; i++) {
     const txtStr = typeof mods[`Testo-${i}`] === "string" ? mods[`Testo-${i}`].trim() : "";
-    const textFiles = txtStr ? writeTextFilesForSlide(i, [txtStr]) : [];
 
-    // posizioni dal template (se presenti)
-    const txtPos = getTextXYFromTemplate(template, i) || { x: 120, y: 160 };
-    const logoPos = getLogoXYHFromTemplate(template, i);
+    const txtBox = getTextBoxFromTemplate(template, i) || { x: 120, y: 160, w: 0, h: 0 };
+    const lines = txtStr
+      ? wrapText(
+          txtStr,
+          txtBox.w > 0 ? Math.max(1, Math.floor(txtBox.w / (60 * 0.6))) : DEFAULT_CHARS_PER_LINE
+        )
+      : [];
+    const textFiles = lines.length ? writeTextFilesForSlide(i, [lines.join("\n")]) : [];
+
+    const logoBox = getLogoBoxFromTemplate(template, i);
 
     const texts: TextBlockSpec[] = textFiles.length
       ? [{
-          ...defaultTextBlock(),
-          x: txtPos.x,
-          y: txtPos.y,
+          ...defaultTextBlock(txtBox.x, txtBox.y),
           textFile: textFiles[0],
         }]
       : [];
@@ -219,9 +259,10 @@ export function buildTimelineFromLayout(
       logoPath: join(paths.images, "logo.png"),
       ttsPath: findTTSForSlide(i),
 
-      logoHeight: logoPos.h ?? 140,
-      logoX: logoPos.x ?? 161,
-      logoY: logoPos.y ?? 713,
+      logoWidth: logoBox.w ?? 240,
+      logoHeight: logoBox.h ?? 140,
+      logoX: logoBox.x ?? 161,
+      logoY: logoBox.y ?? 713,
 
       texts: texts.length ? texts : undefined,
     };
