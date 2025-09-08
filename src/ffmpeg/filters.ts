@@ -250,3 +250,66 @@ export function buildRevealTextChain_XFADE(
   parts.push(`[${inLbl}]null[v]`);
   return parts.join(";");
 }
+// src/ffmpeg/filters.ts
+
+// Converte un path Windows in un path accettabile da FFmpeg drawtext/textfile/fontfile
+export function toFFPath(p: string): string {
+  // Esempio: C:\foo\bar -> C\:/foo/bar
+  return p.replace(/\\/g, "/").replace(/^([A-Za-z]):/, "$1\\:");
+}
+
+// Escape di testo usato in drawtext=text='...'
+export function escTextForDrawText(s: string): string {
+  // FFmpeg drawtext vuole escape di backslash, due punti, virgolette singole, percentuali, newline
+  return s
+    .replace(/\\/g, "\\\\")
+    .replace(/:/g, "\\:")
+    .replace(/'/g, "\\'")
+    .replace(/%/g, "\\%")
+    .replace(/\n/g, "\\n");
+}
+
+export type DrawTextOpts = {
+  label: string;        // etichetta del buffer (es. "tx_0")
+  textFile?: string;    // se presente, usa textfile
+  text?: string;        // alternativa inline
+  fontFile: string;
+  fontSize: number;
+  fontColor: string;    // es. "0xffffff"
+  xExpr: string;        // es. "100"
+  yExpr: string;        // es. "200"
+  lineSpacing?: number; // opzionale
+  box?: boolean;
+  boxColor?: string;    // es. "black"
+  boxAlpha?: number;    // 0..1
+  boxBorderW?: number;  // px
+  enableExpr?: string;  // es. "between(t,0,7)"
+};
+
+// Ritorna la catena drawtext pronta da concatenare a filter_complex
+export function buildDrawText(opts: DrawTextOpts): string {
+  const {
+    label, textFile, text, fontFile, fontSize, fontColor,
+    xExpr, yExpr, lineSpacing = 0,
+    box = false, boxColor = "black", boxAlpha = 0.0, boxBorderW = 0,
+    enableExpr
+  } = opts;
+
+  const ffFont = toFFPath(fontFile);
+  const common =
+    `fontfile='${ffFont}':fontsize=${fontSize}:fontcolor=${fontColor}:` +
+    `x=${xExpr}:y=${yExpr}:line_spacing=${lineSpacing}:` +
+    `box=${box ? 1 : 0}:boxcolor=${boxColor}@${boxAlpha}:boxborderw=${boxBorderW}`;
+
+  if (textFile) {
+    const ffTxt = toFFPath(textFile);
+    return `[${label}_in]drawtext=textfile='${ffTxt}':${common}` +
+           (enableExpr ? `:enable='${enableExpr}'` : "") +
+           `[${label}]`;
+  }
+
+  const inline = escTextForDrawText(text ?? "");
+  return `[${label}_in]drawtext=text='${inline}':${common}` +
+         (enableExpr ? `:enable='${enableExpr}'` : "") +
+         `[${label}]`;
+}

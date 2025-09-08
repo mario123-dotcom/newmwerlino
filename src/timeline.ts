@@ -1,91 +1,217 @@
-import { MIN_FILLER_SEC, HOLD_EXTRA_MS } from "./config";
-import { normalizeQuotes } from "./utils/text";
-import { parseSec } from "./utils/time";
-import { GetLocalAsset } from "./assets";
-import { Modifications, Segment } from "./types";
+import { join } from "path";
+import { existsSync, mkdirSync, writeFileSync } from "fs";
+import { paths } from "./paths";
+import {
+  TemplateDoc,
+  findComposition,
+  findChildByName,
+  pctToPx,
+} from "./template";
 
-/**
- * Costruisce la sequenza temporale dei segmenti a partire dalle
- * "modifiche" presenti nel template JSON. Inserisce automaticamente
- * segmenti di riempimento per eventuali gap e aggiunge l'outro finale.
- *
- * @param mods Mappa chiave/valore proveniente dal template.
- * @returns Lista ordinata di segmenti da renderizzare.
- */
-export function buildTimeline(mods: Modifications): Segment[] {
-  const slidesRaw: Segment[] = [];
-  for (let i = 0; ; i++) {
-    const imgKey = `Immagine-${i}`;
-    if (!(imgKey in mods)) break;
+/* ---------- Tipi usati da composition.ts ---------- */
+export type TextBlockSpec = {
+  textFile?: string;
+  text?: string;
 
-    const tStart =
-      parseSec(mods[`Slide_${i}.time`]) || parseSec(mods[`TTS-${i}.time`]) || 0;
-    const tDur =
-      parseSec(mods[`Slide_${i}.duration`]) ||
-      parseSec(mods[`TTS-${i}.duration`]) ||
-      3;
-    if (tDur <= 0) continue;
+  x: number;
+  y: number;
 
-    const text = normalizeQuotes(String(mods[`Testo-${i}`] ?? ""));
-    const ttsLocal = GetLocalAsset("tts", i);
-    const imgLocal = GetLocalAsset("img", i);
+  fontSize?: number;
+  fontColor?: string;
+  lineSpacing?: number;
+  box?: boolean;
+  boxColor?: string;
+  boxAlpha?: number;
+  boxBorderW?: number;
+};
 
-    slidesRaw.push({
-      kind: "image",
-      index: i,
-      start: tStart,
-      duration: tDur,
-      text,
-      tts: ttsLocal,
-      img: imgLocal,
-    });
+export type SlideSpec = {
+  width?: number;
+  height?: number;
+  fps: number;
+  durationSec: number;
+  outPath: string;
+
+  bgImagePath?: string;
+  logoPath?: string;
+  ttsPath?: string;
+  fontFile?: string;
+
+  // Posizionamento logo (px), altezza fissa se vuoi preservare AR
+  logoHeight?: number;
+  logoX?: number;
+  logoY?: number;
+
+  texts?: TextBlockSpec[];
+};
+
+/* ---------- Util ---------- */
+function ensureTempDir() {
+  try { mkdirSync(paths.temp, { recursive: true }); } catch {}
+}
+
+function parseSec(v: any, fallback: number): number {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v !== "string") return fallback;
+  const s = v.trim().toLowerCase().replace(",", ".");
+  if (s.endsWith("ms")) {
+    const n = parseFloat(s.replace("ms", ""));
+    return Number.isFinite(n) ? n / 1000 : fallback;
   }
-  slidesRaw.sort((a, b) => a.start - b.start);
-
-  const timeline: Segment[] = [];
-  let cursorSched = 0;
-
-  slidesRaw.forEach((s) => {
-    const gap = s.start - cursorSched;
-    if (gap > MIN_FILLER_SEC) {
-      timeline.push({
-        kind: "filler",
-        start: cursorSched,
-        duration: gap,
-        text: "",
-        tts: null,
-        img: null,
-      });
-      cursorSched += gap;
-    } else if (gap > 0) cursorSched += gap;
-
-    const dur = s.duration + HOLD_EXTRA_MS / 1000;
-    timeline.push({ ...s, duration: dur });
-    cursorSched += dur;
-  });
-
-  const outroText = normalizeQuotes(
-    String(mods["Testo-outro"] ?? "LEGGI L'ARTICOLO INTEGRALE SU")
-  );
-  const outroTimePlanned = parseSec(mods["Outro.time"], cursorSched);
-  if (outroTimePlanned > cursorSched + MIN_FILLER_SEC) {
-    const g = outroTimePlanned - cursorSched;
-    timeline.push({
-      kind: "filler",
-      start: cursorSched,
-      duration: g,
-      text: "",
-      tts: null,
-      img: null,
-    });
-    cursorSched = outroTimePlanned;
+  if (s.endsWith("s")) {
+    const n = parseFloat(s.replace("s", ""));
+    return Number.isFinite(n) ? n : fallback;
   }
-  timeline.push({
-    kind: "outro",
-    start: cursorSched,
-    duration: parseSec(mods["Outro.duration"], 5),
-    text: outroText,
-  });
+  const n = parseFloat(s);
+  return Number.isFinite(n) ? n : fallback;
+}
 
-  return timeline;
+function writeTextFilesForSlide(i: number, lines: string[]): string[] {
+  ensureTempDir();
+  return lines.map((txt, idx) => {
+    const p = join(paths.temp, `dtxt-${String(i).padStart(3, "0")}-${idx}.txt`);
+    writeFileSync(p, String(txt ?? ""), "utf8");
+    return p;
+  });
+}
+
+/* --- asset locali già scaricati da fetchAssets() --- */
+function findImageForSlide(i: number): string | undefined {
+  const b = paths.images;
+  const cand = [
+    join(b, `img${i}.jpeg`),
+    join(b, `img${i}.jpg`),
+    join(b, `img${i}.png`),
+  ];
+  return cand.find(existsSync);
+}
+function findTTSForSlide(i: number): string | undefined {
+  const b = paths.tts;
+  const cand = [join(b, `tts-${i}.mp3`)];
+  return cand.find(existsSync);
+}
+
+/* ---------- fallback testo se il template manca lo slot ---------- */
+function defaultTextBlock(x = 120, y = 160): TextBlockSpec {
+  return {
+    x, y,
+    fontSize: 60,
+    fontColor: "white",
+    lineSpacing: 8,
+    box: false,
+  };
+}
+
+/** Ricava (x,y) px per il testo “Testo-i” dalla composition "Slide_i" del template */
+function getTextXYFromTemplate(tpl: TemplateDoc, slideIndex: number): { x: number; y: number } | undefined {
+  const comp = findComposition(tpl, `Slide_${slideIndex}`);
+  const txtEl = findChildByName(comp, `Testo-${slideIndex}`);
+  if (!comp || !txtEl) return undefined;
+
+  const W = tpl.width, H = tpl.height;
+
+  // Interpretazione semplice: x,y come “top-left” in percentuale/px
+  const x = pctToPx(txtEl.x, W);
+  const y = pctToPx(txtEl.y, H);
+
+  if (typeof x === "number" && typeof y === "number") {
+    // Alcuni template usano y_anchor>100 per posizionare rispetto al baseline:
+    // per evitare che esca, clamp a canvas.
+    const xx = Math.max(0, Math.min(W - 10, x));
+    const yy = Math.max(0, Math.min(H - 10, y));
+    return { x: Math.round(xx), y: Math.round(yy) };
+  }
+  return undefined;
+}
+
+/** Ricava posizionamento del logo dalla composition “Slide_i” */
+function getLogoXYHFromTemplate(tpl: TemplateDoc, slideIndex: number): { x?: number; y?: number; h?: number } {
+  const comp = findComposition(tpl, `Slide_${slideIndex}`);
+  const lg = findChildByName(comp, "Logo");
+  if (!comp || !lg) return {};
+  const W = tpl.width, H = tpl.height;
+  const x = pctToPx(lg.x, W);
+  const y = pctToPx(lg.y, H);
+  const h = pctToPx(lg.height, H);
+  return {
+    x: typeof x === "number" ? Math.round(x) : undefined,
+    y: typeof y === "number" ? Math.round(y) : undefined,
+    h: typeof h === "number" ? Math.round(h) : undefined,
+  };
+}
+
+/* ============================================================
+   COSTRUTTORE SLIDE
+   - Legge contenuti da 'mods'
+   - Prende posizioni (testo/logo) dal template
+   ============================================================ */
+export function buildTimelineFromLayout(
+  modifications: Record<string, any>,
+  template: TemplateDoc,
+  opts: { videoW: number; videoH: number; fps: number; defaultDur?: number }
+): SlideSpec[] {
+  const { videoW, videoH, fps, defaultDur = 7 } = opts;
+  const mods = modifications || {};
+
+  // Quante slide? guardo Testo-i / TTS-i / Immagine-i *presenti*
+  let maxIdx = -1;
+  for (let i = 0; i < 50; i++) {
+    const hasTxt = typeof mods[`Testo-${i}`] === "string" && mods[`Testo-${i}`].trim() !== "";
+    const hasTTS = !!mods[`TTS-${i}`] || !!findTTSForSlide(i);
+    const hasImg = !!mods[`Immagine-${i}`] || !!findImageForSlide(i);
+    if (hasTxt || hasTTS || hasImg) maxIdx = i;
+  }
+  const n = Math.max(0, maxIdx + 1);
+
+  const slides: SlideSpec[] = [];
+
+  for (let i = 0; i < n; i++) {
+    const txtStr = typeof mods[`Testo-${i}`] === "string" ? mods[`Testo-${i}`].trim() : "";
+    const textFiles = txtStr ? writeTextFilesForSlide(i, [txtStr]) : [];
+
+    // posizioni dal template (se presenti)
+    const txtPos = getTextXYFromTemplate(template, i) || { x: 120, y: 160 };
+    const logoPos = getLogoXYHFromTemplate(template, i);
+
+    const texts: TextBlockSpec[] = textFiles.length
+      ? [{
+          ...defaultTextBlock(),
+          x: txtPos.x,
+          y: txtPos.y,
+          textFile: textFiles[0],
+        }]
+      : [];
+
+    // Durata preferita: prima TTS-i.duration, poi Slide_i.duration, poi default
+    const durPref =
+      parseSec(mods[`TTS-${i}.duration`], NaN) ||
+      parseSec(mods[`Slide_${i}.duration`], NaN) ||
+      defaultDur;
+
+    const slide: SlideSpec = {
+      width: videoW,
+      height: videoH,
+      fps,
+      durationSec: durPref,
+      outPath: join(paths.temp, `seg-${String(i).padStart(3, "0")}.mp4`),
+
+      bgImagePath: findImageForSlide(i),
+      logoPath: join(paths.images, "logo.png"),
+      ttsPath: findTTSForSlide(i),
+
+      logoHeight: logoPos.h ?? 140,
+      logoX: logoPos.x ?? 161,
+      logoY: logoPos.y ?? 713,
+
+      texts: texts.length ? texts : undefined,
+    };
+
+    console.log(
+      `[timeline] slide ${i} -> img=${!!slide.bgImagePath} tts=${!!slide.ttsPath} text=${txtStr ? "✓" : "—"} dur=${durPref}s`
+    );
+
+    slides.push(slide);
+  }
+
+  return slides;
 }

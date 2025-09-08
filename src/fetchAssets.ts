@@ -1,47 +1,34 @@
 import { existsSync, mkdirSync, writeFileSync, readdirSync, rmSync } from "fs";
 import { join } from "path";
-import fetch from "node-fetch"; // npm install node-fetch
+import fetch from "node-fetch";
 import { paths } from "./paths";
-import { loadTemplate } from "./template";
+import { loadModifications } from "./template";
 
-/** Assicura l'esistenza di una directory creando eventuali cartelle mancanti. */
 function ensureDir(dir: string) {
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 }
-
-/** Cancella ricorsivamente il contenuto di una cartella. */
 function clearDir(dir: string) {
   if (!existsSync(dir)) return;
   for (const file of readdirSync(dir)) {
     rmSync(join(dir, file), { recursive: true, force: true });
   }
 }
-
-/** Scarica un file da `url` e lo salva in `outPath`. */
 async function downloadFile(url: string, outPath: string) {
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`Errore download ${url} -> ${res.statusText}`);
+  if (!res.ok) throw new Error(`Errore download ${url} -> ${res.status} ${res.statusText}`);
   const buf = Buffer.from(await res.arrayBuffer());
   ensureDir(join(outPath, ".."));
   writeFileSync(outPath, buf);
   console.log(`Scaricato: ${outPath}`);
 }
 
-/**
- * Scarica tutti gli asset remoti (immagini, audio, TTS, logo) definiti nel
- * template JSON e li organizza nella cartella `download/` pronta per il
- * rendering.
- */
 export async function fetchAssets() {
-  const data = loadTemplate();
-  const mods = data.modifications || {};
+  const mods = loadModifications() || {};
 
-  // pulizia delle sottocartelle
   clearDir(paths.audio);
   clearDir(paths.images);
   clearDir(paths.tts);
 
-  // ricrea cartelle
   ensureDir(paths.audio);
   ensureDir(paths.images);
   ensureDir(paths.tts);
@@ -52,7 +39,7 @@ export async function fetchAssets() {
     await downloadFile(logoUrl, join(paths.images, "logo.png"));
   }
 
-  // Audio
+  // Audio di background
   const audioUrl = String(mods.Audio ?? "");
   if (audioUrl.startsWith("http")) {
     await downloadFile(audioUrl, join(paths.audio, "bg.mp3"));
@@ -75,8 +62,9 @@ export async function fetchAssets() {
       const url = String(mods[key] ?? "");
       if (url.startsWith("http")) {
         const idx = key.split("-")[1];
-        const ext = url.split(".").pop()?.split("?")[0] || "jpg";
-        await downloadFile(url, join(paths.images, `img${idx}.${ext}`));
+        const ext = (url.split(".").pop()?.split("?")[0] || "jpg").toLowerCase();
+        const safeExt = ext.length <= 5 ? ext : "jpg";
+        await downloadFile(url, join(paths.images, `img${idx}.${safeExt}`));
       }
     }
   }

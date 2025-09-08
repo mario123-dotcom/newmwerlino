@@ -1,25 +1,20 @@
+// ==============================
+// FILE: src/paths.ts (ensure these constants exist)
+// ==============================
 import { join } from "path";
-import { ensureDir } from "./utils/fsx";
-
-/**
- * Raccoglie i percorsi principali utilizzati dal progetto (asset scaricati,
- * cartelle temporanee e output). Le directory vengono create se mancanti.
- */
-export const projectRoot = join(__dirname, "..");
-export const downloadDir  = join(projectRoot, "download");
 
 export const paths = {
-  images: join(downloadDir, "images"),
-  tts:    join(downloadDir, "tts"),
-  audio:  join(downloadDir, "audio"),
-  temp:   join(projectRoot, "src", "temp"),
-  output: join(projectRoot, "src", "output"),
-  fonts:  join(projectRoot, "fonts"),
-  concat: join(projectRoot, "src", "temp", "concat.txt"),
-  final:  join(projectRoot, "src", "output", "final_output.mp4"),
+  root: process.cwd(),
+  temp: join(process.cwd(), "src", "temp"),
+  output: join(process.cwd(), "src", "output"),
+  images: join(process.cwd(), "download", "images"),
+  tts: join(process.cwd(), "download", "tts"),
+  audio: join(process.cwd(), "download", "audio"),
+  fonts: join(process.cwd(), "download", "fonts"),
+  template: join(process.cwd(), "template_horizontal.json"),
+  ffmpeg: process.platform === "win32" ? "ffmpeg" : "ffmpeg",
+  concatList: join(process.cwd(), "src", "temp", "concat.txt"),
+  finalVideo: join(process.cwd(), "src", "output", "final_output.mp4"),
+  get bgAudio() { return join(this.audio, "bg.mp3"); },
 };
 
-Object.values(paths).forEach((p) => {
-  if (p.endsWith(".txt") || p.endsWith(".mp4")) return;
-  ensureDir(p);
-});

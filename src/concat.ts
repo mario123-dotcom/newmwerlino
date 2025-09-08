@@ -1,66 +1,65 @@
-import { existsSync, writeFileSync } from "fs";
-import { dirname, resolve } from "path";
-import { ensureDir } from "./utils/fsx";
-import { DUCK } from "./config";
-import { runFFmpeg } from "./ffmpeg/run";
-import { ffprobeJson } from "./validate";
+import { writeFileSync } from "fs";
+import { runFFmpeg } from "./ffmpeg/run"; // ✅ percorso corretto
 
-/**
- * Concatena i segmenti video generati e produce il file finale in formato MP4
- * utilizzando il demuxer `concat`. Può mixare un'eventuale traccia audio di
- * background applicando un effetto di ducking rispetto all'audio dei segmenti.
- *
- * @param segments      Lista di percorsi ai segmenti da unire nell'ordine corretto.
- * @param bgAudioPath   Percorso opzionale dell'audio di sottofondo da riprodurre in loop.
- * @param outPath       Percorso di output del video finale.
- * @param concatTxtPath File temporaneo con la lista dei segmenti per il demuxer.
- * @param fps           Frame rate del video finale.
- * @param bgVolume      Volume relativo del sottofondo (0–1).
- */
-export function concatAndFinalizeDemuxer({
-  segments, bgAudioPath, outPath, concatTxtPath, fps, bgVolume
-}: {
-  segments: string[]; bgAudioPath?: string; outPath: string;
-  concatTxtPath: string; fps: number; bgVolume: number;
-}) {
-  // Filelist
-  const filelist = segments.map((p) => {
-    const abs = resolve(p).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
-    return `file '${abs}'`;
-  }).join("\n");
+type ConcatArgs = {
+  segments: string[];
+  bgAudioPath?: string | null;
+  outPath: string;
+  concatTxtPath: string;
+  fps: number;
+  bgVolume?: number; // 0..1
+};
 
-  ensureDir(dirname(concatTxtPath));
-  writeFileSync(concatTxtPath, filelist, "utf8");
+// Rende il path sicuro per il demuxer concat: slash forward + apici singoli
+function ffSafe(p: string): string {
+  return p.replace(/\\/g, "/");
+}
 
-  const haveBg = !!(bgAudioPath && existsSync(bgAudioPath));
-  const args: string[] = ["-y", "-fflags", "+genpts", "-f", "concat", "-safe", "0", "-i", concatTxtPath];
-  if (haveBg) args.push("-stream_loop", "-1", "-i", bgAudioPath!);
+export async function concatAndFinalizeDemuxer(args: ConcatArgs) {
+  const { segments, bgAudioPath, outPath, concatTxtPath, fps, bgVolume = 0.15 } = args;
 
-  const probe = ffprobeJson(segments[0]);
-  const haveAudio = probe?.streams?.some((s: any) => s.codec_type === "audio");
-  const baseAudio = haveAudio
-    ? `[0:a:0]aformat=channel_layouts=stereo:sample_rates=44100,aresample=async=1:first_pts=0,asetpts=PTS-STARTPTS[acat]`
-    : `anullsrc=channel_layout=stereo:sample_rate=44100,asetpts=PTS-STARTPTS[acat]`;
-  const audioChain = haveBg
-    ? [
-        baseAudio,
+  // Scrivi concat.txt (una riga per file)
+  const lines = segments.map((s) => `file '${ffSafe(s)}'`);
+  writeFileSync(concatTxtPath, lines.join("\n"), "utf8");
+
+  const ffargs: string[] = [
+    "-y",
+    "-fflags", "+genpts",
+    "-f", "concat",
+    "-safe", "0",
+    "-i", concatTxtPath,
+  ];
+
+  if (bgAudioPath) {
+    ffargs.push("-stream_loop", "-1", "-i", bgAudioPath);
+    ffargs.push(
+      "-filter_complex",
+      [
+        "[0:a:0]aformat=channel_layouts=stereo:sample_rates=44100[tts]",
         `[1:a:0]aformat=channel_layouts=stereo:sample_rates=44100,volume=${bgVolume}[bg]`,
-        `[bg][acat]sidechaincompress=threshold=${DUCK.threshold}:ratio=${DUCK.ratio}:attack=${DUCK.attack}:release=${DUCK.release}:makeup=${DUCK.makeup}[bgduck]`,
-        `[acat][bgduck]amix=inputs=2:normalize=0:duration=longest:dropout_transition=0[mix]`
-      ].join(";")
-    : `${baseAudio};[acat]anull[mix]`;
+        "[tts][bg]amix=inputs=2:normalize=0:duration=longest:dropout_transition=0[mix]",
+      ].join(";"),
+      "-map", "0:v:0",
+      "-map", "[mix]"
+    );
+  } else {
+    ffargs.push("-map", "0:v:0", "-map", "0:a:0");
+  }
 
-  args.push(
-    "-filter_complex", audioChain,
-    "-map", "0:v:0",
-    "-map", "[mix]",
-    "-c:v","libx264","-pix_fmt","yuv420p","-preset","medium","-crf","18","-r",String(fps),
-    "-c:a","aac","-b:a","192k","-ar","44100","-ac","2",
-    "-movflags","+faststart","-shortest", outPath
+  ffargs.push(
+    "-c:v", "libx264",
+    "-pix_fmt", "yuv420p",
+    "-preset", "medium",
+    "-crf", "18",
+    "-r", String(fps),
+    "-c:a", "aac",
+    "-b:a", "192k",
+    "-ar", "44100",
+    "-ac", "2",
+    "-movflags", "+faststart",
+    "-shortest",
+    outPath
   );
 
-  console.log("[DBG ] CONCAT (demuxer) filelist:\n" + filelist + "\n");
-  console.log("[DBG ] FINAL filter_complex:\n" + audioChain + "\n");
-
-  runFFmpeg(args, "FFmpeg FINAL (demuxer concat)");
+  await runFFmpeg(ffargs, "FFmpeg FINAL (demuxer concat)");
 }
