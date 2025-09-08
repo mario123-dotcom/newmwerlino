@@ -348,9 +348,11 @@ export function buildTimelineFromLayout(
     const fontFam = getFontFamilyFromTemplate(template, "Outro", "Testo-outro");
     const fontPath = fontFam ? findFontPath(fontFam) : undefined;
     const txt = textEl?.text as string | undefined;
-    const texts = txt && textBox
-      ? [{ ...defaultTextBlock(textBox.x, textBox.y), text: txt }]
-      : undefined;
+    let texts: TextBlockSpec[] | undefined;
+    if (txt && textBox) {
+      const [txtFile] = writeTextFilesForSlide(slides.length, [txt]);
+      texts = [{ ...defaultTextBlock(textBox.x, textBox.y), textFile: txtFile }];
+    }
     slides.push({
       width: videoW,
       height: videoH,
