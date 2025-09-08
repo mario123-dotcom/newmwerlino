@@ -1,27 +1,24 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildFirstSlideTextChain, buildRevealTextChain_XFADE } from "./filters";
 
-const opts = {
-  segDur: 5,
-  fontfile: "dummy.ttf",
-  videoW: 1920,
-  videoH: 1080,
-  fps: 30
-};
+import { toFFPath, buildDrawText } from "./filters";
 
-test("text chains draw text using text_h", () => {
-  const chainFirst = buildFirstSlideTextChain(
-    "prima riga", opts.segDur, opts.fontfile, opts.videoW, opts.videoH, opts.fps
-  );
-  assert.ok(chainFirst.includes("text_h"));
-  assert.ok(!chainFirst.includes("h-ascent-descent-1"));
-
-
-  const chainOther = buildRevealTextChain_XFADE(
-    "seconda riga", opts.segDur, opts.fontfile, opts.videoW, opts.videoH, opts.fps
-  );
-  assert.ok(chainOther.includes("text_h"));
-  assert.ok(!chainOther.includes("h-ascent-descent-1"));
-
+test("toFFPath converts Windows paths", () => {
+  const win = "C:/foo/bar".replace(/\//g, "\\");
+  assert.equal(toFFPath(win), "C\\:/foo/bar");
 });
+
+test("buildDrawText renders inline text", () => {
+  const chain = buildDrawText({
+    label: "t0",
+    text: "ciao",
+    fontFile: "/tmp/font.ttf",
+    fontSize: 20,
+    fontColor: "white",
+    xExpr: "100",
+    yExpr: "200",
+  });
+  assert.match(chain, /drawtext=/);
+  assert.match(chain, /ciao/);
+});
+
