@@ -250,13 +250,20 @@ export function buildTimelineFromLayout(
   const { videoW, videoH, fps, defaultDur = 7 } = opts;
   const mods = modifications || {};
 
-  // Quante slide? guardo Testo-i / TTS-i / Immagine-i *presenti*
+  // Numero di slide: oltre a testo/tts/immagini, consideriamo anche le
+  // occorrenze `Slide_i.time` nelle modifications per includere eventuali
+  // filler definiti solo nel template.
   let maxIdx = -1;
+  const slideTimeRe = /^Slide_(\d+)\.time$/;
+  for (const k of Object.keys(mods)) {
+    const m = k.match(slideTimeRe);
+    if (m) maxIdx = Math.max(maxIdx, Number(m[1]));
+  }
   for (let i = 0; i < 50; i++) {
     const hasTxt = typeof mods[`Testo-${i}`] === "string" && mods[`Testo-${i}`].trim() !== "";
     const hasTTS = !!mods[`TTS-${i}`] || !!findTTSForSlide(i);
     const hasImg = !!mods[`Immagine-${i}`] || !!findImageForSlide(i);
-    if (hasTxt || hasTTS || hasImg) maxIdx = i;
+    if (hasTxt || hasTTS || hasImg) maxIdx = Math.max(maxIdx, i);
   }
   const n = Math.max(0, maxIdx + 1);
 
@@ -288,14 +295,11 @@ export function buildTimelineFromLayout(
         }]
       : [];
 
-    const ttsDur = parseSec(mods[`TTS-${i}.duration`], 0);
-    const contentDur = Math.max(slideDur, ttsDur);
-
     const slide: SlideSpec = {
       width: videoW,
       height: videoH,
       fps,
-      durationSec: contentDur,
+      durationSec: slideDur,
       outPath: "",
 
       bgImagePath: findImageForSlide(i),
@@ -313,7 +317,7 @@ export function buildTimelineFromLayout(
     };
 
     console.log(
-      `[timeline] slide ${i} -> img=${!!slide.bgImagePath} tts=${!!slide.ttsPath} text=${txtStr ? "✓" : "—"} dur=${contentDur}s`
+      `[timeline] slide ${i} -> img=${!!slide.bgImagePath} tts=${!!slide.ttsPath} text=${txtStr ? "✓" : "—"} dur=${slideDur}s`
     );
 
     slides.push(slide);

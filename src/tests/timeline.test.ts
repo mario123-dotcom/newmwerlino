@@ -120,7 +120,7 @@ test("wrapText splits by length", () => {
   assert.deepEqual(lines, ["uno due", "tre", "quattro", "cinque"]);
 });
 
-test("buildTimelineFromLayout extends slide and adds outro", () => {
+test("buildTimelineFromLayout includes filler slide and outro", () => {
   const tpl: TemplateDoc = {
     width: 100,
     height: 100,
@@ -130,17 +130,24 @@ test("buildTimelineFromLayout extends slide and adds outro", () => {
         name: "Slide_0",
         duration: 2,
         elements: [
-          {
-            type: "text",
-            name: "Testo-0",
-            x: "0%",
-            y: "0%",
-            width: "10%",
-            height: "10%",
-            x_anchor: "0%",
-            y_anchor: "0%",
-            font_family: "Roboto",
-          },
+          { type: "text", name: "Testo-0", x: "0%", y: "0%", width: "10%", height: "10%", x_anchor: "0%", y_anchor: "0%", font_family: "Roboto" },
+          { type: "image", name: "Logo", x: "50%", y: "50%", width: "10%", height: "10%" },
+        ],
+      },
+      {
+        type: "composition",
+        name: "Slide_1",
+        duration: 1,
+        elements: [
+          { type: "image", name: "Logo", x: "50%", y: "50%", width: "10%", height: "10%" },
+        ],
+      },
+      {
+        type: "composition",
+        name: "Slide_2",
+        duration: 2,
+        elements: [
+          { type: "text", name: "Testo-2", x: "0%", y: "0%", width: "10%", height: "10%", x_anchor: "0%", y_anchor: "0%", font_family: "Roboto" },
           { type: "image", name: "Logo", x: "50%", y: "50%", width: "10%", height: "10%" },
         ],
       },
@@ -155,7 +162,7 @@ test("buildTimelineFromLayout extends slide and adds outro", () => {
       },
     ],
   } as any;
-  const mods = { "TTS-0": "foo", "TTS-0.duration": 1 };
+  const mods = { "TTS-0": "foo", "TTS-2": "bar" };
   paths.images = "/tmp/no_img";
   paths.tts = "/tmp/no_tts";
   const slides = buildTimelineFromLayout(mods, tpl, {
@@ -164,7 +171,10 @@ test("buildTimelineFromLayout extends slide and adds outro", () => {
     fps: 30,
     defaultDur: 2,
   });
-  assert.equal(slides.length, 2); // slide + outro
-  assert.equal(slides[0].durationSec, 2); // extended to slide duration
-  assert.equal(slides[1].durationSec, 1); // outro
+  assert.equal(slides.length, 4); // slide0 + filler1 + slide2 + outro
+  assert.equal(slides[0].durationSec, 2);
+  assert.equal(slides[1].ttsPath, undefined); // filler has no tts
+  assert.equal(slides[1].durationSec, 1);
+  assert.equal(slides[2].durationSec, 2);
+  assert.equal(slides[3].durationSec, 1);
 });
