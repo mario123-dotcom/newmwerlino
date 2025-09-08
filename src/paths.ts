@@ -27,6 +27,7 @@ export const paths = {
       return "ffmpeg";
     }
   })(),
+
   concatList: join(process.cwd(), "src", "temp", "concat.txt"),
   finalVideo: join(process.cwd(), "src", "output", "final_output.mp4"),
   get bgAudio() { return join(this.audio, "bg.mp3"); },
