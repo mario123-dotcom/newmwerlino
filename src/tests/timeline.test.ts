@@ -179,6 +179,29 @@ test("buildTimelineFromLayout includes filler slide and outro", () => {
   assert.equal(slides[3].durationSec, 1);
 });
 
+test("buildTimelineFromLayout inserts gap filler and extends to TTS length", () => {
+  const tpl: TemplateDoc = {
+    width: 100,
+    height: 100,
+    elements: [
+      { type: "composition", name: "Slide_0", duration: 1, elements: [] },
+      { type: "composition", name: "Slide_1", duration: 1, elements: [] },
+    ],
+  } as any;
+  const mods = {
+    "Slide_0.time": "0 s",
+    "Slide_1.time": "5 s",
+    "TTS-0": "foo",
+    "TTS-0.duration": "3 s",
+  };
+  paths.tts = "/tmp";
+  paths.images = "/tmp";
+  const slides = buildTimelineFromLayout(mods, tpl, { videoW: 100, videoH: 100, fps: 30, defaultDur: 1 });
+  assert.equal(slides.length, 3);
+  assert.equal(slides[0].durationSec, 3);
+  assert.equal(slides[1].durationSec, 2);
+});
+
 test("buildTimelineFromLayout skips slides marked invisible", () => {
   const tpl: TemplateDoc = {
     width: 100,

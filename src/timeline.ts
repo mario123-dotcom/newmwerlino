@@ -7,6 +7,7 @@ import {
   findChildByName,
   pctToPx,
 } from "./template";
+import { probeDurationSec } from "./ffmpeg/probe";
 
 /* ---------- Tipi usati da composition.ts ---------- */
 export type TextBlockSpec = {
@@ -268,6 +269,7 @@ export function buildTimelineFromLayout(
   const n = Math.max(0, maxIdx + 1);
 
   const slides: SlideSpec[] = [];
+  let prevEnd = 0;
 
   for (let i = 0; i < n; i++) {
     const comp = findComposition(template, `Slide_${i}`);
@@ -281,7 +283,38 @@ export function buildTimelineFromLayout(
       );
     if (!isVisible) continue;
 
-    const slideDur = parseSec(comp?.duration, defaultDur);
+    const start = parseSec(mods[`Slide_${i}.time`], prevEnd);
+
+    // Inserisci filler se c'è un gap rispetto alla fine precedente
+    if (start > prevEnd + 0.001) {
+      const gap = start - prevEnd;
+      const fLogo = getLogoBoxFromTemplate(template, i) || {
+        x: Math.round((videoW - 240) / 2),
+        y: Math.round((videoH - 140) / 2),
+        w: 240,
+        h: 140,
+      };
+      slides.push({
+        width: videoW,
+        height: videoH,
+        fps,
+        durationSec: gap,
+        outPath: "",
+        logoPath: join(paths.images, "logo.png"),
+        logoWidth: fLogo.w,
+        logoHeight: fLogo.h,
+        logoX: fLogo.x,
+        logoY: fLogo.y,
+      });
+      prevEnd = start;
+    }
+
+    let slideDur = parseSec(comp?.duration, defaultDur);
+
+    const ttsPath = findTTSForSlide(i);
+    let ttsDur = parseSec(mods[`TTS-${i}.duration`], 0);
+    if (!ttsDur && ttsPath) ttsDur = probeDurationSec(ttsPath);
+    if (ttsDur > slideDur) slideDur = ttsDur;
 
     const txtStr = typeof mods[`Testo-${i}`] === "string" ? mods[`Testo-${i}`].trim() : "";
 
@@ -314,7 +347,7 @@ export function buildTimelineFromLayout(
 
       bgImagePath: findImageForSlide(i),
       logoPath: join(paths.images, "logo.png"),
-      ttsPath: findTTSForSlide(i),
+      ttsPath,
 
       fontFile: fontPath,
 
@@ -331,6 +364,7 @@ export function buildTimelineFromLayout(
     );
 
     slides.push(slide);
+    prevEnd = start + slideDur;
   }
 
   // Outro
@@ -345,6 +379,30 @@ export function buildTimelineFromLayout(
       outroComp.visible === false
     );
   if (outroVisible) {
+    const outroStart = parseSec(mods["Outro.time"], prevEnd);
+    if (outroStart > prevEnd + 0.001) {
+      const gap = outroStart - prevEnd;
+      const fLogo = getLogoBoxFromTemplate(template, "Outro") || {
+        x: Math.round((videoW - 240) / 2),
+        y: Math.round((videoH - 140) / 2),
+        w: 240,
+        h: 140,
+      };
+      slides.push({
+        width: videoW,
+        height: videoH,
+        fps,
+        durationSec: gap,
+        outPath: "",
+        logoPath: join(paths.images, "logo.png"),
+        logoWidth: fLogo.w,
+        logoHeight: fLogo.h,
+        logoX: fLogo.x,
+        logoY: fLogo.y,
+      });
+      prevEnd = outroStart;
+    }
+
     const outDur = parseSec(outroComp.duration, defaultDur);
     const logoBox = getLogoBoxFromTemplate(template, "Outro");
     const textEl = findChildByName(outroComp, "Testo-outro") as any;
