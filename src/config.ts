@@ -67,7 +67,9 @@ export const FOOTER = {
 
 // Audio
 export const DEFAULT_TTS_VOL = 0.9;
-export const DEFAULT_BG_VOL  = 0.04; // molto basso di base
+// Volume predefinito dell'audio di background: abbastanza alto da essere
+// percepito chiaramente, ma ancora sotto la voce TTS.
+export const DEFAULT_BG_VOL  = 0.2;
 
 export const DUCK = {
   threshold: 0.03,
