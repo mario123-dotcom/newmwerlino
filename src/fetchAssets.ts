@@ -1,6 +1,5 @@
 import { existsSync, mkdirSync, writeFileSync, readdirSync, rmSync } from "fs";
 import { join } from "path";
-import fetch from "node-fetch";
 import { paths } from "./paths";
 import { loadModifications } from "./template";
 
