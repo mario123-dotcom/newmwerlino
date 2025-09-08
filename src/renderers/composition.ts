@@ -1,5 +1,5 @@
 import { runFFmpeg } from "../ffmpeg/run";
-import { buildDrawText, toFFPath } from "../ffmpeg/filters";
+import { buildDrawText } from "../ffmpeg/filters";
 import type { SlideSpec } from "../timeline";
 import { getDefaultFontPath } from "../template";
 
@@ -76,7 +76,6 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
   }
 
   // Testi
-  const fontFF = toFFPath(fontFile);
   if (slide.texts && slide.texts.length) {
     for (let i = 0; i < slide.texts.length; i++) {
       const tb = slide.texts[i];
@@ -84,9 +83,9 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
 
       const draw = buildDrawText({
         label: `tx_${i}`,
-        textFile: tb.textFile ? toFFPath(tb.textFile) : undefined,
+        textFile: tb.textFile,
         text: tb.text,
-        fontFile: fontFF,
+        fontFile,
         fontSize: tb.fontSize ?? 60,
         fontColor: tb.fontColor ?? "white",
         xExpr: String(tb.x),
