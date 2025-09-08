@@ -101,6 +101,20 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
       // drawtext sovrascrive il frame d'ingresso, non servono blend separati
       f.push(draw); // -> [tx_i]
       lastV = `tx_${i}`;
+
+      if (tb.animations && tb.animations.length) {
+        let cur = lastV;
+        tb.animations.forEach((an, ai) => {
+          if (an.type === "fade") {
+            const st = typeof an.time === "number" ? an.time : Math.max(0, dur - an.duration);
+            const t = an.reversed ? "out" : "in";
+            const lbl = `tx_${i}_anim${ai}`;
+            f.push(`[${cur}]fade=t=${t}:st=${st}:d=${an.duration}[${lbl}]`);
+            cur = lbl;
+          }
+        });
+        lastV = cur;
+      }
     }
   }
 

@@ -10,6 +10,13 @@ import {
 import { probeDurationSec } from "./ffmpeg/probe";
 
 /* ---------- Tipi usati da composition.ts ---------- */
+export type AnimationSpec = {
+  type: "fade";
+  time: number | "end";
+  duration: number;
+  reversed?: boolean;
+};
+
 export type TextBlockSpec = {
   textFile?: string;
   text?: string;
@@ -24,6 +31,8 @@ export type TextBlockSpec = {
   boxColor?: string;
   boxAlpha?: number;
   boxBorderW?: number;
+
+  animations?: AnimationSpec[];
 };
 
 export type SlideSpec = {
@@ -273,6 +282,7 @@ export function buildTimelineFromLayout(
 
   for (let i = 0; i < n; i++) {
     const comp = findComposition(template, `Slide_${i}`);
+    const txtEl = findChildByName(comp, `Testo-${i}`);
     const visMod = mods[`Slide_${i}.visible`];
     const isVisible =
       !(
@@ -330,6 +340,16 @@ export function buildTimelineFromLayout(
       : [];
     const textFiles = lines.length ? writeTextFilesForSlide(i, [lines.join("\n")]) : [];
 
+    const anims: AnimationSpec[] | undefined = Array.isArray((txtEl as any)?.animations)
+      ? (txtEl as any).animations
+          .map((a: any) => {
+            const dur = parseSec(a.duration, 0);
+            const t = a.time === "end" ? "end" : parseSec(a.time, 0);
+            return { type: a.type, time: t, duration: dur, reversed: a.reversed === true } as AnimationSpec;
+          })
+          .filter((a: AnimationSpec) => a.type === "fade" && a.duration > 0)
+      : undefined;
+
     const logoBox = getLogoBoxFromTemplate(template, i);
     const fontFamily = getFontFamilyFromTemplate(template, i);
     const fontPath = fontFamily ? findFontPath(fontFamily) : undefined;
@@ -338,6 +358,7 @@ export function buildTimelineFromLayout(
       ? [{
           ...defaultTextBlock(txtBox.x, txtBox.y),
           textFile: textFiles[0],
+          animations: anims,
         }]
       : [];
 
@@ -419,7 +440,16 @@ export function buildTimelineFromLayout(
     let texts: TextBlockSpec[] | undefined;
     if (txt && textBox) {
       const [txtFile] = writeTextFilesForSlide(slides.length, [txt]);
-      texts = [{ ...defaultTextBlock(textBox.x, textBox.y), textFile: txtFile }];
+      const animsOutro: AnimationSpec[] | undefined = Array.isArray(textEl?.animations)
+        ? textEl.animations
+            .map((a: any) => {
+              const dur = parseSec(a.duration, 0);
+              const t = a.time === "end" ? "end" : parseSec(a.time, 0);
+              return { type: a.type, time: t, duration: dur, reversed: a.reversed === true } as AnimationSpec;
+            })
+            .filter((a: AnimationSpec) => a.type === "fade" && a.duration > 0)
+        : undefined;
+      texts = [{ ...defaultTextBlock(textBox.x, textBox.y), textFile: txtFile, animations: animsOutro }];
     }
     slides.push({
       width: videoW,
