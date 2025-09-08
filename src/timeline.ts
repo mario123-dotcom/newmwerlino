@@ -102,26 +102,46 @@ function defaultTextBlock(x = 120, y = 160): TextBlockSpec {
   };
 }
 
-/** Ricava (x,y) px per il testo “Testo-i” dalla composition "Slide_i" del template */
-function getTextXYFromTemplate(tpl: TemplateDoc, slideIndex: number): { x: number; y: number } | undefined {
+/**
+ * Ricava la posizione di partenza (in pixel) del blocco di testo “Testo-i”
+ * all'interno della composition "Slide_i" del template.
+ *
+ * Il template Creatomate descrive il testo tramite x/y, larghezza/altezza e
+ * ancore x/y in percentuale.  Per ottenere il punto in alto a sinistra del
+ * blocco testuale basta sottrarre al centro l'offset dato dalle ancore e
+ * infine assicurarsi che il riquadro risultante resti dentro il canvas.
+ */
+export function getTextXYFromTemplate(
+  tpl: TemplateDoc,
+  slideIndex: number
+): { x: number; y: number } | undefined {
   const comp = findComposition(tpl, `Slide_${slideIndex}`);
   const txtEl = findChildByName(comp, `Testo-${slideIndex}`);
   if (!comp || !txtEl) return undefined;
 
-  const W = tpl.width, H = tpl.height;
+  const W = tpl.width,
+    H = tpl.height;
 
-  // Interpretazione semplice: x,y come “top-left” in percentuale/px
   const x = pctToPx(txtEl.x, W);
   const y = pctToPx(txtEl.y, H);
+  if (typeof x !== "number" || typeof y !== "number") return undefined;
 
-  if (typeof x === "number" && typeof y === "number") {
-    // Alcuni template usano y_anchor>100 per posizionare rispetto al baseline:
-    // per evitare che esca, clamp a canvas.
-    const xx = Math.max(0, Math.min(W - 10, x));
-    const yy = Math.max(0, Math.min(H - 10, y));
-    return { x: Math.round(xx), y: Math.round(yy) };
-  }
-  return undefined;
+  const w = pctToPx(txtEl.width, W) || 0;
+  const h = pctToPx(txtEl.height, H) || 0;
+  const xAnchor = (pctToPx(txtEl.x_anchor, 100) || 0) / 100; // 0..1
+  const yAnchor = (pctToPx(txtEl.y_anchor, 100) || 0) / 100; // 0..1
+
+  // Punto in alto a sinistra prima del clamp
+  let left = x - w * xAnchor;
+  let top = y - h * yAnchor;
+
+  // Mantieni l'intero box dentro il canvas
+  if (w > 0) left = Math.max(0, Math.min(W - w, left));
+  else left = Math.max(0, Math.min(W - 10, left));
+  if (h > 0) top = Math.max(0, Math.min(H - h, top));
+  else top = Math.max(0, Math.min(H - 10, top));
+
+  return { x: Math.round(left), y: Math.round(top) };
 }
 
 /** Ricava posizionamento del logo dalla composition “Slide_i” */
