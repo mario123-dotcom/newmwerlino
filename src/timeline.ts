@@ -309,7 +309,10 @@ export function buildTimelineFromLayout(
       prevEnd = start;
     }
 
-    let slideDur = parseSec(comp?.duration, defaultDur);
+    let slideDur = parseSec(
+      mods[`Slide_${i}.duration`],
+      parseSec(comp?.duration, defaultDur)
+    );
 
     const ttsPath = findTTSForSlide(i);
     let ttsDur = parseSec(mods[`TTS-${i}.duration`], 0);
@@ -403,7 +406,10 @@ export function buildTimelineFromLayout(
       prevEnd = outroStart;
     }
 
-    const outDur = parseSec(outroComp.duration, defaultDur);
+    const outDur = parseSec(
+      mods["Outro.duration"],
+      parseSec(outroComp.duration, defaultDur)
+    );
     const logoBox = getLogoBoxFromTemplate(template, "Outro");
     const textEl = findChildByName(outroComp, "Testo-outro") as any;
     const textBox = getTextBoxFromTemplate(template, "Outro", "Testo-outro");
