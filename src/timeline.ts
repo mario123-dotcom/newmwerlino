@@ -271,6 +271,16 @@ export function buildTimelineFromLayout(
 
   for (let i = 0; i < n; i++) {
     const comp = findComposition(template, `Slide_${i}`);
+    const visMod = mods[`Slide_${i}.visible`];
+    const isVisible =
+      !(
+        visMod === false ||
+        visMod === 0 ||
+        String(visMod).toLowerCase() === "false" ||
+        comp?.visible === false
+      );
+    if (!isVisible) continue;
+
     const slideDur = parseSec(comp?.duration, defaultDur);
 
     const txtStr = typeof mods[`Testo-${i}`] === "string" ? mods[`Testo-${i}`].trim() : "";
@@ -325,7 +335,16 @@ export function buildTimelineFromLayout(
 
   // Outro
   const outroComp = findComposition(template, "Outro");
-  if (outroComp) {
+  const outroVisMod = mods["Outro.visible"];
+  const outroVisible =
+    outroComp &&
+    !(
+      outroVisMod === false ||
+      outroVisMod === 0 ||
+      String(outroVisMod).toLowerCase() === "false" ||
+      outroComp.visible === false
+    );
+  if (outroVisible) {
     const outDur = parseSec(outroComp.duration, defaultDur);
     const logoBox = getLogoBoxFromTemplate(template, "Outro");
     const textEl = findChildByName(outroComp, "Testo-outro") as any;

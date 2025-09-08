@@ -178,3 +178,22 @@ test("buildTimelineFromLayout includes filler slide and outro", () => {
   assert.equal(slides[2].durationSec, 2);
   assert.equal(slides[3].durationSec, 1);
 });
+
+test("buildTimelineFromLayout skips slides marked invisible", () => {
+  const tpl: TemplateDoc = {
+    width: 100,
+    height: 100,
+    elements: [
+      { type: "composition", name: "Slide_0", duration: 1, elements: [] },
+      { type: "composition", name: "Slide_1", duration: 1, elements: [] },
+    ],
+  } as any;
+  const mods = { "Testo-0": "a", "Testo-1": "b", "Slide_1.visible": false };
+  const slides = buildTimelineFromLayout(mods, tpl, {
+    videoW: 100,
+    videoH: 100,
+    fps: 30,
+    defaultDur: 1,
+  });
+  assert.equal(slides.length, 1);
+});
