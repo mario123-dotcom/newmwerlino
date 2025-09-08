@@ -1,66 +1,25 @@
 # Generatore video Merlino
 
-Questa applicazione Node.js crea brevi video partendo da un *template* JSON e da alcuni asset (immagini e audio). I font indicati dal template vengono scaricati automaticamente.
-È pensata per essere usata anche da chi non ha familiarità con FFmpeg: tutto il lavoro "sporco" viene svolto da script già pronti.
+Questa applicazione Node.js genera video combinando un **template JSON** con asset scaricati
+(immagini, tracce vocali TTS, logo e musica di sottofondo). Il progetto è stato
+scritto pensando a chi non ha esperienza con TypeScript o FFmpeg: tutte le
+invocazioni al motore video vengono costruite automaticamente.
 
-## Prerequisiti
-- **Node.js** >= 18
-- **npm** per installare le dipendenze
-- **FFmpeg** installato e raggiungibile dal PATH (in alternativa impostare
-  la variabile d'ambiente `FFMPEG_PATH` con il percorso completo dell'eseguibile,
-  oppure aggiungere la dipendenza opzionale [`ffmpeg-static`](https://www.npmjs.com/package/ffmpeg-static))
+## Dipendenze
+- Node.js ≥ 18
+- FFmpeg installato nel sistema oppure indicato tramite variabile
+  d'ambiente `FFMPEG_PATH`
 
-## Installazione
+Installa i pacchetti del progetto con:
+
 ```bash
 npm install
 ```
 
-Assicurarsi che `ffmpeg` funzioni lanciando `ffmpeg -version` dal terminale.
+## Utilizzo rapido
+1. Copia il tuo template e la risposta JSON nella cartella `template/`.
+2. Lancia `npm start` per scaricare gli asset, costruire le slide, renderizzare i
+   segmenti e concatenarli in `src/output/final_output.mp4`.
 
-## Struttura del progetto
-- `src/` – codice TypeScript.
-  - `main.ts` orchestratore principale.
-  - `renderers/` contiene il renderer unico `composition.ts` che genera slide e outro.
-  - `ffmpeg/` wrapper e filtri personalizzati.
-  - `timeline.ts`, `concat.ts`, `validate.ts` gestiscono l'ordine dei segmenti e l'unione finale.
-- `template/` – esempi di template JSON con la descrizione degli asset da scaricare.
-- `download/` – cartella dove vengono salvati gli asset scaricati (immagini, audio, TTS e font).
-- `comandi.txt` – log con tutti i comandi FFmpeg eseguiti.
-
-## Flusso di lavoro
-1. **Fetch degli asset** – `src/fetchAssets.ts` legge il template e scarica immagini, audio e TTS nella cartella `download/`.
-2. **Timeline** – `src/timeline.ts` converte il template in una sequenza di segmenti (intro, slide con immagine+testo, outro).
-3. **Rendering segmenti** – ogni segmento viene trasformato in un piccolo video con `renderers/composition.ts`.
-   Ogni funzione costruisce internamente un comando `ffmpeg` con filtri come `drawtext`, `overlay` e animazioni di transizione.  I comandi vengono lanciati da `runFFmpeg` (src/ffmpeg/run.ts), che salva anche il comando su `comandi.txt`.
-4. **Validazione** – `validate.ts` controlla che ogni segmento generato sia valido e, se necessario, tenta di ripararlo.
-5. **Concatenazione** – `concat.ts` usa il demuxer `ffmpeg` per unire tutti i segmenti, aggiungendo l'eventuale musica di sottofondo.
-
-## Esecuzione
-```bash
-npm start               # build + esecuzione completa
-npm start -- --reuse-segs     # riusa segmenti esistenti in src/temp
-npm start -- --template tmp2  # usa il template alternativo
-npm start -- --barColor blue  # imposta il colore della barretta del testo
-
-```
-I flag aggiuntivi sono descritti in `src/cli.ts`.
-
-Il risultato finale viene salvato in `download/final.mp4`.
-
-## FFmpeg in breve
-FFmpeg è il motore che elabora audio e video. In questo progetto viene usato per:
-- ridimensionare le immagini a tutto schermo (`scale` + `crop`)
-- applicare zoom e sfumature (`zoompan`, `geq`)
-- scrivere testo con animazioni (`drawtext`, `xfade`)
-- sovrapporre il logo (`overlay`)
-- unire audio e video e codificarli (`libx264`, `aac`)
-
-Non è necessario conoscere in dettaglio i comandi: `runFFmpeg` si occupa di costruirli e lanciarli.  In caso di problemi si può consultare `comandi.txt` per vedere i comandi completi eseguiti.
-
-## Troubleshooting
-- **Manca FFmpeg** – installarlo dal sito ufficiale o tramite il gestore pacchetti del proprio sistema. È possibile specificare il percorso esatto tramite la variabile d'ambiente `FFMPEG_PATH`.
-- **Errore di concatenazione** – verificare che ogni segmento abbia audio (anche silenzioso) e che il file audio di background esista.
-
-Con questa base si possono creare video personalizzati modificando il template o sostituendo gli asset.  Le parti complesse di FFmpeg sono già incapsulate, per cui puoi concentrarti sul contenuto.
-
-Per una descrizione dettagliata di ogni funzione vedi [docs/funzioni.md](docs/funzioni.md).
+Per una spiegazione dettagliata di ogni file e della pipeline completa, consulta
+[docs/architecture.md](docs/architecture.md).
