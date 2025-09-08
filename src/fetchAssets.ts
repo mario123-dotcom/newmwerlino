@@ -1,5 +1,7 @@
 import { existsSync, mkdirSync, writeFileSync, readdirSync, rmSync } from "fs";
 import { join } from "path";
+import { request as httpRequest } from "http";
+import { request as httpsRequest } from "https";
 import { paths } from "./paths";
 import { loadModifications } from "./template";
 
@@ -12,10 +14,32 @@ function clearDir(dir: string) {
     rmSync(join(dir, file), { recursive: true, force: true });
   }
 }
+
+function httpGet(url: string): Promise<Buffer> {
+  const lib = url.startsWith("https") ? httpsRequest : httpRequest;
+  return new Promise((resolve, reject) => {
+    const req = lib(url, (res) => {
+      const status = res.statusCode ?? 0;
+      const loc = res.headers.location;
+      if (status >= 300 && status < 400 && loc) {
+        httpGet(loc).then(resolve, reject);
+        return;
+      }
+      if (status !== 200) {
+        reject(new Error(`HTTP ${status}`));
+        return;
+      }
+      const chunks: Buffer[] = [];
+      res.on("data", (c) => chunks.push(c));
+      res.on("end", () => resolve(Buffer.concat(chunks)));
+    });
+    req.on("error", reject);
+    req.end();
+  });
+}
+
 async function downloadFile(url: string, outPath: string) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Errore download ${url} -> ${res.status} ${res.statusText}`);
-  const buf = Buffer.from(await res.arrayBuffer());
+  const buf = await httpGet(url);
   ensureDir(join(outPath, ".."));
   writeFileSync(outPath, buf);
   console.log(`Scaricato: ${outPath}`);
