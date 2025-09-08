@@ -8,7 +8,6 @@ import { buildTimelineFromLayout, SlideSpec } from "./timeline";
 import { renderSlideSegment } from "./renderers/composition";
 import { concatAndFinalizeDemuxer } from "./concat";
 import { fetchAssets } from "./fetchAssets";
-import { sendFinalVideo } from "./share";
 
 function ensureDir(dir: string) {
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
@@ -68,7 +67,4 @@ function clearDir(dir: string) {
     fps,
     bgVolume: DEFAULT_BG_VOL,
   });
-
-  // 6) share
-  await sendFinalVideo(paths.finalVideo); // ✅ prima era paths.final
 })();

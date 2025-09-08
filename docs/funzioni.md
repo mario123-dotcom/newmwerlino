@@ -63,11 +63,6 @@ semplice cosa fanno e quali parametri accettano.
 - **`renderOutroSegment(seg, outPath, opts)`**
   - Genera l'outro finale con testo centrale e logo.
 
-## `src/share.ts`
-- **`sendFinalVideo(filePath)`**
-  - Invia il video finale via email utilizzando le credenziali SMTP
-    definite nelle variabili d'ambiente; se assenti, registra un avviso.
-
 ## `src/validate.ts`
 - **`ffprobeJson(file)`**
   - Restituisce le informazioni del file usando `ffprobe`.

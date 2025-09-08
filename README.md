@@ -9,7 +9,6 @@ Questa applicazione Node.js crea brevi video partendo da un *template* JSON e da
 - **FFmpeg** installato e raggiungibile dal PATH (in alternativa impostare
   la variabile d'ambiente `FFMPEG_PATH` con il percorso completo dell'eseguibile,
   oppure aggiungere la dipendenza opzionale [`ffmpeg-static`](https://www.npmjs.com/package/ffmpeg-static))
-- Facoltativo: variabili d'ambiente SMTP per l'invio automatico del video finale via email
 
 ## Installazione
 ```bash
@@ -35,7 +34,6 @@ Assicurarsi che `ffmpeg` funzioni lanciando `ffmpeg -version` dal terminale.
    Ogni funzione costruisce internamente un comando `ffmpeg` con filtri come `drawtext`, `overlay` e animazioni di transizione.  I comandi vengono lanciati da `runFFmpeg` (src/ffmpeg/run.ts), che salva anche il comando su `comandi.txt`.
 4. **Validazione** – `validate.ts` controlla che ogni segmento generato sia valido e, se necessario, tenta di ripararlo.
 5. **Concatenazione** – `concat.ts` usa il demuxer `ffmpeg` per unire tutti i segmenti, aggiungendo l'eventuale musica di sottofondo.
-6. **Condivisione** – `share.ts` può inviare il video finale tramite email se sono impostate le variabili SMTP.
 
 ## Esecuzione
 ```bash
@@ -62,7 +60,6 @@ Non è necessario conoscere in dettaglio i comandi: `runFFmpeg` si occupa di cos
 ## Troubleshooting
 - **Manca FFmpeg** – installarlo dal sito ufficiale o tramite il gestore pacchetti del proprio sistema. È possibile specificare il percorso esatto tramite la variabile d'ambiente `FFMPEG_PATH`.
 - **Errore di concatenazione** – verificare che ogni segmento abbia audio (anche silenzioso) e che il file audio di background esista.
-- **Email non inviata** – controllare le variabili `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `SMTP_PORT` e `EMAIL_FROM`.
 
 Con questa base si possono creare video personalizzati modificando il template o sostituendo gli asset.  Le parti complesse di FFmpeg sono già incapsulate, per cui puoi concentrarti sul contenuto.
 
