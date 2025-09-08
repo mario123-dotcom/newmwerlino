@@ -98,9 +98,9 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
         enableExpr: `between(t,0,${dur})`,
       });
 
+      // drawtext sovrascrive il frame d'ingresso, non servono blend separati
       f.push(draw); // -> [tx_i]
-      f.push(`[tx_${i}][${lastV}]blend=all_mode=normal:all_opacity=1,format=rgba[v${i+2}]`);
-      lastV = `v${i+2}`;
+      lastV = `tx_${i}`;
     }
   }
 
