@@ -1,5 +1,6 @@
 import { spawnSync } from "child_process";
 import { appendFileSync } from "fs";
+import { paths } from "../paths";
 
 const LOG_FILE = "comandi.txt";
 
@@ -8,14 +9,26 @@ const LOG_FILE = "comandi.txt";
  * Lancia un'eccezione se il processo termina con exit code diverso da 0.
  */
 export function runFFmpeg(args: string[], label = "FFmpeg") {
-  const cmd = `ffmpeg ${args.join(" ")}`;
+  const ff = paths.ffmpeg;
+  const cmd = `${ff} ${args.join(" ")}`;
   console.log(`[${label}] ${cmd}`);
 
   // Salva anche su file
   appendFileSync(LOG_FILE, `[${label}] ${cmd}\n`);
 
-  const res = spawnSync("ffmpeg", args, { stdio: "inherit" });
-  if (res.status !== 0) throw new Error(`${label} failed (exit ${res.status ?? "unknown"})`);
+  const res = spawnSync(ff, args, { stdio: "inherit" });
+
+  if (res.error) {
+    const code = (res.error as any).code;
+    if (code === "ENOENT") {
+      throw new Error(`${label} failed: ffmpeg not installed or not in PATH`);
+    }
+    throw new Error(`${label} failed: ${res.error.message}`);
+  }
+
+  if ((res.status ?? 1) !== 0) {
+    throw new Error(`${label} failed (exit ${res.status ?? "unknown"})`);
+  }
 }
 
 /** Esegue un comando e restituisce stdout/stderr senza stream diretti. */
