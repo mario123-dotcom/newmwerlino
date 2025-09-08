@@ -6,7 +6,8 @@ Questa applicazione Node.js crea brevi video partendo da un *template* JSON e da
 ## Prerequisiti
 - **Node.js** >= 18
 - **npm** per installare le dipendenze
-- **FFmpeg** installato e raggiungibile dal PATH
+- **FFmpeg** installato e raggiungibile dal PATH (in alternativa impostare
+  la variabile d'ambiente `FFMPEG_PATH` con il percorso completo dell'eseguibile)
 - Facoltativo: variabili d'ambiente SMTP per l'invio automatico del video finale via email
 
 ## Installazione
@@ -59,7 +60,7 @@ FFmpeg è il motore che elabora audio e video. In questo progetto viene usato pe
 Non è necessario conoscere in dettaglio i comandi: `runFFmpeg` si occupa di costruirli e lanciarli.  In caso di problemi si può consultare `comandi.txt` per vedere i comandi completi eseguiti.
 
 ## Troubleshooting
-- **Manca FFmpeg** – installarlo dal sito ufficiale o tramite il gestore pacchetti del proprio sistema.
+- **Manca FFmpeg** – installarlo dal sito ufficiale o tramite il gestore pacchetti del proprio sistema. È possibile specificare il percorso esatto tramite la variabile d'ambiente `FFMPEG_PATH`.
 - **Font non trovato** – assicurarsi di mettere almeno un file `.ttf` o `.otf` dentro `fonts/`.
 - **Errore di concatenazione** – verificare che ogni segmento abbia audio (anche silenzioso) e che il file audio di background esista.
 - **Email non inviata** – controllare le variabili `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `SMTP_PORT` e `EMAIL_FROM`.
