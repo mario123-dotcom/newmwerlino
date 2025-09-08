@@ -79,7 +79,9 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
   if (slide.texts && slide.texts.length) {
     for (let i = 0; i < slide.texts.length; i++) {
       const tb = slide.texts[i];
-      f.push(`[${lastV}]format=rgba[tx_${i}_in]`);
+
+      // layer trasparente su cui disegnare il testo
+      f.push(`color=c=black@0:s=${W}x${H}:d=${dur}[tx_${i}_in]`);
 
       const draw = buildDrawText({
         label: `tx_${i}`,
@@ -98,23 +100,24 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
         enableExpr: `between(t,0,${dur})`,
       });
 
-      // drawtext sovrascrive il frame d'ingresso, non servono blend separati
       f.push(draw); // -> [tx_i]
-      lastV = `tx_${i}`;
 
+      let cur = `tx_${i}`;
       if (tb.animations && tb.animations.length) {
-        let cur = lastV;
         tb.animations.forEach((an, ai) => {
           if (an.type === "fade") {
             const st = typeof an.time === "number" ? an.time : Math.max(0, dur - an.duration);
             const t = an.reversed ? "out" : "in";
             const lbl = `tx_${i}_anim${ai}`;
-            f.push(`[${cur}]fade=t=${t}:st=${st}:d=${an.duration}[${lbl}]`);
+            f.push(`[${cur}]fade=t=${t}:st=${st}:d=${an.duration}:alpha=1[${lbl}]`);
             cur = lbl;
           }
         });
-        lastV = cur;
       }
+
+      const outLbl = `v_txt${i}`;
+      f.push(`[${lastV}][${cur}]overlay=x=0:y=0:enable='between(t,0,${dur})'[${outLbl}]`);
+      lastV = outLbl;
     }
   }
 
