@@ -67,4 +67,5 @@ function clearDir(dir: string) {
     fps,
     bgVolume: DEFAULT_BG_VOL,
   });
+  process.exit(0);
 })();

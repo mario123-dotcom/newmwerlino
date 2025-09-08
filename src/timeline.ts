@@ -1,6 +1,7 @@
 import { join } from "path";
 import { existsSync, mkdirSync, writeFileSync, readdirSync } from "fs";
 import { paths } from "./paths";
+import { MIN_FILLER_SEC } from "./config";
 import {
   TemplateDoc,
   findComposition,
@@ -120,10 +121,18 @@ function defaultTextBlock(x = 120, y = 160): TextBlockSpec {
  */
 export function getTextBoxFromTemplate(
   tpl: TemplateDoc,
-  slideIndex: number
+  slideIndexOrName: number | string,
+  textName?: string
 ): { x: number; y: number; w: number; h: number } | undefined {
-  const comp = findComposition(tpl, `Slide_${slideIndex}`);
-  const txtEl = findChildByName(comp, `Testo-${slideIndex}`);
+  const compName =
+    typeof slideIndexOrName === "number"
+      ? `Slide_${slideIndexOrName}`
+      : slideIndexOrName;
+  const txtName =
+    textName ??
+    (typeof slideIndexOrName === "number" ? `Testo-${slideIndexOrName}` : undefined);
+  const comp = findComposition(tpl, compName);
+  const txtEl = txtName ? findChildByName(comp, txtName) : undefined;
   if (!comp || !txtEl) return undefined;
 
   const W = tpl.width,
@@ -152,10 +161,15 @@ export function getTextBoxFromTemplate(
 /** Ricava posizione e dimensione del logo dalla composition "Slide_i" */
 export function getLogoBoxFromTemplate(
   tpl: TemplateDoc,
-  slideIndex: number
+  slideIndexOrName: number | string,
+  logoName = "Logo"
 ): { x?: number; y?: number; w?: number; h?: number } {
-  const comp = findComposition(tpl, `Slide_${slideIndex}`);
-  const lg = findChildByName(comp, "Logo");
+  const compName =
+    typeof slideIndexOrName === "number"
+      ? `Slide_${slideIndexOrName}`
+      : slideIndexOrName;
+  const comp = findComposition(tpl, compName);
+  const lg = findChildByName(comp, logoName);
   if (!comp || !lg) return {};
   const W = tpl.width,
     H = tpl.height;
@@ -184,9 +198,20 @@ export function getLogoBoxFromTemplate(
   };
 }
 
-export function getFontFamilyFromTemplate(tpl: TemplateDoc, slideIndex: number): string | undefined {
-  const comp = findComposition(tpl, `Slide_${slideIndex}`);
-  const txtEl = findChildByName(comp, `Testo-${slideIndex}`) as any;
+export function getFontFamilyFromTemplate(
+  tpl: TemplateDoc,
+  slideIndexOrName: number | string,
+  textName?: string
+): string | undefined {
+  const compName =
+    typeof slideIndexOrName === "number"
+      ? `Slide_${slideIndexOrName}`
+      : slideIndexOrName;
+  const txtName =
+    textName ??
+    (typeof slideIndexOrName === "number" ? `Testo-${slideIndexOrName}` : undefined);
+  const comp = findComposition(tpl, compName);
+  const txtEl = txtName ? (findChildByName(comp, txtName) as any) : undefined;
   const fam = txtEl?.font_family;
   return typeof fam === "string" ? fam : undefined;
 }
@@ -239,6 +264,9 @@ export function buildTimelineFromLayout(
   const slides: SlideSpec[] = [];
 
   for (let i = 0; i < n; i++) {
+    const comp = findComposition(template, `Slide_${i}`);
+    const slideDur = parseSec(comp?.duration, defaultDur);
+
     const txtStr = typeof mods[`Testo-${i}`] === "string" ? mods[`Testo-${i}`].trim() : "";
 
     const txtBox = getTextBoxFromTemplate(template, i) || { x: 120, y: 160, w: 0, h: 0 };
@@ -261,18 +289,15 @@ export function buildTimelineFromLayout(
         }]
       : [];
 
-    // Durata preferita: prima TTS-i.duration, poi Slide_i.duration, poi default
-    const durPref =
-      parseSec(mods[`TTS-${i}.duration`], NaN) ||
-      parseSec(mods[`Slide_${i}.duration`], NaN) ||
-      defaultDur;
+    const ttsDur = parseSec(mods[`TTS-${i}.duration`], slideDur);
+    const contentDur = Math.min(slideDur, ttsDur);
 
     const slide: SlideSpec = {
       width: videoW,
       height: videoH,
       fps,
-      durationSec: durPref,
-      outPath: join(paths.temp, `seg-${String(i).padStart(3, "0")}.mp4`),
+      durationSec: contentDur,
+      outPath: "",
 
       bgImagePath: findImageForSlide(i),
       logoPath: join(paths.images, "logo.png"),
@@ -289,10 +314,57 @@ export function buildTimelineFromLayout(
     };
 
     console.log(
-      `[timeline] slide ${i} -> img=${!!slide.bgImagePath} tts=${!!slide.ttsPath} text=${txtStr ? "✓" : "—"} dur=${durPref}s`
+      `[timeline] slide ${i} -> img=${!!slide.bgImagePath} tts=${!!slide.ttsPath} text=${txtStr ? "✓" : "—"} dur=${contentDur}s`
     );
 
     slides.push(slide);
+
+    const fillerDur = slideDur - contentDur;
+    if (fillerDur > MIN_FILLER_SEC) {
+      const fw = logoBox.w ?? 240;
+      const fh = logoBox.h ?? 140;
+      slides.push({
+        width: videoW,
+        height: videoH,
+        fps,
+        durationSec: fillerDur,
+        outPath: "",
+        logoPath: join(paths.images, "logo.png"),
+        logoWidth: fw,
+        logoHeight: fh,
+        logoX: Math.round((videoW - fw) / 2),
+        logoY: Math.round((videoH - fh) / 2),
+      });
+    }
+  }
+
+  // Outro
+  const outroComp = findComposition(template, "Outro");
+  if (outroComp) {
+    const outDur = parseSec(outroComp.duration, defaultDur);
+    const logoBox = getLogoBoxFromTemplate(template, "Outro");
+    const textEl = findChildByName(outroComp, "Testo-outro") as any;
+    const textBox = getTextBoxFromTemplate(template, "Outro", "Testo-outro");
+    const fontFam = getFontFamilyFromTemplate(template, "Outro", "Testo-outro");
+    const fontPath = fontFam ? findFontPath(fontFam) : undefined;
+    const txt = textEl?.text as string | undefined;
+    const texts = txt && textBox
+      ? [{ ...defaultTextBlock(textBox.x, textBox.y), text: txt }]
+      : undefined;
+    slides.push({
+      width: videoW,
+      height: videoH,
+      fps,
+      durationSec: outDur,
+      outPath: "",
+      logoPath: join(paths.images, "logo.png"),
+      logoWidth: logoBox.w ?? 240,
+      logoHeight: logoBox.h ?? 140,
+      logoX: logoBox.x ?? Math.round((videoW - (logoBox.w ?? 240)) / 2),
+      logoY: logoBox.y ?? Math.round((videoH - (logoBox.h ?? 140)) / 2),
+      fontFile: fontPath,
+      texts,
+    });
   }
 
   return slides;

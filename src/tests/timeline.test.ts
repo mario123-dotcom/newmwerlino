@@ -1,8 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { getTextBoxFromTemplate, getLogoBoxFromTemplate, getFontFamilyFromTemplate, wrapText } from "../timeline";
+import { getTextBoxFromTemplate, getLogoBoxFromTemplate, getFontFamilyFromTemplate, wrapText, buildTimelineFromLayout } from "../timeline";
 import type { TemplateDoc } from "../template";
+import { paths } from "../paths";
 
 test("getTextBoxFromTemplate uses anchors and keeps box inside canvas", () => {
   const tpl: TemplateDoc = {
@@ -117,4 +118,49 @@ test("getFontFamilyFromTemplate reads font family", () => {
 test("wrapText splits by length", () => {
   const lines = wrapText("uno due tre quattro cinque", 7);
   assert.deepEqual(lines, ["uno due", "tre", "quattro", "cinque"]);
+});
+
+test("buildTimelineFromLayout adds filler and outro", () => {
+  const tpl: TemplateDoc = {
+    width: 100,
+    height: 100,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 2,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "0%",
+            y: "0%",
+            width: "10%",
+            height: "10%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+            font_family: "Roboto",
+          },
+          { type: "image", name: "Logo", x: "50%", y: "50%", width: "10%", height: "10%" },
+        ],
+      },
+      {
+        type: "composition",
+        name: "Outro",
+        duration: 1,
+        elements: [
+          { type: "text", name: "Testo-outro", x: "0%", y: "0%", font_family: "Roboto" },
+          { type: "image", name: "Logo", x: "50%", y: "50%", width: "10%", height: "10%" },
+        ],
+      },
+    ],
+  } as any;
+  const mods = { "TTS-0": "foo", "TTS-0.duration": 1 };
+  paths.images = "/tmp/no_img";
+  paths.tts = "/tmp/no_tts";
+  const slides = buildTimelineFromLayout(mods, tpl, { videoW: 100, videoH: 100, fps: 30, defaultDur: 2 });
+  assert.equal(slides.length, 3); // slide, filler, outro
+  assert.equal(slides[0].durationSec, 1);
+  assert.equal(slides[1].durationSec, 1); // filler
+  assert.equal(slides[2].durationSec, 1); // outro
 });

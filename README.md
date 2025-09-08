@@ -20,7 +20,7 @@ Assicurarsi che `ffmpeg` funzioni lanciando `ffmpeg -version` dal terminale.
 ## Struttura del progetto
 - `src/` – codice TypeScript.
   - `main.ts` orchestratore principale.
-  - `renderers/` genera i segmenti video (immagini, filler, outro).
+  - `renderers/` contiene il renderer unico `composition.ts` che genera slide, filler e outro.
   - `ffmpeg/` wrapper e filtri personalizzati.
   - `timeline.ts`, `concat.ts`, `validate.ts` gestiscono l'ordine dei segmenti e l'unione finale.
 - `template/` – esempi di template JSON con la descrizione degli asset da scaricare.
@@ -30,7 +30,7 @@ Assicurarsi che `ffmpeg` funzioni lanciando `ffmpeg -version` dal terminale.
 ## Flusso di lavoro
 1. **Fetch degli asset** – `src/fetchAssets.ts` legge il template e scarica immagini, audio e TTS nella cartella `download/`.
 2. **Timeline** – `src/timeline.ts` converte il template in una sequenza di segmenti (intro, slide con immagine+testo, filler, outro).
-3. **Rendering segmenti** – ogni segmento viene trasformato in un piccolo video con `renderers/image.ts`, `renderers/filler.ts` o `renderers/outro.ts`.  
+3. **Rendering segmenti** – ogni segmento viene trasformato in un piccolo video con `renderers/composition.ts`.
    Ogni funzione costruisce internamente un comando `ffmpeg` con filtri come `drawtext`, `overlay` e animazioni di transizione.  I comandi vengono lanciati da `runFFmpeg` (src/ffmpeg/run.ts), che salva anche il comando su `comandi.txt`.
 4. **Validazione** – `validate.ts` controlla che ogni segmento generato sia valido e, se necessario, tenta di ripararlo.
 5. **Concatenazione** – `concat.ts` usa il demuxer `ffmpeg` per unire tutti i segmenti, aggiungendo l'eventuale musica di sottofondo.
