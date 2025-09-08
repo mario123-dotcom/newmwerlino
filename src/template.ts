@@ -20,6 +20,8 @@ export type TemplateElement = {
   // testo (quando type === 'text')
   text?: string;
   font_size?: number | string;
+  font_family?: string;
+  font_weight?: string;
   line_height?: number | string;
   color?: string;
   background_color?: string;

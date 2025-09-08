@@ -1,266 +1,13 @@
-// src/ffmpeg/filters.ts
-import { autosizeAndWrap, Orientation } from "../utils/autosize";
-import { deriveOrientation, WRAP_TARGET, TEXT } from "../config";
-import type { TextTransition } from "../types";
+// Minimal FFmpeg text utilities
 
-/**
- * Genera una catena di filtri FFmpeg che produce un layer di ombra
- * sfumata da sovrapporre all'immagine di background.
- *
- * @param strength Intensità dell'ombra (0-1).
- * @param gamma    Curva di gamma applicata alla sfumatura.
- * @param leftPower Controlla la pendenza orizzontale.
- * @param vertPower Controlla la pendenza verticale.
- * @param bias     Offset per tagliare la parte più chiara.
- * @param color    Colore dell'ombra.
- */
-export function shadeChain(
-  strength: number,
-  gamma = 1.0,
-  leftPower = 0.8,
-  vertPower = 0.2,
-  bias = 0.2,
-  color = "black"
-): string {
-  if (strength <= 0) return "format=rgba,geq=r='0':g='0':b='0':a='0'";
-  const shape  = `pow(1-(X/W),${leftPower})*pow(Y/H,${vertPower})`;
-  const shaped = gamma === 1.0 ? shape : `pow(${shape},${gamma})`;
-  const aExpr  = `255*${Math.max(0, Math.min(1, strength))}*clip(((${shaped})-${bias})/(1-${bias}),0\\,1)`;
-  const rgb = (() => {
-    const col = color.toLowerCase();
-    if (col.startsWith("#") && (col.length === 7 || col.length === 4)) {
-      const hex = col.slice(1);
-      const r = hex.length === 3 ? parseInt(hex[0] + hex[0], 16) : parseInt(hex.slice(0, 2), 16);
-      const g = hex.length === 3 ? parseInt(hex[1] + hex[1], 16) : parseInt(hex.slice(2, 4), 16);
-      const b = hex.length === 3 ? parseInt(hex[2] + hex[2], 16) : parseInt(hex.slice(4, 6), 16);
-      return { r, g, b };
-    }
-    switch (col) {
-      case "red":
-        return { r: 255, g: 0, b: 0 };
-      case "black":
-      default:
-        return { r: 0, g: 0, b: 0 };
-    }
-  })();
-  return `format=rgba,geq=r='${rgb.r}':g='${rgb.g}':b='${rgb.b}':a='${aExpr}'`;
-}
-
-/** Espressione per uno zoompan dolce sull'intera clip. */
-export function zoomExprFullClip(durationSec: number, fps: number): string {
-  const frames = Math.max(1, Math.round(durationSec * fps));
-  const zStart = 1.0, zEnd = 1.08;
-  const step   = (zEnd - zStart) / Math.max(1, frames - 1);
-  return `'min(${zStart.toFixed(3)}+on*${step.toFixed(6)},${zEnd.toFixed(3)})'`;
-}
-
-function escDrawText(s: string) {
-  return String(s).replace(/\\/g, "\\\\").replace(/:/g, "\\:").replace(/'/g, "\\'");
-}
-function djitter(i: number) { const x = Math.sin(i * 12.9898) * 43758.5453123; return x - Math.floor(x); }
-function lineOffset(i: number, segDur: number, animDur: number) {
-  const STAGGER = { base: 0.10, growth: 0.10, jitter: 0.015 };
-  const t = STAGGER.base * i + (STAGGER.growth * (i * (i - 1))) / 2;
-  const j = (djitter(i) * 2 - 1) * STAGGER.jitter;
-  const off = Math.max(0, Math.min(segDur - animDur, t + j));
-  return Number(off.toFixed(3));
-}
-
-/**
- * Costruisce la catena `filter_complex` per la prima slide, includendo
- * autosize del testo, doppio bordo e animazione di wipe.
- */
-export function buildFirstSlideTextChain(
-  txt: string,
-  segDur: number,
-  fontfile: string,
-  videoW: number,
-  videoH: number,
-  fps: number,
-  color = "black",
-  transition: TextTransition = "wipeup",
-  align?: "left" | "center" | "right",
-  extraLeftPx = 0,
-  barColor = "black",
-): string {
-  const orientation: Orientation = deriveOrientation(videoW, videoH);
-
-  const chosenAlign = align ?? (orientation === "landscape" ? "left" : "center");
-
-  const baseCols = WRAP_TARGET[orientation].FIRST;
-  const targetOverride = transition === "wiperight"
-    ? 35
-    : undefined;
-
-  const auto = autosizeAndWrap(txt, {
-    orientation,
-    isFirstSlide: true,
-    videoW,
-    videoH,
-    align: chosenAlign,
-
-    targetColsOverride: targetOverride,
-  });
-
-  if (transition === "wiperight" && extraLeftPx > 0) {
-    const xNum = Number(auto.xExpr);
-    if (!Number.isNaN(xNum)) auto.xExpr = `${xNum + extraLeftPx}`;
-  }
-
-  if (!auto.lines.length || (auto.lines.length === 1 && auto.lines[0] === "")) return `[pre]null[v]`;
-
-  const EXTRA  = Math.max(6, Math.round(videoH * 0.06));
-  const CANV_H = auto.lineH + EXTRA;
-
-  const parts: string[] = [];
-  let inLbl = "pre";
-
-  if (transition === "wiperight") {
-    const margin = Math.round(videoW * TEXT.LEFT_MARGIN_P) + extraLeftPx;
-    const barW = Math.max(4, Math.round(auto.fontSize * 0.5));
-    const barX = Math.max(0, margin - barW - auto.padPx);
-    const barH = videoH - auto.y0;
-    parts.push(`color=c=${barColor}:s=${barW}x${barH}:r=${fps}:d=${segDur},format=rgba,setsar=1[bar_can]`);
-    parts.push(`[bar_can]split=2[bar_rgb][bar_forA]`);
-    parts.push(`[bar_forA]alphaextract,format=gray,setsar=1[bar_Aorig]`);
-    parts.push(`color=c=black:s=${barW}x${barH}:r=${fps}:d=${segDur},format=gray,setsar=1[bar_off]`);
-    parts.push(`color=c=white:s=${barW}x${barH}:r=${fps}:d=${segDur},format=gray,setsar=1[bar_on]`);
-    parts.push(`[bar_off][bar_on]xfade=transition=wipeup:duration=0.6:offset=0[bar_wipe]`);
-    parts.push(`[bar_Aorig][bar_wipe]blend=all_mode=multiply[bar_A]`);
-    parts.push(`[bar_rgb][bar_A]alphamerge[bar_ready]`);
-    parts.push(`[pre][bar_ready]overlay=x=${barX}:y=H-h[bar_out]`);
-    inLbl = "bar_out";
-  }
-
-  for (let i = 0; i < auto.lines.length; i++) {
-    const safe   = escDrawText(auto.lines[i]);
-    const offset = lineOffset(i, segDur, 0.6);
-    const lineY  = auto.y0 + i * auto.lineH;
-
-    parts.push(`color=c=black@0.0:s=${videoW}x${CANV_H}:r=${fps}:d=${segDur},format=rgba,setsar=1[S${i}_canvas]`);
-    // box “doppio” per bordo pieno + anti-alias
-    parts.push(`[S${i}_canvas]drawtext=fontfile='${fontfile}':fontsize=${auto.fontSize}:fontcolor=${color}@0:x=${auto.xExpr}:y=h-text_h-1+${EXTRA}:text='${safe}':box=1:boxcolor=white@1.0:boxborderw=${auto.padPx}[S${i}_big]`);
-    parts.push(`[S${i}_big]drawtext=fontfile='${fontfile}':fontsize=${auto.fontSize}:fontcolor=${color}:x=${auto.xExpr}:y=h-text_h-1:text='${safe}':box=1:boxcolor=white@1.0:boxborderw=${auto.padPx}[S${i}_rgba]`);
-
-
-    // alpha wipe con direzione configurabile
-    parts.push(`[S${i}_rgba]split=2[S${i}_rgb][S${i}_forA]`);
-    parts.push(`[S${i}_forA]alphaextract,format=gray,setsar=1[S${i}_Aorig]`);
-    parts.push(`color=c=black:s=${videoW}x${CANV_H}:r=${fps}:d=${segDur},format=gray,setsar=1[S${i}_off]`);
-    parts.push(`color=c=white:s=${videoW}x${CANV_H}:r=${fps}:d=${segDur},format=gray,setsar=1[S${i}_on]`);
-    parts.push(`[S${i}_off][S${i}_on]xfade=transition=${transition}:duration=0.6:offset=${offset.toFixed(3)}[S${i}_wipe]`);
-    parts.push(`[S${i}_Aorig][S${i}_wipe]blend=all_mode=multiply[S${i}_A]`);
-    parts.push(`[S${i}_rgb][S${i}_A]alphamerge[S${i}_ready]`);
-
-    // posizionamento riga con passo lineH calcolato → spaziatura identica
-    parts.push(`[${inLbl}][S${i}_ready]overlay=x=0:y=${lineY}[S${i}_out]`);
-    inLbl = `S${i}_out`;
-  }
-
-  parts.push(`[${inLbl}]null[v]`);
-  return parts.join(";");
-}
-
-/**
- * Catena `filter_complex` per le slide successive alla prima: esegue
- * autosize, genera le righe e applica una transizione di rivelazione
- * basata su `xfade`.
- */
-export function buildRevealTextChain_XFADE(
-  txt: string,
-  segDur: number,
-  fontfile: string,
-  videoW: number,
-  videoH: number,
-  fps: number,
-  color = "white",
-  transition: TextTransition = "wipeup",
-  align: "left" | "center" | "right" = "center",
-  extraLeftPx = 0,
-  barColor = "black",
-): string {
-  const orientation: Orientation = deriveOrientation(videoW, videoH);
-  const baseCols = WRAP_TARGET[orientation].OTHER;
-  const targetOverride = transition === "wiperight"
-    ? 30
-    : undefined;
-
-  const auto = autosizeAndWrap(txt, {
-    orientation,
-    isFirstSlide: false,
-    videoW,
-    videoH,
-    align,
-
-    targetColsOverride: targetOverride,
-  });
-
-  if (transition === "wiperight" && extraLeftPx > 0) {
-    const xNum = Number(auto.xExpr);
-    if (!Number.isNaN(xNum)) auto.xExpr = `${xNum + extraLeftPx}`;
-  }
-
-  if (!auto.lines.length || (auto.lines.length === 1 && auto.lines[0] === "")) return `[pre]null[v]`;
-
-  const parts: string[] = [];
-  let inLbl = "pre";
-
-  if (transition === "wiperight") {
-    const margin = Math.round(videoW * TEXT.LEFT_MARGIN_P) + extraLeftPx;
-    const barW = Math.max(4, Math.round(auto.fontSize * 0.5));
-    const barX = Math.max(0, margin - barW - auto.padPx);
-    const barH = videoH - auto.y0;
-    parts.push(`color=c=${barColor}:s=${barW}x${barH}:r=${fps}:d=${segDur},format=rgba,setsar=1[bar_can]`);
-    parts.push(`[bar_can]split=2[bar_rgb][bar_forA]`);
-    parts.push(`[bar_forA]alphaextract,format=gray,setsar=1[bar_Aorig]`);
-    parts.push(`color=c=black:s=${barW}x${barH}:r=${fps}:d=${segDur},format=gray,setsar=1[bar_off]`);
-    parts.push(`color=c=white:s=${barW}x${barH}:r=${fps}:d=${segDur},format=gray,setsar=1[bar_on]`);
-    parts.push(`[bar_off][bar_on]xfade=transition=wipeup:duration=0.6:offset=0[bar_wipe]`);
-    parts.push(`[bar_Aorig][bar_wipe]blend=all_mode=multiply[bar_A]`);
-    parts.push(`[bar_rgb][bar_A]alphamerge[bar_ready]`);
-    parts.push(`[pre][bar_ready]overlay=x=${barX}:y=H-h[bar_out]`);
-    inLbl = "bar_out";
-  }
-
-  const EXTRA = Math.max(6, Math.round(videoH * 0.06));
-
-  for (let i = 0; i < auto.lines.length; i++) {
-    const safe   = escDrawText(auto.lines[i]);
-    const offset = lineOffset(i, segDur, 0.6);
-    const lineY  = auto.y0 + i * auto.lineH;
-
-    // canvas “a riga” di altezza esatta = lineH ⇒ spaziatura identica
-    parts.push(`color=c=black@0.0:s=${videoW}x${auto.lineH}:r=${fps}:d=${segDur},format=rgba,setsar=1[L${i}_canvas]`);
-    parts.push(`[L${i}_canvas]drawtext=fontfile='${fontfile}':fontsize=${auto.fontSize}:fontcolor=${color}:x=${auto.xExpr}:y=h-text_h-1:text='${safe}'[L${i}_rgba]`);
-
-
-    // alpha XFADE (wipeup/wipedown/wipeleft/wiperight)
-    parts.push(`[L${i}_rgba]split=2[L${i}_rgb][L${i}_forA]`);
-    parts.push(`[L${i}_forA]alphaextract,format=gray,setsar=1[L${i}_Aorig]`);
-    parts.push(`color=c=black:s=${videoW}x${auto.lineH}:r=${fps}:d=${segDur},format=gray,setsar=1[L${i}_off]`);
-    parts.push(`color=c=white:s=${videoW}x${auto.lineH}:r=${fps}:d=${segDur},format=gray,setsar=1[L${i}_on]`);
-    parts.push(`[L${i}_off][L${i}_on]xfade=transition=${transition}:duration=0.6:offset=${offset.toFixed(3)}[L${i}_wipe]`);
-    parts.push(`[L${i}_Aorig][L${i}_wipe]blend=all_mode=multiply[L${i}_A]`);
-    parts.push(`[L${i}_rgb][L${i}_A]alphamerge[L${i}_ready]`);
-
-    parts.push(`[${inLbl}][L${i}_ready]overlay=x=0:y=${lineY}[L${i}_out]`);
-    inLbl = `L${i}_out`;
-  }
-
-  parts.push(`[${inLbl}]null[v]`);
-  return parts.join(";");
-}
-// src/ffmpeg/filters.ts
-
-// Converte un path Windows in un path accettabile da FFmpeg drawtext/textfile/fontfile
+// Convert a filesystem path into a form accepted by FFmpeg on any platform.
+// Example: `C:\foo\bar` -> `C\:/foo/bar`
 export function toFFPath(p: string): string {
-  // Esempio: C:\foo\bar -> C\:/foo/bar
   return p.replace(/\\/g, "/").replace(/^([A-Za-z]):/, "$1\\:");
 }
 
-// Escape di testo usato in drawtext=text='...'
+// Escape characters that would otherwise break the drawtext filter.
 export function escTextForDrawText(s: string): string {
-  // FFmpeg drawtext vuole escape di backslash, due punti, virgolette singole, percentuali, newline
   return s
     .replace(/\\/g, "\\\\")
     .replace(/:/g, "\\:")
@@ -270,29 +17,39 @@ export function escTextForDrawText(s: string): string {
 }
 
 export type DrawTextOpts = {
-  label: string;        // etichetta del buffer (es. "tx_0")
-  textFile?: string;    // se presente, usa textfile
-  text?: string;        // alternativa inline
+  label: string;        // buffer label (e.g. "tx_0")
+  textFile?: string;    // path to file containing the text
+  text?: string;        // inline text alternative
   fontFile: string;
   fontSize: number;
-  fontColor: string;    // es. "0xffffff"
-  xExpr: string;        // es. "100"
-  yExpr: string;        // es. "200"
-  lineSpacing?: number; // opzionale
+  fontColor: string;    // e.g. "white"
+  xExpr: string;        // expression for x position
+  yExpr: string;        // expression for y position
+  lineSpacing?: number;
   box?: boolean;
-  boxColor?: string;    // es. "black"
+  boxColor?: string;
   boxAlpha?: number;    // 0..1
-  boxBorderW?: number;  // px
-  enableExpr?: string;  // es. "between(t,0,7)"
+  boxBorderW?: number;  // pixels
+  enableExpr?: string;  // e.g. "between(t,0,7)"
 };
 
-// Ritorna la catena drawtext pronta da concatenare a filter_complex
+// Build the drawtext filter snippet for the given options.
 export function buildDrawText(opts: DrawTextOpts): string {
   const {
-    label, textFile, text, fontFile, fontSize, fontColor,
-    xExpr, yExpr, lineSpacing = 0,
-    box = false, boxColor = "black", boxAlpha = 0.0, boxBorderW = 0,
-    enableExpr
+    label,
+    textFile,
+    text,
+    fontFile,
+    fontSize,
+    fontColor,
+    xExpr,
+    yExpr,
+    lineSpacing = 0,
+    box = false,
+    boxColor = "black",
+    boxAlpha = 0.0,
+    boxBorderW = 0,
+    enableExpr,
   } = opts;
 
   const ffFont = toFFPath(fontFile);
@@ -303,13 +60,18 @@ export function buildDrawText(opts: DrawTextOpts): string {
 
   if (textFile) {
     const ffTxt = toFFPath(textFile);
-    return `[${label}_in]drawtext=textfile='${ffTxt}':${common}` +
-           (enableExpr ? `:enable='${enableExpr}'` : "") +
-           `[${label}]`;
+    return (
+      `[${label}_in]drawtext=textfile='${ffTxt}':${common}` +
+      (enableExpr ? `:enable='${enableExpr}'` : "") +
+      `[${label}]`
+    );
   }
 
   const inline = escTextForDrawText(text ?? "");
-  return `[${label}_in]drawtext=text='${inline}':${common}` +
-         (enableExpr ? `:enable='${enableExpr}'` : "") +
-         `[${label}]`;
+  return (
+    `[${label}_in]drawtext=text='${inline}':${common}` +
+    (enableExpr ? `:enable='${enableExpr}'` : "") +
+    `[${label}]`
+  );
 }
+

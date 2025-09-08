@@ -17,6 +17,7 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
   const fps = slide.fps;
   const out = slide.outPath;
 
+  const logoW = slide.logoWidth ?? 240;
   const logoH = slide.logoHeight ?? 140;
   const logoX = slide.logoX ?? 161;
   const logoY = slide.logoY ?? 713;
@@ -63,12 +64,12 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
     lastV = "v0";
   }
 
-  // Logo (preserva AR, altezza fissa)
+  // Logo (preserva AR dentro al box indicato)
   if (hasLogo) {
     const logoIndex = hasBG ? 2 : 1;
     f.push(
       `[${logoIndex}:v]format=rgba,` +
-      `scale=-1:${logoH}:flags=lanczos:force_original_aspect_ratio=decrease[lg]`
+      `scale=${logoW}:${logoH}:flags=lanczos:force_original_aspect_ratio=decrease[lg]`
     );
     f.push(`[${lastV}][lg]overlay=x=${logoX}:y=${logoY}:enable='between(t,0,${dur})'[v1]`);
     lastV = "v1";
@@ -98,9 +99,9 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
         enableExpr: `between(t,0,${dur})`,
       });
 
+      // drawtext sovrascrive il frame d'ingresso, non servono blend separati
       f.push(draw); // -> [tx_i]
-      f.push(`[tx_${i}][${lastV}]blend=all_mode=normal:all_opacity=1,format=rgba[v${i+2}]`);
-      lastV = `v${i+2}`;
+      lastV = `tx_${i}`;
     }
   }
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env ts-node
 import { join } from "path";
+import { existsSync, mkdirSync, readdirSync, rmSync } from "fs";
 import { DEFAULT_BG_VOL } from "./config";
 import { paths } from "./paths";
 import { loadTemplate, loadModifications } from "./template";
@@ -7,9 +8,25 @@ import { buildTimelineFromLayout, SlideSpec } from "./timeline";
 import { renderSlideSegment } from "./renderers/composition";
 import { concatAndFinalizeDemuxer } from "./concat";
 import { fetchAssets } from "./fetchAssets";
-import { sendFinalVideo } from "./share";
+
+function ensureDir(dir: string) {
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+}
+
+function clearDir(dir: string) {
+  if (!existsSync(dir)) return;
+  for (const f of readdirSync(dir)) {
+    rmSync(join(dir, f), { recursive: true, force: true });
+  }
+}
 
 (async () => {
+  // prepara le cartelle di lavoro
+  ensureDir(paths.temp);
+  ensureDir(paths.output);
+  clearDir(paths.temp);
+  clearDir(paths.output);
+
   // 1) scarica asset
   await fetchAssets();
 
@@ -50,7 +67,5 @@ import { sendFinalVideo } from "./share";
     fps,
     bgVolume: DEFAULT_BG_VOL,
   });
-
-  // 6) share
-  await sendFinalVideo(paths.finalVideo); // ✅ prima era paths.final
+  process.exit(0);
 })();
