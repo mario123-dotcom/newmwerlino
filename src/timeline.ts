@@ -10,12 +10,18 @@ import {
 import { probeDurationSec } from "./ffmpeg/probe";
 
 /* ---------- Tipi usati da composition.ts ---------- */
-export type AnimationSpec = {
-  type: "fade";
-  time: number | "end";
-  duration: number;
-  reversed?: boolean;
-};
+export type AnimationSpec =
+  | {
+      type: "fade";
+      time: number | "end";
+      duration: number;
+      reversed?: boolean;
+    }
+  | {
+      type: "wipe";
+      time: number;
+      duration: number;
+    };
 
 export type TextBlockSpec = {
   textFile?: string;
@@ -338,29 +344,40 @@ export function buildTimelineFromLayout(
           txtBox.w > 0 ? Math.max(1, Math.floor(txtBox.w / (60 * 0.6))) : DEFAULT_CHARS_PER_LINE
         )
       : [];
-    const textFiles = lines.length ? writeTextFilesForSlide(i, [lines.join("\n")]) : [];
+    const textFiles = lines.length ? writeTextFilesForSlide(i, lines) : [];
 
-    const anims: AnimationSpec[] | undefined = Array.isArray((txtEl as any)?.animations)
-      ? (txtEl as any).animations
-          .map((a: any) => {
-            const dur = parseSec(a.duration, 0);
-            const t = a.time === "end" ? "end" : parseSec(a.time, 0);
-            return { type: a.type, time: t, duration: dur, reversed: a.reversed === true } as AnimationSpec;
-          })
-          .filter((a: AnimationSpec) => a.type === "fade" && a.duration > 0)
-      : undefined;
+    // Animazioni per ciascuna linea
+    const baseBlock = defaultTextBlock(txtBox.x, txtBox.y);
+    const lineHeight = (baseBlock.fontSize ?? 60) + (baseBlock.lineSpacing ?? 8);
+    const perLineAnims: AnimationSpec[][] = textFiles.map(() => []);
+    if (Array.isArray((txtEl as any)?.animations)) {
+      for (const a of (txtEl as any).animations) {
+        const dur = parseSec(a.duration, 0);
+        if (a.type === "fade" && dur > 0) {
+          const t = a.time === "end" ? "end" : parseSec(a.time, 0);
+          for (const arr of perLineAnims) {
+            arr.push({ type: "fade", time: t, duration: dur, reversed: a.reversed === true });
+          }
+        } else if (a.type === "text-reveal" && a.axis === "x" && a.split === "line" && dur > 0) {
+          const start = parseSec(a.time, 0);
+          const segDur = textFiles.length ? dur / textFiles.length : dur;
+          for (let li = 0; li < perLineAnims.length; li++) {
+            perLineAnims[li].push({ type: "wipe", time: start + li * segDur, duration: segDur });
+          }
+        }
+      }
+    }
 
     const logoBox = getLogoBoxFromTemplate(template, i);
     const fontFamily = getFontFamilyFromTemplate(template, i);
     const fontPath = fontFamily ? findFontPath(fontFamily) : undefined;
 
-    const texts: TextBlockSpec[] = textFiles.length
-      ? [{
-          ...defaultTextBlock(txtBox.x, txtBox.y),
-          textFile: textFiles[0],
-          animations: anims,
-        }]
-      : [];
+    const texts: TextBlockSpec[] = textFiles.map((tf, idx) => ({
+      ...baseBlock,
+      y: baseBlock.y + idx * lineHeight,
+      textFile: tf,
+      animations: perLineAnims[idx].length ? perLineAnims[idx] : undefined,
+    }));
 
     const slide: SlideSpec = {
       width: videoW,
@@ -439,17 +456,37 @@ export function buildTimelineFromLayout(
     const txt = textEl?.text as string | undefined;
     let texts: TextBlockSpec[] | undefined;
     if (txt && textBox) {
-      const [txtFile] = writeTextFilesForSlide(slides.length, [txt]);
-      const animsOutro: AnimationSpec[] | undefined = Array.isArray(textEl?.animations)
-        ? textEl.animations
-            .map((a: any) => {
-              const dur = parseSec(a.duration, 0);
-              const t = a.time === "end" ? "end" : parseSec(a.time, 0);
-              return { type: a.type, time: t, duration: dur, reversed: a.reversed === true } as AnimationSpec;
-            })
-            .filter((a: AnimationSpec) => a.type === "fade" && a.duration > 0)
-        : undefined;
-      texts = [{ ...defaultTextBlock(textBox.x, textBox.y), textFile: txtFile, animations: animsOutro }];
+      const linesOut = wrapText(
+        txt,
+        textBox.w > 0 ? Math.max(1, Math.floor(textBox.w / (60 * 0.6))) : DEFAULT_CHARS_PER_LINE
+      );
+      const txtFiles = writeTextFilesForSlide(slides.length, linesOut);
+      const baseOut = defaultTextBlock(textBox.x, textBox.y);
+      const lineH = (baseOut.fontSize ?? 60) + (baseOut.lineSpacing ?? 8);
+      const perLine: AnimationSpec[][] = txtFiles.map(() => []);
+      if (Array.isArray(textEl?.animations)) {
+        for (const a of textEl.animations) {
+          const dur = parseSec(a.duration, 0);
+          if (a.type === "fade" && dur > 0) {
+            const t = a.time === "end" ? "end" : parseSec(a.time, 0);
+            for (const arr of perLine) {
+              arr.push({ type: "fade", time: t, duration: dur, reversed: a.reversed === true });
+            }
+          } else if (a.type === "text-reveal" && a.axis === "x" && a.split === "line" && dur > 0) {
+            const start = parseSec(a.time, 0);
+            const seg = txtFiles.length ? dur / txtFiles.length : dur;
+            for (let li = 0; li < perLine.length; li++) {
+              perLine[li].push({ type: "wipe", time: start + li * seg, duration: seg });
+            }
+          }
+        }
+      }
+      texts = txtFiles.map((tf, idx) => ({
+        ...baseOut,
+        y: baseOut.y + idx * lineH,
+        textFile: tf,
+        animations: perLine[idx].length ? perLine[idx] : undefined,
+      }));
     }
     slides.push({
       width: videoW,
