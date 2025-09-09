@@ -80,8 +80,11 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
     for (let i = 0; i < slide.texts.length; i++) {
       const tb = slide.texts[i];
 
-      // layer trasparente su cui disegnare il testo e base per xfade
-      f.push(`color=c=black@0:s=${W}x${H}:d=${dur}[tx_${i}_blank]`);
+      // layer trasparente su cui disegnare il testo; il "blank" serve solo per xfade
+      const needBlank = tb.animations?.some((a) => a.type === "wipe") ?? false;
+      if (needBlank) {
+        f.push(`color=c=black@0:s=${W}x${H}:d=${dur}[tx_${i}_blank]`);
+      }
       f.push(`color=c=black@0:s=${W}x${H}:d=${dur}[tx_${i}_in]`);
 
       const draw = buildDrawText({
@@ -112,7 +115,7 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
             const lbl = `tx_${i}_anim${ai}`;
             f.push(`[${cur}]fade=t=${t}:st=${st}:d=${an.duration}:alpha=1[${lbl}]`);
             cur = lbl;
-          } else if (an.type === "wipe") {
+          } else if (an.type === "wipe" && needBlank) {
             const lbl = `tx_${i}_anim${ai}`;
             f.push(`[tx_${i}_blank][${cur}]xfade=transition=wipeleft:duration=${an.duration}:offset=${an.time}[${lbl}]`);
             cur = lbl;
