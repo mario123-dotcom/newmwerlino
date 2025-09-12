@@ -32,6 +32,15 @@ export type TemplateElement = {
 
   // figli (quando type === 'composition' o gruppi con layers)
   elements?: TemplateElement[];
+
+  // animazioni opzionali (es. fade, text-reveal...)
+  animations?: {
+    time?: number | string;
+    duration?: number | string;
+    type: string;
+    reversed?: boolean;
+    [key: string]: any;
+  }[];
 };
 
 /** Documento template (come template_horizontal.json) */
