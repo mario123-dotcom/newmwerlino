@@ -38,10 +38,6 @@ export type TextBlockSpec = {
   boxColor?: string;
   boxAlpha?: number;
   boxBorderW?: number;
-  shadowColor?: string;
-  shadowAlpha?: number;
-  shadowX?: number;
-  shadowY?: number;
 
   animations?: AnimationSpec[];
 };
@@ -395,15 +391,6 @@ export function buildTimelineFromLayout(
         baseBlock.boxColor = bg.color;
         baseBlock.boxAlpha = bg.alpha;
       }
-      const sh = parseRGBA((txtEl as any).shadow_color);
-      if (sh) {
-        baseBlock.shadowColor = sh.color;
-        baseBlock.shadowAlpha = sh.alpha;
-        const sx = lenToPx((txtEl as any).shadow_x, videoW, videoH);
-        const sy = lenToPx((txtEl as any).shadow_y, videoW, videoH);
-        if (typeof sx === "number") baseBlock.shadowX = sx;
-        if (typeof sy === "number") baseBlock.shadowY = sy;
-      }
     }
     const lineHeight = (baseBlock.fontSize ?? 60) + (baseBlock.lineSpacing ?? 8);
     const perLineAnims: AnimationSpec[][] = textFiles.map(() => []);
@@ -550,15 +537,6 @@ export function buildTimelineFromLayout(
         baseOut.box = true;
         baseOut.boxColor = bg.color;
         baseOut.boxAlpha = bg.alpha;
-      }
-      const sh = parseRGBA(textEl?.shadow_color);
-      if (sh) {
-        baseOut.shadowColor = sh.color;
-        baseOut.shadowAlpha = sh.alpha;
-        const sx = lenToPx(textEl?.shadow_x, videoW, videoH);
-        const sy = lenToPx(textEl?.shadow_y, videoW, videoH);
-        if (typeof sx === "number") baseOut.shadowX = sx;
-        if (typeof sy === "number") baseOut.shadowY = sy;
       }
       const lineH = (baseOut.fontSize ?? 60) + (baseOut.lineSpacing ?? 8);
       const perLine: AnimationSpec[][] = txtFiles.map(() => []);
