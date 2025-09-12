@@ -72,7 +72,8 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
     slide.shadowY > 0
   ) {
     const sc = slide.shadowColor;
-    const sa = slide.shadowAlpha ?? 1;
+    // amplify alpha so the shadow is clearly visible even with low template values
+    const sa = Math.min(1, (slide.shadowAlpha ?? 1) * 3);
     const sx = slide.shadowX;
     const sy = slide.shadowY;
     f.push(
