@@ -61,6 +61,12 @@ export type SlideSpec = {
   logoY?: number;
 
   texts?: TextBlockSpec[];
+
+  // overlay shadow on background
+  shadowColor?: string;
+  shadowAlpha?: number;
+  shadowX?: number;
+  shadowY?: number;
 };
 
 /* ---------- Util ---------- */
@@ -82,6 +88,35 @@ function parseSec(v: any, fallback: number): number {
   }
   const n = parseFloat(s);
   return Number.isFinite(n) ? n : fallback;
+}
+
+function lenToPx(v: any, W: number, H: number): number | undefined {
+  if (v == null) return undefined;
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v !== "string") return undefined;
+  const s = v.trim().toLowerCase();
+  if (s.endsWith("vmin")) {
+    const n = parseFloat(s.replace("vmin", ""));
+    return Number.isFinite(n) ? (n / 100) * Math.min(W, H) : undefined;
+  }
+  if (s.endsWith("px")) {
+    const n = parseFloat(s.replace("px", ""));
+    return Number.isFinite(n) ? n : undefined;
+  }
+  const n = parseFloat(s);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function parseRGBA(c: any): { color: string; alpha: number } | undefined {
+  if (typeof c !== "string") return undefined;
+  const m = c.trim().match(/^rgba?\((\d+),(\d+),(\d+)(?:,(\d*(?:\.\d+)?))?\)$/i);
+  if (!m) return undefined;
+  const r = Math.max(0, Math.min(255, parseInt(m[1], 10)));
+  const g = Math.max(0, Math.min(255, parseInt(m[2], 10)));
+  const b = Math.max(0, Math.min(255, parseInt(m[3], 10)));
+  const a = m[4] != null ? Math.max(0, Math.min(1, parseFloat(m[4]))) : 1;
+  const hex = ((r << 16) | (g << 8) | b).toString(16).padStart(6, "0");
+  return { color: `#${hex}`, alpha: a };
 }
 
 function writeTextFilesForSlide(i: number, lines: string[]): string[] {
@@ -349,15 +384,28 @@ export function buildTimelineFromLayout(
 
     // Animazioni per ciascuna linea
     const baseBlock = defaultTextBlock(txtBox.x, txtBox.y);
+    if (txtEl) {
+      const bg = parseRGBA((txtEl as any).background_color);
+      if (bg) {
+        baseBlock.box = true;
+        baseBlock.boxColor = bg.color;
+        baseBlock.boxAlpha = bg.alpha;
+      }
+    }
     const lineHeight = (baseBlock.fontSize ?? 60) + (baseBlock.lineSpacing ?? 8);
     const perLineAnims: AnimationSpec[][] = textFiles.map(() => []);
     if (Array.isArray((txtEl as any)?.animations)) {
       for (const a of (txtEl as any).animations) {
         const dur = parseSec(a.duration, 0);
-        if (a.type === "fade" && dur > 0) {
-          const t = a.time === "end" ? "end" : parseSec(a.time, 0);
+        if (
+          a.type === "fade" &&
+          dur > 0 &&
+          a.reversed !== true &&
+          String(a.time) !== "end"
+        ) {
+          const t = parseSec(a.time, 0);
           for (const arr of perLineAnims) {
-            arr.push({ type: "fade", time: t, duration: dur, reversed: a.reversed === true });
+            arr.push({ type: "fade", time: t, duration: dur });
           }
         } else if (a.type === "text-reveal" && a.split === "line" && dur > 0) {
           const start = parseSec(a.time, 0);
@@ -381,6 +429,10 @@ export function buildTimelineFromLayout(
     const logoBox = getLogoBoxFromTemplate(template, i);
     const fontFamily = getFontFamilyFromTemplate(template, i);
     const fontPath = fontFamily ? findFontPath(fontFamily) : undefined;
+
+    const compShadow = parseRGBA((comp as any)?.shadow_color);
+    const compShadowX = lenToPx((comp as any)?.shadow_x, videoW, videoH);
+    const compShadowY = lenToPx((comp as any)?.shadow_y, videoW, videoH);
 
     const texts: TextBlockSpec[] = textFiles.map((tf, idx) => ({
       ...baseBlock,
@@ -408,6 +460,11 @@ export function buildTimelineFromLayout(
       logoY: logoBox.y ?? 713,
 
       texts: texts.length ? texts : undefined,
+
+      shadowColor: compShadow?.color,
+      shadowAlpha: compShadow?.alpha,
+      shadowX: typeof compShadowX === "number" ? compShadowX : undefined,
+      shadowY: typeof compShadowY === "number" ? compShadowY : undefined,
     };
 
     console.log(
@@ -463,6 +520,9 @@ export function buildTimelineFromLayout(
     const textBox = getTextBoxFromTemplate(template, "Outro", "Testo-outro");
     const fontFam = getFontFamilyFromTemplate(template, "Outro", "Testo-outro");
     const fontPath = fontFam ? findFontPath(fontFam) : undefined;
+    const outShadow = parseRGBA((outroComp as any)?.shadow_color);
+    const outShadowX = lenToPx((outroComp as any)?.shadow_x, videoW, videoH);
+    const outShadowY = lenToPx((outroComp as any)?.shadow_y, videoW, videoH);
     const txt = textEl?.text as string | undefined;
     let texts: TextBlockSpec[] | undefined;
     if (txt && textBox) {
@@ -472,15 +532,26 @@ export function buildTimelineFromLayout(
       );
       const txtFiles = writeTextFilesForSlide(slides.length, linesOut);
       const baseOut = defaultTextBlock(textBox.x, textBox.y);
+      const bg = parseRGBA(textEl?.background_color);
+      if (bg) {
+        baseOut.box = true;
+        baseOut.boxColor = bg.color;
+        baseOut.boxAlpha = bg.alpha;
+      }
       const lineH = (baseOut.fontSize ?? 60) + (baseOut.lineSpacing ?? 8);
       const perLine: AnimationSpec[][] = txtFiles.map(() => []);
       if (Array.isArray(textEl?.animations)) {
         for (const a of textEl.animations) {
           const dur = parseSec(a.duration, 0);
-          if (a.type === "fade" && dur > 0) {
-            const t = a.time === "end" ? "end" : parseSec(a.time, 0);
+          if (
+            a.type === "fade" &&
+            dur > 0 &&
+            a.reversed !== true &&
+            String(a.time) !== "end"
+          ) {
+            const t = parseSec(a.time, 0);
             for (const arr of perLine) {
-              arr.push({ type: "fade", time: t, duration: dur, reversed: a.reversed === true });
+              arr.push({ type: "fade", time: t, duration: dur });
             }
           } else if (a.type === "text-reveal" && a.split === "line" && dur > 0) {
             const start = parseSec(a.time, 0);
@@ -520,6 +591,10 @@ export function buildTimelineFromLayout(
       logoY: logoBox.y ?? Math.round((videoH - (logoBox.h ?? 140)) / 2),
       fontFile: fontPath,
       texts,
+      shadowColor: outShadow?.color,
+      shadowAlpha: outShadow?.alpha,
+      shadowX: typeof outShadowX === "number" ? outShadowX : undefined,
+      shadowY: typeof outShadowY === "number" ? outShadowY : undefined,
     });
   }
 

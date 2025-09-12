@@ -53,10 +53,18 @@ export function buildDrawText(opts: DrawTextOpts): string {
   } = opts;
 
   const ffFont = toFFPath(fontFile);
-  const common =
-    `fontfile='${ffFont}':fontsize=${fontSize}:fontcolor=${fontColor}:` +
-    `x=${xExpr}:y=${yExpr}:line_spacing=${lineSpacing}:` +
-    `box=${box ? 1 : 0}:boxcolor=${boxColor}@${boxAlpha}:boxborderw=${boxBorderW}`;
+  const parts = [
+    `fontfile='${ffFont}'`,
+    `fontsize=${fontSize}`,
+    `fontcolor=${fontColor}`,
+    `x=${xExpr}`,
+    `y=${yExpr}`,
+    `line_spacing=${lineSpacing}`,
+    `box=${box ? 1 : 0}`,
+    `boxcolor=${boxColor}@${boxAlpha}`,
+    `boxborderw=${boxBorderW}`,
+  ];
+  const common = parts.join(":");
 
   if (textFile) {
     const ffTxt = toFFPath(textFile);

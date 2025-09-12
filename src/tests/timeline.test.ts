@@ -247,3 +247,70 @@ test("buildTimelineFromLayout skips slides marked invisible", () => {
   });
   assert.equal(slides.length, 1);
 });
+
+test("buildTimelineFromLayout parses slide shadow", () => {
+  const tpl: TemplateDoc = {
+    width: 100,
+    height: 100,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        shadow_color: "rgba(0,0,0,0.5)",
+        shadow_x: "10px",
+        shadow_y: "20px",
+        duration: 1,
+        elements: [
+          { type: "text", name: "Testo-0", x: "0%", y: "0%", width: "10%", height: "10%", x_anchor: "0%", y_anchor: "0%" },
+        ],
+      },
+    ],
+  } as any;
+  const mods = { "Testo-0": "hello" };
+  paths.images = "/tmp/no_img";
+  paths.tts = "/tmp/no_tts";
+  const slides = buildTimelineFromLayout(mods, tpl, { videoW: 100, videoH: 100, fps: 30, defaultDur: 1 });
+  const s0 = slides[0];
+  assert.equal(s0.shadowColor, "#000000");
+  assert.equal(s0.shadowAlpha, 0.5);
+  assert.equal(s0.shadowX, 10);
+  assert.equal(s0.shadowY, 20);
+});
+
+test("buildTimelineFromLayout ignores fade-out animations", () => {
+  const tpl: TemplateDoc = {
+    width: 100,
+    height: 100,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 2,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "0%",
+            y: "0%",
+            width: "10%",
+            height: "10%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+            animations: [
+              { type: "fade", time: 0, duration: 0.5 },
+              { type: "fade", time: "end", duration: 0.5, reversed: true },
+            ],
+          },
+        ],
+      },
+    ],
+  } as any;
+  const mods = { "Testo-0": "hi" };
+  paths.images = "/tmp/no_img";
+  paths.tts = "/tmp/no_tts";
+  const slides = buildTimelineFromLayout(mods, tpl, { videoW: 100, videoH: 100, fps: 30, defaultDur: 2 });
+  const anims = slides[0].texts![0].animations!;
+  assert.equal(anims.length, 1);
+  assert.equal(anims[0].type, "fade");
+  assert.equal(anims[0].time, 0);
+});
