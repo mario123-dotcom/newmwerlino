@@ -21,6 +21,7 @@ export type AnimationSpec =
       type: "wipe";
       time: number;
       duration: number;
+      direction: "wipeleft" | "wiperight" | "wipeup" | "wipedown";
     };
 
 export type TextBlockSpec = {
@@ -358,11 +359,20 @@ export function buildTimelineFromLayout(
           for (const arr of perLineAnims) {
             arr.push({ type: "fade", time: t, duration: dur, reversed: a.reversed === true });
           }
-        } else if (a.type === "text-reveal" && a.axis === "x" && a.split === "line" && dur > 0) {
+        } else if (a.type === "text-reveal" && a.split === "line" && dur > 0) {
           const start = parseSec(a.time, 0);
           const segDur = textFiles.length ? dur / textFiles.length : dur;
+          const dir =
+            a.axis === "y"
+              ? (String(a.y_anchor ?? "").trim() === "100%" ? "wipedown" : "wipeup")
+              : (String(a.x_anchor ?? "").trim() === "100%" ? "wipeleft" : "wiperight");
           for (let li = 0; li < perLineAnims.length; li++) {
-            perLineAnims[li].push({ type: "wipe", time: start + li * segDur, duration: segDur });
+            perLineAnims[li].push({
+              type: "wipe",
+              time: start + li * segDur,
+              duration: segDur,
+              direction: dir,
+            });
           }
         }
       }
@@ -472,11 +482,20 @@ export function buildTimelineFromLayout(
             for (const arr of perLine) {
               arr.push({ type: "fade", time: t, duration: dur, reversed: a.reversed === true });
             }
-          } else if (a.type === "text-reveal" && a.axis === "x" && a.split === "line" && dur > 0) {
+          } else if (a.type === "text-reveal" && a.split === "line" && dur > 0) {
             const start = parseSec(a.time, 0);
             const seg = txtFiles.length ? dur / txtFiles.length : dur;
+            const dir =
+              a.axis === "y"
+                ? (String(a.y_anchor ?? "").trim() === "100%" ? "wipedown" : "wipeup")
+                : (String(a.x_anchor ?? "").trim() === "100%" ? "wipeleft" : "wiperight");
             for (let li = 0; li < perLine.length; li++) {
-              perLine[li].push({ type: "wipe", time: start + li * seg, duration: seg });
+              perLine[li].push({
+                type: "wipe",
+                time: start + li * seg,
+                duration: seg,
+                direction: dir,
+              });
             }
           }
         }
