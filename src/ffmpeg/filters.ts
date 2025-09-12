@@ -30,6 +30,10 @@ export type DrawTextOpts = {
   boxColor?: string;
   boxAlpha?: number;    // 0..1
   boxBorderW?: number;  // pixels
+  shadowColor?: string; // e.g. "black"
+  shadowAlpha?: number; // 0..1
+  shadowX?: number;     // pixels
+  shadowY?: number;     // pixels
   enableExpr?: string;  // e.g. "between(t,0,7)"
 };
 
@@ -49,14 +53,31 @@ export function buildDrawText(opts: DrawTextOpts): string {
     boxColor = "black",
     boxAlpha = 0.0,
     boxBorderW = 0,
+    shadowColor,
+    shadowAlpha = 1.0,
+    shadowX = 0,
+    shadowY = 0,
     enableExpr,
   } = opts;
 
   const ffFont = toFFPath(fontFile);
-  const common =
-    `fontfile='${ffFont}':fontsize=${fontSize}:fontcolor=${fontColor}:` +
-    `x=${xExpr}:y=${yExpr}:line_spacing=${lineSpacing}:` +
-    `box=${box ? 1 : 0}:boxcolor=${boxColor}@${boxAlpha}:boxborderw=${boxBorderW}`;
+  const parts = [
+    `fontfile='${ffFont}'`,
+    `fontsize=${fontSize}`,
+    `fontcolor=${fontColor}`,
+    `x=${xExpr}`,
+    `y=${yExpr}`,
+    `line_spacing=${lineSpacing}`,
+    `box=${box ? 1 : 0}`,
+    `boxcolor=${boxColor}@${boxAlpha}`,
+    `boxborderw=${boxBorderW}`,
+  ];
+  if (shadowColor) {
+    parts.push(`shadowcolor=${shadowColor}@${shadowAlpha}`);
+    parts.push(`shadowx=${shadowX}`);
+    parts.push(`shadowy=${shadowY}`);
+  }
+  const common = parts.join(":");
 
   if (textFile) {
     const ffTxt = toFFPath(textFile);

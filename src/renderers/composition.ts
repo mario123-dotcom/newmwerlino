@@ -101,6 +101,10 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
         boxColor: tb.boxColor ?? "black",
         boxAlpha: tb.boxAlpha ?? 0.0,
         boxBorderW: tb.boxBorderW ?? 0,
+        shadowColor: tb.shadowColor,
+        shadowAlpha: tb.shadowAlpha,
+        shadowX: tb.shadowX,
+        shadowY: tb.shadowY,
         enableExpr: `between(t,0,${dur})`,
       });
 

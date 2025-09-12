@@ -38,6 +38,10 @@ export type TextBlockSpec = {
   boxColor?: string;
   boxAlpha?: number;
   boxBorderW?: number;
+  shadowColor?: string;
+  shadowAlpha?: number;
+  shadowX?: number;
+  shadowY?: number;
 
   animations?: AnimationSpec[];
 };
@@ -82,6 +86,35 @@ function parseSec(v: any, fallback: number): number {
   }
   const n = parseFloat(s);
   return Number.isFinite(n) ? n : fallback;
+}
+
+function lenToPx(v: any, W: number, H: number): number | undefined {
+  if (v == null) return undefined;
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v !== "string") return undefined;
+  const s = v.trim().toLowerCase();
+  if (s.endsWith("vmin")) {
+    const n = parseFloat(s.replace("vmin", ""));
+    return Number.isFinite(n) ? (n / 100) * Math.min(W, H) : undefined;
+  }
+  if (s.endsWith("px")) {
+    const n = parseFloat(s.replace("px", ""));
+    return Number.isFinite(n) ? n : undefined;
+  }
+  const n = parseFloat(s);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function parseRGBA(c: any): { color: string; alpha: number } | undefined {
+  if (typeof c !== "string") return undefined;
+  const m = c.trim().match(/^rgba?\((\d+),(\d+),(\d+)(?:,(\d*(?:\.\d+)?))?\)$/i);
+  if (!m) return undefined;
+  const r = Math.max(0, Math.min(255, parseInt(m[1], 10)));
+  const g = Math.max(0, Math.min(255, parseInt(m[2], 10)));
+  const b = Math.max(0, Math.min(255, parseInt(m[3], 10)));
+  const a = m[4] != null ? Math.max(0, Math.min(1, parseFloat(m[4]))) : 1;
+  const hex = ((r << 16) | (g << 8) | b).toString(16).padStart(6, "0");
+  return { color: `#${hex}`, alpha: a };
 }
 
 function writeTextFilesForSlide(i: number, lines: string[]): string[] {
@@ -349,6 +382,23 @@ export function buildTimelineFromLayout(
 
     // Animazioni per ciascuna linea
     const baseBlock = defaultTextBlock(txtBox.x, txtBox.y);
+    if (txtEl) {
+      const bg = parseRGBA((txtEl as any).background_color);
+      if (bg) {
+        baseBlock.box = true;
+        baseBlock.boxColor = bg.color;
+        baseBlock.boxAlpha = bg.alpha;
+      }
+      const sh = parseRGBA((txtEl as any).shadow_color);
+      if (sh) {
+        baseBlock.shadowColor = sh.color;
+        baseBlock.shadowAlpha = sh.alpha;
+        const sx = lenToPx((txtEl as any).shadow_x, videoW, videoH);
+        const sy = lenToPx((txtEl as any).shadow_y, videoW, videoH);
+        if (typeof sx === "number") baseBlock.shadowX = sx;
+        if (typeof sy === "number") baseBlock.shadowY = sy;
+      }
+    }
     const lineHeight = (baseBlock.fontSize ?? 60) + (baseBlock.lineSpacing ?? 8);
     const perLineAnims: AnimationSpec[][] = textFiles.map(() => []);
     if (Array.isArray((txtEl as any)?.animations)) {
@@ -472,6 +522,21 @@ export function buildTimelineFromLayout(
       );
       const txtFiles = writeTextFilesForSlide(slides.length, linesOut);
       const baseOut = defaultTextBlock(textBox.x, textBox.y);
+      const bg = parseRGBA(textEl?.background_color);
+      if (bg) {
+        baseOut.box = true;
+        baseOut.boxColor = bg.color;
+        baseOut.boxAlpha = bg.alpha;
+      }
+      const sh = parseRGBA(textEl?.shadow_color);
+      if (sh) {
+        baseOut.shadowColor = sh.color;
+        baseOut.shadowAlpha = sh.alpha;
+        const sx = lenToPx(textEl?.shadow_x, videoW, videoH);
+        const sy = lenToPx(textEl?.shadow_y, videoW, videoH);
+        if (typeof sx === "number") baseOut.shadowX = sx;
+        if (typeof sy === "number") baseOut.shadowY = sy;
+      }
       const lineH = (baseOut.fontSize ?? 60) + (baseOut.lineSpacing ?? 8);
       const perLine: AnimationSpec[][] = txtFiles.map(() => []);
       if (Array.isArray(textEl?.animations)) {
