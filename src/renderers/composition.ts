@@ -83,9 +83,9 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
       // layer trasparente su cui disegnare il testo; il "blank" serve solo per xfade
       const needBlank = tb.animations?.some((a) => a.type === "wipe") ?? false;
       if (needBlank) {
-        f.push(`color=c=black@0:s=${W}x${H}:d=${dur}[tx_${i}_blank]`);
+        f.push(`color=c=black@0:s=${W}x${H}:d=${dur},format=rgba[tx_${i}_blank]`);
       }
-      f.push(`color=c=black@0:s=${W}x${H}:d=${dur}[tx_${i}_in]`);
+      f.push(`color=c=black@0:s=${W}x${H}:d=${dur},format=rgba[tx_${i}_in]`);
 
       const draw = buildDrawText({
         label: `tx_${i}`,
@@ -113,13 +113,11 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
             const st = typeof an.time === "number" ? an.time : Math.max(0, dur - an.duration);
             const t = an.reversed ? "out" : "in";
             const lbl = `tx_${i}_anim${ai}`;
-            f.push(`[${cur}]fade=t=${t}:st=${st}:d=${an.duration}:alpha=1[${lbl}]`);
+            f.push(`[${cur}]fade=t=${t}:st=${st}:d=${an.duration}:alpha=1,format=rgba[${lbl}]`);
             cur = lbl;
           } else if (an.type === "wipe" && needBlank) {
             const lbl = `tx_${i}_anim${ai}`;
-            f.push(
-              `[tx_${i}_blank][${cur}]xfade=transition=${an.direction}:duration=${an.duration}:offset=${an.time}[${lbl}]`
-            );
+            f.push(`[tx_${i}_blank][${cur}]xfade=transition=${an.direction}:duration=${an.duration}:offset=${an.time},format=rgba[${lbl}]`);
             cur = lbl;
           }
         });
