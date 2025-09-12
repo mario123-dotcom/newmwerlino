@@ -64,6 +64,25 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
     lastV = "v0";
   }
 
+  if (
+    slide.shadowColor &&
+    typeof slide.shadowX === "number" &&
+    slide.shadowX > 0 &&
+    typeof slide.shadowY === "number" &&
+    slide.shadowY > 0
+  ) {
+    const sc = slide.shadowColor;
+    const sa = slide.shadowAlpha ?? 1;
+    const sx = slide.shadowX;
+    const sy = slide.shadowY;
+    f.push(
+      `color=c=${sc}@1:s=${W}x${H}:d=${dur},format=rgba,` +
+        `geq=a='${sa}*255*max(${sx}-X,0)/${sx}*max(Y-(H-${sy}),0)/${sy}'[sh]`
+    );
+    f.push(`[${lastV}][sh]overlay=x=0:y=0:enable='between(t,0,${dur})'[v_sh]`);
+    lastV = "v_sh";
+  }
+
   // Logo (preserva AR dentro al box indicato)
   if (hasLogo) {
     const logoIndex = hasBG ? 2 : 1;

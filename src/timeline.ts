@@ -65,6 +65,12 @@ export type SlideSpec = {
   logoY?: number;
 
   texts?: TextBlockSpec[];
+
+  // overlay shadow on background
+  shadowColor?: string;
+  shadowAlpha?: number;
+  shadowX?: number;
+  shadowY?: number;
 };
 
 /* ---------- Util ---------- */
@@ -404,10 +410,15 @@ export function buildTimelineFromLayout(
     if (Array.isArray((txtEl as any)?.animations)) {
       for (const a of (txtEl as any).animations) {
         const dur = parseSec(a.duration, 0);
-        if (a.type === "fade" && dur > 0) {
-          const t = a.time === "end" ? "end" : parseSec(a.time, 0);
+        if (
+          a.type === "fade" &&
+          dur > 0 &&
+          a.reversed !== true &&
+          String(a.time) !== "end"
+        ) {
+          const t = parseSec(a.time, 0);
           for (const arr of perLineAnims) {
-            arr.push({ type: "fade", time: t, duration: dur, reversed: a.reversed === true });
+            arr.push({ type: "fade", time: t, duration: dur });
           }
         } else if (a.type === "text-reveal" && a.split === "line" && dur > 0) {
           const start = parseSec(a.time, 0);
@@ -431,6 +442,10 @@ export function buildTimelineFromLayout(
     const logoBox = getLogoBoxFromTemplate(template, i);
     const fontFamily = getFontFamilyFromTemplate(template, i);
     const fontPath = fontFamily ? findFontPath(fontFamily) : undefined;
+
+    const compShadow = parseRGBA((comp as any)?.shadow_color);
+    const compShadowX = lenToPx((comp as any)?.shadow_x, videoW, videoH);
+    const compShadowY = lenToPx((comp as any)?.shadow_y, videoW, videoH);
 
     const texts: TextBlockSpec[] = textFiles.map((tf, idx) => ({
       ...baseBlock,
@@ -458,6 +473,11 @@ export function buildTimelineFromLayout(
       logoY: logoBox.y ?? 713,
 
       texts: texts.length ? texts : undefined,
+
+      shadowColor: compShadow?.color,
+      shadowAlpha: compShadow?.alpha,
+      shadowX: typeof compShadowX === "number" ? compShadowX : undefined,
+      shadowY: typeof compShadowY === "number" ? compShadowY : undefined,
     };
 
     console.log(
@@ -513,6 +533,9 @@ export function buildTimelineFromLayout(
     const textBox = getTextBoxFromTemplate(template, "Outro", "Testo-outro");
     const fontFam = getFontFamilyFromTemplate(template, "Outro", "Testo-outro");
     const fontPath = fontFam ? findFontPath(fontFam) : undefined;
+    const outShadow = parseRGBA((outroComp as any)?.shadow_color);
+    const outShadowX = lenToPx((outroComp as any)?.shadow_x, videoW, videoH);
+    const outShadowY = lenToPx((outroComp as any)?.shadow_y, videoW, videoH);
     const txt = textEl?.text as string | undefined;
     let texts: TextBlockSpec[] | undefined;
     if (txt && textBox) {
@@ -542,10 +565,15 @@ export function buildTimelineFromLayout(
       if (Array.isArray(textEl?.animations)) {
         for (const a of textEl.animations) {
           const dur = parseSec(a.duration, 0);
-          if (a.type === "fade" && dur > 0) {
-            const t = a.time === "end" ? "end" : parseSec(a.time, 0);
+          if (
+            a.type === "fade" &&
+            dur > 0 &&
+            a.reversed !== true &&
+            String(a.time) !== "end"
+          ) {
+            const t = parseSec(a.time, 0);
             for (const arr of perLine) {
-              arr.push({ type: "fade", time: t, duration: dur, reversed: a.reversed === true });
+              arr.push({ type: "fade", time: t, duration: dur });
             }
           } else if (a.type === "text-reveal" && a.split === "line" && dur > 0) {
             const start = parseSec(a.time, 0);
@@ -585,6 +613,10 @@ export function buildTimelineFromLayout(
       logoY: logoBox.y ?? Math.round((videoH - (logoBox.h ?? 140)) / 2),
       fontFile: fontPath,
       texts,
+      shadowColor: outShadow?.color,
+      shadowAlpha: outShadow?.alpha,
+      shadowX: typeof outShadowX === "number" ? outShadowX : undefined,
+      shadowY: typeof outShadowY === "number" ? outShadowY : undefined,
     });
   }
 
