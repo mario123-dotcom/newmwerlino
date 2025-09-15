@@ -77,7 +77,8 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
     const sh = slide.shadowH;
     const alpha = (sa * 255).toFixed(2);
     f.push(
-      `color=c=${sc}@1:s=${W}x${H}:d=${dur},format=rgba,geq=r='r':g='g':b='b':a='${alpha}*max(${sw}-X,0)/${sw}*max(Y-(H-${sh}),0)/${sh}'[shdw]`
+      `color=c=${sc}@1:s=${W}x${H}:d=${dur},format=rgba,` +
+        `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${alpha}*max(${sw}-X,0)/${sw}*max(Y-(H-${sh}),0)/${sh}'[shdw]`
     );
     f.push(
       `[${lastV}][shdw]overlay=x=0:y=0:enable='between(t,0,${dur})'[v_sh]`
