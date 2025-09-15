@@ -67,8 +67,8 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
   if (hasBG) {
     const sc = slide.shadowColor ?? "black";
     const sa = slide.shadowAlpha ?? 1;
-    const sw = slide.shadowW ?? Math.round(W * 0.25);
-    const sh = slide.shadowH ?? Math.round(H * 0.25);
+    const sw = slide.shadowW ?? Math.round(W * 0.75);
+    const sh = slide.shadowH ?? Math.round(H * 0.75);
     f.push(
       `color=c=${sc}@1:s=${W}x${H}:d=${dur},format=rgba,` +
         `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='255*${sa}*max(${sw}-(W-X),0)/${sw}*max(${sh}-(H-Y),0)/${sh}'[shdw]`
