@@ -3,17 +3,21 @@
 // ==============================
 import { join } from "path";
 
+const root = process.cwd();
+const downloads = join(root, "download");
+
 export const paths = {
-  root: process.cwd(),
-  temp: join(process.cwd(), "src", "temp"),
-  output: join(process.cwd(), "src", "output"),
-  images: join(process.cwd(), "download", "images"),
-  tts: join(process.cwd(), "download", "tts"),
-  audio: join(process.cwd(), "download", "audio"),
-  fonts: join(process.cwd(), "download", "fonts"),
-  templateDir: join(process.cwd(), "template"),
-  template: join(process.cwd(), "template", "template_horizontal.json"),
-  modifications: join(process.cwd(), "template", "risposta_horizontal.json"),
+  root,
+  downloads,
+  temp: join(root, "src", "temp"),
+  output: join(root, "src", "output"),
+  images: join(downloads, "images"),
+  tts: join(downloads, "tts"),
+  audio: join(downloads, "audio"),
+  fonts: join(downloads, "fonts"),
+  templateDir: join(root, "template"),
+  template: join(root, "template", "template_horizontal.json"),
+  modifications: join(root, "template", "risposta_horizontal.json"),
   // Resolve the FFmpeg binary:
   // 1. Respect an explicit env override
   // 2. Use `ffmpeg-static` if it's installed
@@ -28,8 +32,9 @@ export const paths = {
     }
   })(),
 
-  concatList: join(process.cwd(), "src", "temp", "concat.txt"),
-  finalVideo: join(process.cwd(), "src", "output", "final_output.mp4"),
-  get bgAudio() { return join(this.audio, "bg.mp3"); },
+  concatList: join(root, "src", "temp", "concat.txt"),
+  finalVideo: join(root, "src", "output", "final_output.mp4"),
+  get bgAudio() {
+    return join(this.audio, "bg.mp3");
+  },
 };
-

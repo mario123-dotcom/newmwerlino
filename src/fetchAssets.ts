@@ -48,10 +48,8 @@ async function downloadFile(url: string, outPath: string) {
 export async function fetchAssets() {
   const mods = loadModifications() || {};
 
-  clearDir(paths.audio);
-  clearDir(paths.images);
-  clearDir(paths.tts);
-  clearDir(paths.fonts);
+  // Pulisce completamente la cartella di download per evitare artefatti (es. "npm" o "img=true")
+  clearDir(paths.downloads);
 
   ensureDir(paths.audio);
   ensureDir(paths.images);

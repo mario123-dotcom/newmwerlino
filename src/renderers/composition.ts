@@ -104,12 +104,13 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
 
       // layer trasparente su cui disegnare il testo; il "blank" serve solo per xfade
       const wipeAnims = tb.animations?.filter((a) => a.type === "wipe") ?? [];
+      let blankEnd = 0;
       if (wipeAnims.length) {
-        const blankDur = Math.min(
+        blankEnd = Math.min(
           dur,
           Math.max(...wipeAnims.map((a) => (a.time ?? 0) + a.duration))
         );
-        f.push(`color=c=black@0:s=${W}x${H}:d=${blankDur},format=rgba[tx_${i}_blank]`);
+        f.push(`color=c=black@0:s=${W}x${H}:d=${blankEnd},format=rgba[tx_${i}_blank]`);
       }
       f.push(`color=c=black@0:s=${W}x${H}:d=${dur},format=rgba[tx_${i}_in]`);
 
@@ -146,8 +147,13 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
           } else if (an.type === "wipe" && wipeAnims.length) {
             // salta wipe oltre la durata (evita wipe-out)
             if (an.time + an.duration >= dur) return;
+            const tmp = `tx_${i}_tmp${ai}`;
             const lbl = `tx_${i}_anim${ai}`;
-            f.push(`[tx_${i}_blank][${cur}]xfade=transition=${an.direction}:duration=${an.duration}:offset=${an.time},format=rgba[${lbl}]`);
+            f.push(
+              `[tx_${i}_blank][${cur}]xfade=transition=${an.direction}:duration=${an.duration}:offset=${an.time},format=rgba[${tmp}]`
+            );
+            const pad = Math.max(0, dur - blankEnd);
+            f.push(`[${tmp}]trim=0:${blankEnd},tpad=stop_mode=clone:stop_duration=${pad}[${lbl}]`);
             cur = lbl;
           }
         });
