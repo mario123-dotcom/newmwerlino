@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, writeFileSync, readdirSync, rmSync } from "fs";
-import { join } from "path";
+import { join, dirname } from "path";
 import { request as httpRequest } from "http";
 import { request as httpsRequest } from "https";
 import { paths } from "./paths";
@@ -39,8 +39,9 @@ function httpGet(url: string): Promise<Buffer> {
 }
 
 async function downloadFile(url: string, outPath: string) {
+  if (!url.startsWith("http")) return;
   const buf = await httpGet(url);
-  ensureDir(join(outPath, ".."));
+  ensureDir(dirname(outPath));
   writeFileSync(outPath, buf);
   console.log(`Scaricato: ${outPath}`);
 }
@@ -72,10 +73,11 @@ export async function fetchAssets() {
 
   // TTS
   for (const key of Object.keys(mods)) {
-    if (key.startsWith("TTS-")) {
+    const m = /^TTS-(\d+)$/.exec(key);
+    if (m) {
       const url = String(mods[key] ?? "");
       if (url.startsWith("http")) {
-        const idx = key.split("-")[1];
+        const idx = m[1];
         await downloadFile(url, join(paths.tts, `tts-${idx}.mp3`));
       }
     }
@@ -83,10 +85,11 @@ export async function fetchAssets() {
 
   // Immagini
   for (const key of Object.keys(mods)) {
-    if (key.startsWith("Immagine-")) {
+    const m = /^Immagine-(\d+)$/.exec(key);
+    if (m) {
       const url = String(mods[key] ?? "");
       if (url.startsWith("http")) {
-        const idx = key.split("-")[1];
+        const idx = m[1];
         const ext = (url.split(".").pop()?.split("?")[0] || "jpg").toLowerCase();
         const safeExt = ext.length <= 5 ? ext : "jpg";
         await downloadFile(url, join(paths.images, `img${idx}.${safeExt}`));
