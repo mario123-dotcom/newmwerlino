@@ -5,7 +5,6 @@ import { join } from "path";
 
 export const paths = {
   root: process.cwd(),
-  downloads: join(process.cwd(), "download"),
   temp: join(process.cwd(), "src", "temp"),
   output: join(process.cwd(), "src", "output"),
   images: join(process.cwd(), "download", "images"),

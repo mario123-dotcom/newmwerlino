@@ -130,28 +130,19 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
 
       let cur = `tx_${i}`;
       if (tb.animations && tb.animations.length) {
-        for (let ai = 0; ai < tb.animations.length; ai++) {
-          const an = tb.animations[ai];
+        tb.animations.forEach((an, ai) => {
+          if ("reversed" in an && (an as any).reversed) return; // ignora animazioni "out"
           if (an.type === "fade") {
-            // ignore fade-out: text must stay visible until end of segment
-            if (an.reversed) continue;
-            const st =
-              typeof an.time === "number" ? an.time : Math.max(0, dur - an.duration);
+            const st = typeof an.time === "number" ? an.time : Math.max(0, dur - an.duration);
             const lbl = `tx_${i}_anim${ai}`;
-            f.push(
-              `[${cur}]fade=t=in:st=${st}:d=${an.duration}:alpha=1,format=rgba[${lbl}]`
-            );
+            f.push(`[${cur}]fade=t=in:st=${st}:d=${an.duration}:alpha=1,format=rgba[${lbl}]`);
             cur = lbl;
           } else if (an.type === "wipe" && needBlank) {
-            // Ignore wipe-out animations for the same reason
-            if ((an as any).reversed) continue;
             const lbl = `tx_${i}_anim${ai}`;
-            f.push(
-              `[tx_${i}_blank][${cur}]xfade=transition=${an.direction}:duration=${an.duration}:offset=${an.time},format=rgba[${lbl}]`
-            );
+            f.push(`[tx_${i}_blank][${cur}]xfade=transition=${an.direction}:duration=${an.duration}:offset=${an.time},format=rgba[${lbl}]`);
             cur = lbl;
           }
-        }
+        });
       }
 
       const outLbl = `v_txt${i}`;

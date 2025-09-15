@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, writeFileSync, readdirSync, rmSync } from "fs";
-import { join, dirname } from "path";
+import { join } from "path";
 import { request as httpRequest } from "http";
 import { request as httpsRequest } from "https";
 import { paths } from "./paths";
@@ -39,9 +39,8 @@ function httpGet(url: string): Promise<Buffer> {
 }
 
 async function downloadFile(url: string, outPath: string) {
-  if (!url.startsWith("http")) return;
   const buf = await httpGet(url);
-  ensureDir(dirname(outPath));
+  ensureDir(join(outPath, ".."));
   writeFileSync(outPath, buf);
   console.log(`Scaricato: ${outPath}`);
 }
@@ -49,32 +48,34 @@ async function downloadFile(url: string, outPath: string) {
 export async function fetchAssets() {
   const mods = loadModifications() || {};
 
-  clearDir(paths.downloads);
-  ensureDir(paths.downloads);
+  clearDir(paths.audio);
+  clearDir(paths.images);
+  clearDir(paths.tts);
+  clearDir(paths.fonts);
+
   ensureDir(paths.audio);
   ensureDir(paths.images);
   ensureDir(paths.tts);
   ensureDir(paths.fonts);
 
   // Logo
-  const logoUrl = String(mods.Logo ?? "").trim();
+  const logoUrl = String(mods.Logo ?? "");
   if (logoUrl.startsWith("http")) {
     await downloadFile(logoUrl, join(paths.images, "logo.png"));
   }
 
   // Audio di background
-  const audioUrl = String(mods.Audio ?? "").trim();
+  const audioUrl = String(mods.Audio ?? "");
   if (audioUrl.startsWith("http")) {
-    await downloadFile(audioUrl, paths.bgAudio);
+    await downloadFile(audioUrl, join(paths.audio, "bg.mp3"));
   }
 
   // TTS
   for (const key of Object.keys(mods)) {
-    const m = /^TTS-(\d+)$/.exec(key);
-    if (m) {
-      const url = String(mods[key] ?? "").trim();
+    if (key.startsWith("TTS-")) {
+      const url = String(mods[key] ?? "");
       if (url.startsWith("http")) {
-        const idx = m[1];
+        const idx = key.split("-")[1];
         await downloadFile(url, join(paths.tts, `tts-${idx}.mp3`));
       }
     }
@@ -82,11 +83,10 @@ export async function fetchAssets() {
 
   // Immagini
   for (const key of Object.keys(mods)) {
-    const m = /^Immagine-(\d+)$/.exec(key);
-    if (m) {
-      const url = String(mods[key] ?? "").trim();
+    if (key.startsWith("Immagine-")) {
+      const url = String(mods[key] ?? "");
       if (url.startsWith("http")) {
-        const idx = m[1];
+        const idx = key.split("-")[1];
         const ext = (url.split(".").pop()?.split("?")[0] || "jpg").toLowerCase();
         const safeExt = ext.length <= 5 ? ext : "jpg";
         await downloadFile(url, join(paths.images, `img${idx}.${safeExt}`));
@@ -107,17 +107,17 @@ export async function fetchAssets() {
   tpl.elements.forEach((e) => collectFonts(e));
 
   async function downloadFont(family: string) {
-    const famParam = encodeURIComponent(family.trim()).replace(/%20/g, "+");
+    const famParam = family.trim().replace(/\s+/g, "+");
     try {
       const cssBuf = await httpGet(
-        `https://fonts.googleapis.com/css2?family=${famParam}`
+        `https://fonts.googleapis.com/css2?family=${encodeURIComponent(famParam)}`
       );
       const css = cssBuf.toString("utf8");
       const match = css.match(/url\((https:[^\)]+)\)/);
       if (!match) return;
       const fontUrl = match[1];
       const ext = fontUrl.split(".").pop()?.split("?")[0] || "ttf";
-      const safe = family.trim().replace(/\s+/g, "_").toLowerCase();
+      const safe = family.replace(/\s+/g, "_").toLowerCase();
       await downloadFile(fontUrl, join(paths.fonts, `${safe}.${ext}`));
     } catch (err) {
       console.warn(`Impossibile scaricare il font ${family}:`, err);
