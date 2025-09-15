@@ -143,6 +143,8 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
             );
             cur = lbl;
           } else if (an.type === "wipe" && needBlank) {
+            // Ignore wipe-out animations for the same reason
+            if ((an as any).reversed) continue;
             const lbl = `tx_${i}_anim${ai}`;
             f.push(
               `[tx_${i}_blank][${cur}]xfade=transition=${an.direction}:duration=${an.duration}:offset=${an.time},format=rgba[${lbl}]`

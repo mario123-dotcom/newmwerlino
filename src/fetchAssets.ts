@@ -49,11 +49,8 @@ async function downloadFile(url: string, outPath: string) {
 export async function fetchAssets() {
   const mods = loadModifications() || {};
 
-  clearDir(paths.audio);
-  clearDir(paths.images);
-  clearDir(paths.tts);
-  clearDir(paths.fonts);
-
+  clearDir(paths.downloads);
+  ensureDir(paths.downloads);
   ensureDir(paths.audio);
   ensureDir(paths.images);
   ensureDir(paths.tts);
