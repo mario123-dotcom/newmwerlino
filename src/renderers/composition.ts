@@ -71,14 +71,13 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
     typeof slide.shadowH === "number" &&
     slide.shadowH > 0
   ) {
-    const sc = slide.shadowColor;
-    const sa = Math.min(1, (slide.shadowAlpha ?? 1) * 3);
+    const sc = "black";
+    const sa = 1;
     const sw = slide.shadowW;
     const sh = slide.shadowH;
-    const alpha = (sa * 255).toFixed(2);
     f.push(
-      `color=c=${sc}@1:s=${W}x${H}:d=${dur},format=rgba,` +
-        `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${alpha}*max(${sw}-(W-X),0)/${sw}*max(${sh}-(H-Y),0)/${sh}'[shdw]`
+      `color=c=${sc}@${sa}:s=${W}x${H}:d=${dur},format=rgba,` +
+        `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='255*max(${sw}-(W-X),0)/${sw}*max(${sh}-(H-Y),0)/${sh}'[shdw]`
     );
     f.push(
       `[${lastV}][shdw]overlay=x=0:y=0:enable='between(t,0,${dur})'[v_sh]`
