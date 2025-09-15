@@ -7,8 +7,10 @@ invocazioni al motore video vengono costruite automaticamente.
 
 ## Dipendenze
 - Node.js ≥ 18
-- FFmpeg installato nel sistema oppure indicato tramite variabile
-  d'ambiente `FFMPEG_PATH`
+- [ffmpeg-static](https://www.npmjs.com/package/ffmpeg-static) installato
+  automaticamente con le dipendenze **oppure** un'installazione di FFmpeg
+  disponibile nel sistema e indicata tramite la variabile d'ambiente
+  `FFMPEG_PATH`
 
 Installa i pacchetti del progetto con:
 

@@ -10,7 +10,9 @@
     "start:reuse:dir": "npm run build && node dist/main.js --reuse-segs --segsDir src/temp",
     "test": "npm run build && node --test dist/**/*.test.js"
   },
-  "dependencies": {},
+  "dependencies": {
+    "ffmpeg-static": "^5.2.0"
+  },
   "devDependencies": {
     "@types/node": "^20.11.0",
     "typescript": "^5.5.0"
