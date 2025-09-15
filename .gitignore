@@ -5,6 +5,12 @@ src/output/
 node_modules/
 dist/
 
+# Directory di asset scaricati o temporanei
+download/
+img=true/
+newmerlino@*/
+npm/
+
 
 # Ignora file di log
 npm-debug.log*

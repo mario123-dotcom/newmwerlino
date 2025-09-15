@@ -13,7 +13,7 @@ import { probeDurationSec } from "./ffmpeg/probe";
 export type AnimationSpec =
   | {
       type: "fade";
-      time: number | "end";
+      time: number;
       duration: number;
     }
   | {
@@ -353,8 +353,8 @@ export function buildTimelineFromLayout(
     if (Array.isArray((txtEl as any)?.animations)) {
       for (const a of (txtEl as any).animations) {
         const dur = parseSec(a.duration, 0);
-        if (a.type === "fade" && dur > 0) {
-          const t = a.time === "end" ? "end" : parseSec(a.time, 0);
+        if (a.type === "fade" && dur > 0 && a.time !== "end") {
+          const t = parseSec(a.time, 0);
           for (const arr of perLineAnims) {
             arr.push({ type: "fade", time: t, duration: dur });
           }
@@ -476,8 +476,8 @@ export function buildTimelineFromLayout(
       if (Array.isArray(textEl?.animations)) {
         for (const a of textEl.animations) {
           const dur = parseSec(a.duration, 0);
-          if (a.type === "fade" && dur > 0) {
-            const t = a.time === "end" ? "end" : parseSec(a.time, 0);
+          if (a.type === "fade" && dur > 0 && a.time !== "end") {
+            const t = parseSec(a.time, 0);
             for (const arr of perLine) {
               arr.push({ type: "fade", time: t, duration: dur });
             }
