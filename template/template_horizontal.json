@@ -4516,13 +4516,6 @@
               "duration": 0.895,
               "easing": "quadratic-out",
               "type": "fade"
-            },
-            {
-              "time": "end",
-              "duration": 0.6,
-              "easing": "quadratic-out",
-              "reversed": true,
-              "type": "fade"
             }
           ]
         },

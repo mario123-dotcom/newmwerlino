@@ -15,7 +15,6 @@ export type AnimationSpec =
       type: "fade";
       time: number | "end";
       duration: number;
-      reversed?: boolean;
     }
   | {
       type: "wipe";
@@ -357,7 +356,7 @@ export function buildTimelineFromLayout(
         if (a.type === "fade" && dur > 0) {
           const t = a.time === "end" ? "end" : parseSec(a.time, 0);
           for (const arr of perLineAnims) {
-            arr.push({ type: "fade", time: t, duration: dur, reversed: a.reversed === true });
+            arr.push({ type: "fade", time: t, duration: dur });
           }
         } else if (a.type === "text-reveal" && a.split === "line" && dur > 0) {
           const start = parseSec(a.time, 0);
@@ -480,7 +479,7 @@ export function buildTimelineFromLayout(
           if (a.type === "fade" && dur > 0) {
             const t = a.time === "end" ? "end" : parseSec(a.time, 0);
             for (const arr of perLine) {
-              arr.push({ type: "fade", time: t, duration: dur, reversed: a.reversed === true });
+              arr.push({ type: "fade", time: t, duration: dur });
             }
           } else if (a.type === "text-reveal" && a.split === "line" && dur > 0) {
             const start = parseSec(a.time, 0);

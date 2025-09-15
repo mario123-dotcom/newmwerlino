@@ -111,9 +111,8 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
         tb.animations.forEach((an, ai) => {
           if (an.type === "fade") {
             const st = typeof an.time === "number" ? an.time : Math.max(0, dur - an.duration);
-            const t = an.reversed ? "out" : "in";
             const lbl = `tx_${i}_anim${ai}`;
-            f.push(`[${cur}]fade=t=${t}:st=${st}:d=${an.duration}:alpha=1,format=rgba[${lbl}]`);
+            f.push(`[${cur}]fade=t=in:st=${st}:d=${an.duration}:alpha=1,format=rgba[${lbl}]`);
             cur = lbl;
           } else if (an.type === "wipe" && needBlank) {
             const lbl = `tx_${i}_anim${ai}`;
