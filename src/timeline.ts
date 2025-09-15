@@ -13,9 +13,8 @@ import { probeDurationSec } from "./ffmpeg/probe";
 export type AnimationSpec =
   | {
       type: "fade";
-      time: number | "end";
+      time: number;
       duration: number;
-      reversed?: boolean;
     }
   | {
       type: "wipe";
@@ -354,10 +353,12 @@ export function buildTimelineFromLayout(
     if (Array.isArray((txtEl as any)?.animations)) {
       for (const a of (txtEl as any).animations) {
         const dur = parseSec(a.duration, 0);
-        if (a.type === "fade" && dur > 0) {
-          const t = a.time === "end" ? "end" : parseSec(a.time, 0);
+        if (a.type === "fade" && dur > 0 && a.time !== "end") {
+          const t = parseSec(a.time, 0);
           for (const arr of perLineAnims) {
-            arr.push({ type: "fade", time: t, duration: dur, reversed: a.reversed === true });
+            if (!arr.some((an) => an.type === "fade")) {
+              arr.push({ type: "fade", time: t, duration: dur });
+            }
           }
         } else if (a.type === "text-reveal" && a.split === "line" && dur > 0) {
           const start = parseSec(a.time, 0);
@@ -477,10 +478,12 @@ export function buildTimelineFromLayout(
       if (Array.isArray(textEl?.animations)) {
         for (const a of textEl.animations) {
           const dur = parseSec(a.duration, 0);
-          if (a.type === "fade" && dur > 0) {
-            const t = a.time === "end" ? "end" : parseSec(a.time, 0);
+          if (a.type === "fade" && dur > 0 && a.time !== "end") {
+            const t = parseSec(a.time, 0);
             for (const arr of perLine) {
-              arr.push({ type: "fade", time: t, duration: dur, reversed: a.reversed === true });
+              if (!arr.some((an) => an.type === "fade")) {
+                arr.push({ type: "fade", time: t, duration: dur });
+              }
             }
           } else if (a.type === "text-reveal" && a.split === "line" && dur > 0) {
             const start = parseSec(a.time, 0);

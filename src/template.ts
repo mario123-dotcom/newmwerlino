@@ -38,7 +38,6 @@ export type TemplateElement = {
     time?: number | string;
     duration?: number | string;
     type: string;
-    reversed?: boolean;
     [key: string]: any;
   }[];
 };
