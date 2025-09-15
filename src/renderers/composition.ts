@@ -130,10 +130,11 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
 
       let cur = `tx_${i}`;
       if (tb.animations && tb.animations.length) {
-        tb.animations.forEach((an, ai) => {
+        for (let ai = 0; ai < tb.animations.length; ai++) {
+          const an = tb.animations[ai];
           if (an.type === "fade") {
             // ignore fade-out: text must stay visible until end of segment
-            if (an.reversed) return;
+            if (an.reversed) continue;
             const st =
               typeof an.time === "number" ? an.time : Math.max(0, dur - an.duration);
             const lbl = `tx_${i}_anim${ai}`;
@@ -148,7 +149,7 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
             );
             cur = lbl;
           }
-        });
+        }
       }
 
       const outLbl = `v_txt${i}`;

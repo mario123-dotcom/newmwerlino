@@ -60,13 +60,13 @@ export async function fetchAssets() {
   ensureDir(paths.fonts);
 
   // Logo
-  const logoUrl = String(mods.Logo ?? "");
+  const logoUrl = String(mods.Logo ?? "").trim();
   if (logoUrl.startsWith("http")) {
     await downloadFile(logoUrl, join(paths.images, "logo.png"));
   }
 
   // Audio di background
-  const audioUrl = String(mods.Audio ?? "");
+  const audioUrl = String(mods.Audio ?? "").trim();
   if (audioUrl.startsWith("http")) {
     await downloadFile(audioUrl, join(paths.audio, "bg.mp3"));
   }
@@ -75,7 +75,7 @@ export async function fetchAssets() {
   for (const key of Object.keys(mods)) {
     const m = /^TTS-(\d+)$/.exec(key);
     if (m) {
-      const url = String(mods[key] ?? "");
+      const url = String(mods[key] ?? "").trim();
       if (url.startsWith("http")) {
         const idx = m[1];
         await downloadFile(url, join(paths.tts, `tts-${idx}.mp3`));
@@ -87,7 +87,7 @@ export async function fetchAssets() {
   for (const key of Object.keys(mods)) {
     const m = /^Immagine-(\d+)$/.exec(key);
     if (m) {
-      const url = String(mods[key] ?? "");
+      const url = String(mods[key] ?? "").trim();
       if (url.startsWith("http")) {
         const idx = m[1];
         const ext = (url.split(".").pop()?.split("?")[0] || "jpg").toLowerCase();
@@ -110,17 +110,17 @@ export async function fetchAssets() {
   tpl.elements.forEach((e) => collectFonts(e));
 
   async function downloadFont(family: string) {
-    const famParam = family.trim().replace(/\s+/g, "+");
+    const famParam = encodeURIComponent(family.trim()).replace(/%20/g, "+");
     try {
       const cssBuf = await httpGet(
-        `https://fonts.googleapis.com/css2?family=${encodeURIComponent(famParam)}`
+        `https://fonts.googleapis.com/css2?family=${famParam}`
       );
       const css = cssBuf.toString("utf8");
       const match = css.match(/url\((https:[^\)]+)\)/);
       if (!match) return;
       const fontUrl = match[1];
       const ext = fontUrl.split(".").pop()?.split("?")[0] || "ttf";
-      const safe = family.replace(/\s+/g, "_").toLowerCase();
+      const safe = family.trim().replace(/\s+/g, "_").toLowerCase();
       await downloadFile(fontUrl, join(paths.fonts, `${safe}.${ext}`));
     } catch (err) {
       console.warn(`Impossibile scaricare il font ${family}:`, err);
