@@ -75,8 +75,13 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
     const sa = Math.min(1, (slide.shadowAlpha ?? 1) * 3);
     const sw = slide.shadowW;
     const sh = slide.shadowH;
-    f.push(`color=c=${sc}@${sa}:s=${sw}x${sh}:d=${dur},format=rgba[shdw]`);
-    f.push(`[${lastV}][shdw]overlay=x=0:y=${H - sh}:enable='between(t,0,${dur})'[v_sh]`);
+    const alpha = (sa * 255).toFixed(2);
+    f.push(
+      `color=c=${sc}@1:s=${W}x${H}:d=${dur},format=rgba,geq=r='r':g='g':b='b':a='${alpha}*max(${sw}-X,0)/${sw}*max(Y-(H-${sh}),0)/${sh}'[shdw]`
+    );
+    f.push(
+      `[${lastV}][shdw]overlay=x=0:y=0:enable='between(t,0,${dur})'[v_sh]`
+    );
     lastV = "v_sh";
   }
 
