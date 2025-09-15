@@ -48,10 +48,8 @@ async function downloadFile(url: string, outPath: string) {
 export async function fetchAssets() {
   const mods = loadModifications() || {};
 
-  clearDir(paths.audio);
-  clearDir(paths.images);
-  clearDir(paths.tts);
-  clearDir(paths.fonts);
+  // Pulisce completamente la cartella di download per evitare artefatti (es. "npm" o "img=true")
+  clearDir(paths.downloads);
 
   ensureDir(paths.audio);
   ensureDir(paths.images);
@@ -72,24 +70,24 @@ export async function fetchAssets() {
 
   // TTS
   for (const key of Object.keys(mods)) {
-    if (key.startsWith("TTS-")) {
-      const url = String(mods[key] ?? "");
+    const m = key.match(/^TTS-(\d+)$/);
+    if (m) {
+      const url = String(mods[key] ?? "").trim();
       if (url.startsWith("http")) {
-        const idx = key.split("-")[1];
-        await downloadFile(url, join(paths.tts, `tts-${idx}.mp3`));
+        await downloadFile(url, join(paths.tts, `tts-${m[1]}.mp3`));
       }
     }
   }
 
   // Immagini
   for (const key of Object.keys(mods)) {
-    if (key.startsWith("Immagine-")) {
-      const url = String(mods[key] ?? "");
+    const m = key.match(/^Immagine-(\d+)$/);
+    if (m) {
+      const url = String(mods[key] ?? "").trim();
       if (url.startsWith("http")) {
-        const idx = key.split("-")[1];
         const ext = (url.split(".").pop()?.split("?")[0] || "jpg").toLowerCase();
         const safeExt = ext.length <= 5 ? ext : "jpg";
-        await downloadFile(url, join(paths.images, `img${idx}.${safeExt}`));
+        await downloadFile(url, join(paths.images, `img${m[1]}.${safeExt}`));
       }
     }
   }

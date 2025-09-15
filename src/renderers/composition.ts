@@ -103,9 +103,14 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
       const tb = slide.texts[i];
 
       // layer trasparente su cui disegnare il testo; il "blank" serve solo per xfade
-      const needBlank = tb.animations?.some((a) => a.type === "wipe") ?? false;
-      if (needBlank) {
-        f.push(`color=c=black@0:s=${W}x${H}:d=${dur},format=rgba[tx_${i}_blank]`);
+      const wipeAnims = tb.animations?.filter((a) => a.type === "wipe") ?? [];
+      let blankEnd = 0;
+      if (wipeAnims.length) {
+        blankEnd = Math.min(
+          dur,
+          Math.max(...wipeAnims.map((a) => (a.time ?? 0) + a.duration))
+        );
+        f.push(`color=c=black@0:s=${W}x${H}:d=${blankEnd},format=rgba[tx_${i}_blank]`);
       }
       f.push(`color=c=black@0:s=${W}x${H}:d=${dur},format=rgba[tx_${i}_in]`);
 
@@ -131,15 +136,24 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
       let cur = `tx_${i}`;
       if (tb.animations && tb.animations.length) {
         tb.animations.forEach((an, ai) => {
+          if ("reversed" in an && (an as any).reversed) return; // ignora animazioni "out"
           if (an.type === "fade") {
             const st = typeof an.time === "number" ? an.time : Math.max(0, dur - an.duration);
-            const t = an.reversed ? "out" : "in";
+            // salta fade che finirebbero oltre la durata del segmento (fade-out)
+            if (st + an.duration >= dur) return;
             const lbl = `tx_${i}_anim${ai}`;
-            f.push(`[${cur}]fade=t=${t}:st=${st}:d=${an.duration}:alpha=1,format=rgba[${lbl}]`);
+            f.push(`[${cur}]fade=t=in:st=${st}:d=${an.duration}:alpha=1,format=rgba[${lbl}]`);
             cur = lbl;
-          } else if (an.type === "wipe" && needBlank) {
+          } else if (an.type === "wipe" && wipeAnims.length) {
+            // salta wipe oltre la durata (evita wipe-out)
+            if (an.time + an.duration >= dur) return;
+            const tmp = `tx_${i}_tmp${ai}`;
             const lbl = `tx_${i}_anim${ai}`;
-            f.push(`[tx_${i}_blank][${cur}]xfade=transition=${an.direction}:duration=${an.duration}:offset=${an.time},format=rgba[${lbl}]`);
+            f.push(
+              `[tx_${i}_blank][${cur}]xfade=transition=${an.direction}:duration=${an.duration}:offset=${an.time},format=rgba[${tmp}]`
+            );
+            const pad = Math.max(0, dur - blankEnd);
+            f.push(`[${tmp}]trim=0:${blankEnd},tpad=stop_mode=clone:stop_duration=${pad}[${lbl}]`);
             cur = lbl;
           }
         });
