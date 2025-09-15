@@ -65,8 +65,8 @@ export type SlideSpec = {
   // overlay shadow on background
   shadowColor?: string;
   shadowAlpha?: number;
-  shadowX?: number;
-  shadowY?: number;
+  shadowW?: number;
+  shadowH?: number;
 };
 
 /* ---------- Util ---------- */
@@ -431,8 +431,8 @@ export function buildTimelineFromLayout(
     const fontPath = fontFamily ? findFontPath(fontFamily) : undefined;
 
     const compShadow = parseRGBA((comp as any)?.shadow_color);
-    const compShadowX = lenToPx((comp as any)?.shadow_x, videoW, videoH);
-    const compShadowY = lenToPx((comp as any)?.shadow_y, videoW, videoH);
+    const compShadowW = lenToPx((comp as any)?.shadow_x, videoW, videoH);
+    const compShadowH = lenToPx((comp as any)?.shadow_y, videoW, videoH);
 
     const texts: TextBlockSpec[] = textFiles.map((tf, idx) => ({
       ...baseBlock,
@@ -463,8 +463,8 @@ export function buildTimelineFromLayout(
 
       shadowColor: compShadow?.color,
       shadowAlpha: compShadow?.alpha,
-      shadowX: typeof compShadowX === "number" ? compShadowX : undefined,
-      shadowY: typeof compShadowY === "number" ? compShadowY : undefined,
+      shadowW: typeof compShadowW === "number" ? compShadowW : undefined,
+      shadowH: typeof compShadowH === "number" ? compShadowH : undefined,
     };
 
     console.log(
@@ -521,8 +521,8 @@ export function buildTimelineFromLayout(
     const fontFam = getFontFamilyFromTemplate(template, "Outro", "Testo-outro");
     const fontPath = fontFam ? findFontPath(fontFam) : undefined;
     const outShadow = parseRGBA((outroComp as any)?.shadow_color);
-    const outShadowX = lenToPx((outroComp as any)?.shadow_x, videoW, videoH);
-    const outShadowY = lenToPx((outroComp as any)?.shadow_y, videoW, videoH);
+    const outShadowW = lenToPx((outroComp as any)?.shadow_x, videoW, videoH);
+    const outShadowH = lenToPx((outroComp as any)?.shadow_y, videoW, videoH);
     const txt = textEl?.text as string | undefined;
     let texts: TextBlockSpec[] | undefined;
     if (txt && textBox) {
@@ -593,8 +593,8 @@ export function buildTimelineFromLayout(
       texts,
       shadowColor: outShadow?.color,
       shadowAlpha: outShadow?.alpha,
-      shadowX: typeof outShadowX === "number" ? outShadowX : undefined,
-      shadowY: typeof outShadowY === "number" ? outShadowY : undefined,
+      shadowW: typeof outShadowW === "number" ? outShadowW : undefined,
+      shadowH: typeof outShadowH === "number" ? outShadowH : undefined,
     });
   }
 

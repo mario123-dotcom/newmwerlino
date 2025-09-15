@@ -66,21 +66,17 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
 
   if (
     slide.shadowColor &&
-    typeof slide.shadowX === "number" &&
-    slide.shadowX > 0 &&
-    typeof slide.shadowY === "number" &&
-    slide.shadowY > 0
+    typeof slide.shadowW === "number" &&
+    slide.shadowW > 0 &&
+    typeof slide.shadowH === "number" &&
+    slide.shadowH > 0
   ) {
     const sc = slide.shadowColor;
-    // amplify alpha so the shadow is clearly visible even with low template values
     const sa = Math.min(1, (slide.shadowAlpha ?? 1) * 3);
-    const sx = slide.shadowX;
-    const sy = slide.shadowY;
-    f.push(
-      `color=c=${sc}@1:s=${W}x${H}:d=${dur},format=rgba,` +
-        `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${sa}*255*max(${sx}-X,0)/${sx}*max(Y-(H-${sy}),0)/${sy}'[sh]`
-    );
-    f.push(`[${lastV}][sh]overlay=x=0:y=0:enable='between(t,0,${dur})'[v_sh]`);
+    const sw = slide.shadowW;
+    const sh = slide.shadowH;
+    f.push(`color=c=${sc}@${sa}:s=${sw}x${sh}:d=${dur},format=rgba[shdw]`);
+    f.push(`[${lastV}][shdw]overlay=x=0:y=${H - sh}:enable='between(t,0,${dur})'[v_sh]`);
     lastV = "v_sh";
   }
 

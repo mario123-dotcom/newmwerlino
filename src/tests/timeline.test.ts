@@ -273,8 +273,8 @@ test("buildTimelineFromLayout parses slide shadow", () => {
   const s0 = slides[0];
   assert.equal(s0.shadowColor, "#000000");
   assert.equal(s0.shadowAlpha, 0.5);
-  assert.equal(s0.shadowX, 10);
-  assert.equal(s0.shadowY, 20);
+  assert.equal(s0.shadowW, 10);
+  assert.equal(s0.shadowH, 20);
 });
 
 test("buildTimelineFromLayout ignores fade-out animations", () => {
