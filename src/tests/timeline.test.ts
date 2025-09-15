@@ -314,3 +314,56 @@ test("buildTimelineFromLayout ignores fade-out animations", () => {
   assert.equal(anims[0].type, "fade");
   assert.equal(anims[0].time, 0);
 });
+
+test("buildTimelineFromLayout uses fixed wipe timings", () => {
+  const tpl: TemplateDoc = {
+    width: 100,
+    height: 100,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 2,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "0%",
+            y: "0%",
+            width: "10%",
+            height: "10%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+            animations: [
+              {
+                type: "text-reveal",
+                time: 5,
+                duration: 5,
+                split: "line",
+                axis: "x",
+                x_anchor: "100%",
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  } as any;
+  const mods = { "Testo-0": "a b" };
+  paths.images = "/tmp/no_img";
+  paths.tts = "/tmp/no_tts";
+  const slides = buildTimelineFromLayout(mods, tpl, {
+    videoW: 100,
+    videoH: 100,
+    fps: 30,
+    defaultDur: 2,
+  });
+  const t0 = slides[0].texts!;
+  assert.equal(t0.length >= 2, true);
+  assert.deepEqual(t0[0].animations, [
+    { type: "wipe", time: 0, duration: 0.5, direction: "wipeleft" },
+  ]);
+  assert.deepEqual(t0[1].animations, [
+    { type: "wipe", time: 0.5, duration: 0.5, direction: "wipeleft" },
+  ]);
+});

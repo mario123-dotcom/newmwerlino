@@ -70,6 +70,7 @@ export type SlideSpec = {
 };
 
 /* ---------- Util ---------- */
+const LINE_WIPE_DURATION = 0.5;
 function ensureTempDir() {
   try { mkdirSync(paths.temp, { recursive: true }); } catch {}
 }
@@ -394,8 +395,9 @@ export function buildTimelineFromLayout(
     }
     const lineHeight = (baseBlock.fontSize ?? 60) + (baseBlock.lineSpacing ?? 8);
     const perLineAnims: AnimationSpec[][] = textFiles.map(() => []);
-    if (Array.isArray((txtEl as any)?.animations)) {
-      for (const a of (txtEl as any).animations) {
+    const anims = (txtEl as any)?.animations;
+    if (Array.isArray(anims)) {
+      for (const a of anims) {
         const dur = parseSec(a.duration, 0);
         if (
           a.type === "fade" &&
@@ -407,21 +409,23 @@ export function buildTimelineFromLayout(
           for (const arr of perLineAnims) {
             arr.push({ type: "fade", time: t, duration: dur });
           }
-        } else if (a.type === "text-reveal" && a.split === "line" && dur > 0) {
-          const start = parseSec(a.time, 0);
-          const segDur = textFiles.length ? dur / textFiles.length : dur;
-          const dir =
-            a.axis === "y"
-              ? (String(a.y_anchor ?? "").trim() === "100%" ? "wipedown" : "wipeup")
-              : (String(a.x_anchor ?? "").trim() === "100%" ? "wipeleft" : "wiperight");
-          for (let li = 0; li < perLineAnims.length; li++) {
-            perLineAnims[li].push({
-              type: "wipe",
-              time: start + li * segDur,
-              duration: segDur,
-              direction: dir,
-            });
-          }
+        }
+      }
+      const tr = anims.find(
+        (a: any) => a.type === "text-reveal" && a.split === "line"
+      );
+      if (tr) {
+        const dir =
+          tr.axis === "y"
+            ? (String(tr.y_anchor ?? "").trim() === "100%" ? "wipedown" : "wipeup")
+            : (String(tr.x_anchor ?? "").trim() === "100%" ? "wipeleft" : "wiperight");
+        for (let li = 0; li < perLineAnims.length; li++) {
+          perLineAnims[li].push({
+            type: "wipe",
+            time: li * LINE_WIPE_DURATION,
+            duration: LINE_WIPE_DURATION,
+            direction: dir,
+          });
         }
       }
     }
@@ -540,8 +544,9 @@ export function buildTimelineFromLayout(
       }
       const lineH = (baseOut.fontSize ?? 60) + (baseOut.lineSpacing ?? 8);
       const perLine: AnimationSpec[][] = txtFiles.map(() => []);
-      if (Array.isArray(textEl?.animations)) {
-        for (const a of textEl.animations) {
+      const anims = textEl?.animations;
+      if (Array.isArray(anims)) {
+        for (const a of anims) {
           const dur = parseSec(a.duration, 0);
           if (
             a.type === "fade" &&
@@ -553,21 +558,23 @@ export function buildTimelineFromLayout(
             for (const arr of perLine) {
               arr.push({ type: "fade", time: t, duration: dur });
             }
-          } else if (a.type === "text-reveal" && a.split === "line" && dur > 0) {
-            const start = parseSec(a.time, 0);
-            const seg = txtFiles.length ? dur / txtFiles.length : dur;
-            const dir =
-              a.axis === "y"
-                ? (String(a.y_anchor ?? "").trim() === "100%" ? "wipedown" : "wipeup")
-                : (String(a.x_anchor ?? "").trim() === "100%" ? "wipeleft" : "wiperight");
-            for (let li = 0; li < perLine.length; li++) {
-              perLine[li].push({
-                type: "wipe",
-                time: start + li * seg,
-                duration: seg,
-                direction: dir,
-              });
-            }
+          }
+        }
+        const tr = anims.find(
+          (a: any) => a.type === "text-reveal" && a.split === "line"
+        );
+        if (tr) {
+          const dir =
+            tr.axis === "y"
+              ? (String(tr.y_anchor ?? "").trim() === "100%" ? "wipedown" : "wipeup")
+              : (String(tr.x_anchor ?? "").trim() === "100%" ? "wipeleft" : "wiperight");
+          for (let li = 0; li < perLine.length; li++) {
+            perLine[li].push({
+              type: "wipe",
+              time: li * LINE_WIPE_DURATION,
+              duration: LINE_WIPE_DURATION,
+              direction: dir,
+            });
           }
         }
       }
