@@ -356,7 +356,9 @@ export function buildTimelineFromLayout(
         if (a.type === "fade" && dur > 0 && a.time !== "end") {
           const t = parseSec(a.time, 0);
           for (const arr of perLineAnims) {
-            arr.push({ type: "fade", time: t, duration: dur });
+            if (!arr.some((an) => an.type === "fade")) {
+              arr.push({ type: "fade", time: t, duration: dur });
+            }
           }
         } else if (a.type === "text-reveal" && a.split === "line" && dur > 0) {
           const start = parseSec(a.time, 0);
@@ -479,7 +481,9 @@ export function buildTimelineFromLayout(
           if (a.type === "fade" && dur > 0 && a.time !== "end") {
             const t = parseSec(a.time, 0);
             for (const arr of perLine) {
-              arr.push({ type: "fade", time: t, duration: dur });
+              if (!arr.some((an) => an.type === "fade")) {
+                arr.push({ type: "fade", time: t, duration: dur });
+              }
             }
           } else if (a.type === "text-reveal" && a.split === "line" && dur > 0) {
             const start = parseSec(a.time, 0);
