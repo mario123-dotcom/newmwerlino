@@ -68,7 +68,7 @@ export async function fetchAssets() {
   // Audio di background
   const audioUrl = String(mods.Audio ?? "").trim();
   if (audioUrl.startsWith("http")) {
-    await downloadFile(audioUrl, join(paths.audio, "bg.mp3"));
+    await downloadFile(audioUrl, paths.bgAudio);
   }
 
   // TTS
