@@ -134,10 +134,14 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
           if ("reversed" in an && (an as any).reversed) return; // ignora animazioni "out"
           if (an.type === "fade") {
             const st = typeof an.time === "number" ? an.time : Math.max(0, dur - an.duration);
+            // salta fade che finirebbero oltre la durata del segmento (fade-out)
+            if (st + an.duration >= dur) return;
             const lbl = `tx_${i}_anim${ai}`;
             f.push(`[${cur}]fade=t=in:st=${st}:d=${an.duration}:alpha=1,format=rgba[${lbl}]`);
             cur = lbl;
           } else if (an.type === "wipe" && needBlank) {
+            // salta wipe oltre la durata (evita wipe-out)
+            if (an.time + an.duration >= dur) return;
             const lbl = `tx_${i}_anim${ai}`;
             f.push(`[tx_${i}_blank][${cur}]xfade=transition=${an.direction}:duration=${an.duration}:offset=${an.time},format=rgba[${lbl}]`);
             cur = lbl;
