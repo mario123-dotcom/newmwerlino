@@ -669,11 +669,20 @@ function collectTagsFromModGroup(group: Record<string, any>): string[] {
 
 function collectTagsFromElement(element: TemplateElement | undefined): string[] {
   if (!element) return [];
-  const tags: string[] = [];
+  const tagSet = new Set<string>();
+  const addTags = (values: string[]) => {
+    for (const raw of values) {
+      const tag = typeof raw === "string" ? raw.trim() : "";
+      if (tag) tagSet.add(tag);
+    }
+  };
   const anyEl = element as any;
-  tags.push(...parseTagList(anyEl?.tags));
-  tags.push(...parseTagList(anyEl?.tag));
-  return tags;
+  addTags(parseTagList(anyEl?.tags));
+  addTags(parseTagList(anyEl?.tag));
+  if (isPlainObject(anyEl)) {
+    addTags(collectTagsFromModGroup(anyEl));
+  }
+  return Array.from(tagSet);
 }
 
 function collectTagsFromMods(mods: Record<string, any>, prefix: string): string[] {

@@ -548,6 +548,72 @@ test("buildTimelineFromLayout marks animated background from template tags", () 
   assert.equal(slides[0].backgroundAnimated, true);
 });
 
+test("buildTimelineFromLayout infers animated backgrounds from nested template metadata tags", () => {
+  const tpl: TemplateDoc = {
+    width: 1920,
+    height: 1080,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 5,
+        elements: [
+          {
+            type: "composition",
+            name: "Sfondo-wrapper",
+            elements: [
+              {
+                type: "image",
+                name: "Immagine-0",
+                metadata: {
+                  extras: {
+                    tags: {
+                      background: true,
+                      zoom: true,
+                    },
+                  },
+                },
+              },
+            ],
+          },
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "10%",
+            y: "10%",
+            width: "80%",
+            height: "30%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+          },
+          {
+            type: "image",
+            name: "Logo",
+            x: "90%",
+            y: "90%",
+            width: "10%",
+            height: "10%",
+            x_anchor: "100%",
+            y_anchor: "100%",
+          },
+        ],
+      },
+    ],
+  } as any;
+  const mods = { "Testo-0": "demo" };
+  paths.images = "/tmp/no_img";
+  paths.tts = "/tmp/no_tts";
+
+  const slides = buildTimelineFromLayout(mods, tpl, {
+    videoW: 1920,
+    videoH: 1080,
+    fps: 30,
+    defaultDur: 5,
+  });
+
+  assert.equal(slides[0].backgroundAnimated, true);
+});
+
 test("buildTimelineFromLayout reads animated background flags from modifications", () => {
   const tpl: TemplateDoc = {
     width: 1920,
