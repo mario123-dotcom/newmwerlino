@@ -609,6 +609,59 @@ test("buildTimelineFromLayout reads animated background flags from modifications
   assert.equal(slidesOverride[0].backgroundAnimated, undefined);
 });
 
+test("buildTimelineFromLayout infers animated backgrounds from split background/zoom tags", () => {
+  const tpl: TemplateDoc = {
+    width: 1920,
+    height: 1080,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 5,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "10%",
+            y: "10%",
+            width: "80%",
+            height: "30%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+          },
+        ],
+      },
+    ],
+  } as any;
+  paths.images = "/tmp/no_img";
+  paths.tts = "/tmp/no_tts";
+
+  const slidesFromCommaString = buildTimelineFromLayout(
+    { "Testo-0": "demo", "Slide_0.tags": "background, zoom" },
+    tpl,
+    { videoW: 1920, videoH: 1080, fps: 30, defaultDur: 5 }
+  );
+  assert.equal(slidesFromCommaString[0].backgroundAnimated, true);
+
+  const slidesFromBooleanTags = buildTimelineFromLayout(
+    {
+      "Testo-0": "demo",
+      "Slide_0.tags.background": true,
+      "Slide_0.tags.zoom": true,
+    },
+    tpl,
+    { videoW: 1920, videoH: 1080, fps: 30, defaultDur: 5 }
+  );
+  assert.equal(slidesFromBooleanTags[0].backgroundAnimated, true);
+
+  const slidesMissingZoom = buildTimelineFromLayout(
+    { "Testo-0": "demo", "Slide_0.tags.background": true },
+    tpl,
+    { videoW: 1920, videoH: 1080, fps: 30, defaultDur: 5 }
+  );
+  assert.equal(slidesMissingZoom[0].backgroundAnimated, undefined);
+});
+
 test("buildTimelineFromLayout ignores fade-out animations", () => {
   const tpl: TemplateDoc = {
     width: 100,

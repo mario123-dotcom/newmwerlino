@@ -608,6 +608,9 @@ function readBackgroundAnimationFlag(
 }
 
 function hasBackgroundAnimationTag(tags: string[]): boolean {
+  let backgroundHint = false;
+  let animationHint = false;
+
   for (const raw of tags) {
     const tag = typeof raw === "string" ? raw.trim() : "";
     if (!tag) continue;
@@ -615,16 +618,28 @@ function hasBackgroundAnimationTag(tags: string[]): boolean {
     const compact = lower.replace(/[^a-z0-9]+/g, "");
     const hasBackground =
       lower.includes("background") ||
+      lower.includes("sfondo") ||
       lower.includes("bg") ||
-      compact.includes("background");
+      compact.includes("background") ||
+      compact === "bg";
     const hasAnimCue =
       lower.includes("anim") ||
       lower.includes("zoom") ||
       lower.includes("kenburn") ||
-      compact.includes("anim");
-    if (hasBackground && hasAnimCue) return true;
+      lower.includes("motion") ||
+      compact.includes("anim") ||
+      compact.includes("zoom") ||
+      compact.includes("kenburn") ||
+      compact.includes("motion");
+
+    if (hasBackground && hasAnimCue) {
+      return true;
+    }
+    if (hasBackground) backgroundHint = true;
+    if (hasAnimCue) animationHint = true;
   }
-  return false;
+
+  return backgroundHint && animationHint;
 }
 
 function outroBackgroundNameCandidates(): string[] {
