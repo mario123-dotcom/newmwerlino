@@ -432,6 +432,72 @@ test("buildTimelineFromLayout detects gradient background shapes as shadows", ()
   assert.equal(s1.shadowEnabled, undefined);
 });
 
+test("buildTimelineFromLayout marks slide shadow when only blur is provided", () => {
+  const tpl: TemplateDoc = {
+    width: 1920,
+    height: 1080,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 5,
+        elements: [
+          {
+            type: "image",
+            name: "Immagine-0",
+            shadow_blur: "1 vmin",
+          } as any,
+        ],
+      },
+    ],
+  } as any;
+  const mods = { "Testo-0": "ombra" };
+  paths.images = "/tmp/no_img";
+  paths.tts = "/tmp/no_tts";
+  const slides = buildTimelineFromLayout(mods, tpl, {
+    videoW: 1920,
+    videoH: 1080,
+    fps: 30,
+    defaultDur: 5,
+  });
+  assert.ok(slides.length >= 1);
+  const s0 = slides[0];
+  assert.equal(s0.shadowEnabled, true);
+});
+
+test("buildTimelineFromLayout honours boolean shadow modifications", () => {
+  const tpl: TemplateDoc = {
+    width: 100,
+    height: 100,
+    elements: [
+      { type: "composition", name: "Slide_0", duration: 1, elements: [] },
+    ],
+  } as any;
+  paths.images = "/tmp/no_img";
+  paths.tts = "/tmp/no_tts";
+
+  const slidesWithShadow = buildTimelineFromLayout(
+    { "Testo-0": "ombra", "Slide_0.shadowEnabled": true },
+    tpl,
+    { videoW: 100, videoH: 100, fps: 30, defaultDur: 1 }
+  );
+  assert.equal(slidesWithShadow[0].shadowEnabled, true);
+
+  const slidesNoShadow = buildTimelineFromLayout(
+    { "Testo-0": "ombra", "Slide_0.shadowEnabled": false },
+    tpl,
+    { videoW: 100, videoH: 100, fps: 30, defaultDur: 1 }
+  );
+  assert.equal(slidesNoShadow[0].shadowEnabled, undefined);
+
+  const slidesStringFalse = buildTimelineFromLayout(
+    { "Testo-0": "ombra", "Slide_0.shadowEnabled": "false" },
+    tpl,
+    { videoW: 100, videoH: 100, fps: 30, defaultDur: 1 }
+  );
+  assert.equal(slidesStringFalse[0].shadowEnabled, undefined);
+});
+
 test("buildTimelineFromLayout ignores fade-out animations", () => {
   const tpl: TemplateDoc = {
     width: 100,

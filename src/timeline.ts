@@ -166,6 +166,49 @@ type ShadowInfo = {
   declared?: boolean;
 };
 
+function isShadowCandidate(element: TemplateElement | undefined): boolean {
+  if (!element) return false;
+  if ((element as any)?.visible === false) return false;
+  const type = typeof element.type === "string" ? element.type.toLowerCase() : "";
+  if (type === "text" || type === "audio") return false;
+  const name = typeof element.name === "string" ? element.name.trim().toLowerCase() : "";
+  if (
+    name.startsWith("logo") ||
+    name.startsWith("avatar") ||
+    name.startsWith("copyright") ||
+    name.startsWith("testo")
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function hasShadowHintElement(element: TemplateElement | undefined): boolean {
+  if (!element) return false;
+  if (isGradientShadowElement(element)) return true;
+  if (isShadowCandidate(element)) {
+    for (const key of Object.keys(element as any)) {
+      if (key.toLowerCase().includes("shadow")) {
+        const value = (element as any)[key];
+        if (
+          value === false ||
+          value === 0 ||
+          (typeof value === "string" && value.trim().toLowerCase() === "false")
+        ) {
+          continue;
+        }
+        return true;
+      }
+    }
+  }
+  if (Array.isArray((element as any)?.elements)) {
+    for (const child of (element as any).elements as TemplateElement[]) {
+      if (hasShadowHintElement(child)) return true;
+    }
+  }
+  return false;
+}
+
 function isGradientShadowElement(element: TemplateElement | undefined): boolean {
   if (!element) return false;
   if ((element as any)?.visible === false) return false;
@@ -297,7 +340,8 @@ function extractShadow(
     extractGradientShadow(source, W, H),
     extractShadowFromElementProps(source, W, H)
   );
-  return merged.declared ? merged : undefined;
+  if (merged.declared) return merged;
+  return hasShadowHintElement(source) ? { declared: true } : undefined;
 }
 
 function readShadowMod(
@@ -358,7 +402,7 @@ function extractShadowFromMods(
   ]);
 
   if (rawColor == null && rawAlpha == null && rawX == null && rawY == null) {
-    return undefined;
+    return hasShadowHintInMods(mods, prefix) ? { declared: true } : undefined;
   }
 
   const info: ShadowInfo = { declared: true };
@@ -388,6 +432,28 @@ function mergeShadows(...parts: (ShadowInfo | undefined)[]): ShadowInfo {
     if (part.h !== undefined) merged.h = part.h;
   }
   return merged;
+}
+
+function hasShadowHintInMods(mods: Record<string, any>, prefix: string): boolean {
+  if (!mods) return false;
+  const prefixLower = prefix.toLowerCase();
+  const prefixDot = `${prefixLower}.`;
+  for (const key of Object.keys(mods)) {
+    if (typeof key !== "string") continue;
+    const lowerKey = key.toLowerCase();
+    if (!lowerKey.startsWith(prefixDot)) continue;
+    if (!lowerKey.includes("shadow")) continue;
+    const value = mods[key];
+    if (
+      value === false ||
+      value === 0 ||
+      (typeof value === "string" && value.trim().toLowerCase() === "false")
+    ) {
+      continue;
+    }
+    return true;
+  }
+  return false;
 }
 
 function uniqueNames(names: string[]): string[] {
@@ -469,20 +535,12 @@ function findShadowBearingDescendant(
   if (!parent || !Array.isArray(parent.elements)) return undefined;
   for (const child of parent.elements) {
     if (!child) continue;
-    const type = typeof child.type === "string" ? child.type.toLowerCase() : "";
-    const name = typeof child.name === "string" ? child.name.trim().toLowerCase() : "";
     const hasShadowProps =
       (child as any)?.shadow_color != null ||
       (child as any)?.shadow_x != null ||
       (child as any)?.shadow_y != null;
     const gradientCandidate = isGradientShadowElement(child);
-    const skipByName =
-      name.startsWith("logo") ||
-      name.startsWith("avatar") ||
-      name.startsWith("copyright") ||
-      name.startsWith("testo");
-    const allowedType = type !== "text" && type !== "audio";
-    if ((hasShadowProps || gradientCandidate) && allowedType && !skipByName) {
+    if ((hasShadowProps || gradientCandidate) && isShadowCandidate(child)) {
       return child;
     }
     const nested = findShadowBearingDescendant(child);
