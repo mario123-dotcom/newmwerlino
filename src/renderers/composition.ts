@@ -64,19 +64,46 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
     lastV = "v0";
   }
 
-  if (hasBG) {
-    const sc = slide.shadowColor ?? "black";
-    const sa = slide.shadowAlpha ?? 1;
-    const sw = Math.max(slide.shadowW ?? 0, Math.round(W * 0.75));
-    const sh = Math.max(slide.shadowH ?? 0, Math.round(H * 0.75));
-    f.push(
-      `color=c=${sc}@1:s=${W}x${H}:d=${dur},format=rgba,` +
-        `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='255*${sa}*pow(max(${sw}-X,0)/${sw}*max(${sh}-Y,0)/${sh},0.25)'[shdw]`
-    );
-    f.push(
-      `[${lastV}][shdw]overlay=x=0:y=0:enable='between(t,0,${dur})'[v_sh]`
-    );
-    lastV = "v_sh";
+  const wantsShadow =
+    hasBG &&
+    (slide.shadowColor != null ||
+      slide.shadowAlpha != null ||
+      slide.shadowW != null ||
+      slide.shadowH != null);
+
+  if (wantsShadow) {
+    const sc =
+      slide.shadowColor && slide.shadowColor.trim()
+        ? slide.shadowColor
+        : "black";
+    const alphaRaw =
+      typeof slide.shadowAlpha === "number" && Number.isFinite(slide.shadowAlpha)
+        ? slide.shadowAlpha
+        : undefined;
+    const sa = Math.min(Math.max(alphaRaw ?? 1, 0), 1);
+    if (sa > 0) {
+      const swRaw =
+        typeof slide.shadowW === "number" && Number.isFinite(slide.shadowW)
+          ? slide.shadowW
+          : W;
+      const shRaw =
+        typeof slide.shadowH === "number" && Number.isFinite(slide.shadowH)
+          ? slide.shadowH
+          : H;
+      const sw = Math.max(swRaw, W);
+      const sh = Math.max(shRaw, H);
+      const alphaBase = Number((255 * sa).toFixed(6));
+      const xTerm = `max(${sw}-(${W - 1}-X),0)/${sw}`;
+      const yTerm = `max(${sh}-(${H - 1}-Y),0)/${sh}`;
+      f.push(
+        `color=c=${sc}@1:s=${W}x${H}:d=${dur},format=rgba,` +
+          `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${alphaBase}*pow(${xTerm}*${yTerm},0.25)'[shdw]`
+      );
+      f.push(
+        `[${lastV}][shdw]overlay=x=0:y=0:enable='between(t,0,${dur})'[v_sh]`
+      );
+      lastV = "v_sh";
+    }
   }
 
   // Logo (preserva AR dentro al box indicato)
