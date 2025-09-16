@@ -177,6 +177,7 @@ test("buildTimelineFromLayout includes filler slide and outro", () => {
   assert.equal(slides[0].durationSec, 2);
   assert.equal(slides[1].ttsPath, undefined); // filler has no tts
   assert.equal(slides[1].durationSec, 1);
+  assert.equal(slides[1].backgroundAnimated, false);
   assert.equal(slides[2].durationSec, 2);
   assert.equal(slides[3].durationSec, 1);
 });
@@ -500,7 +501,7 @@ test("buildTimelineFromLayout honours boolean shadow modifications", () => {
   assert.equal(slidesStringFalse[0].shadowEnabled, undefined);
 });
 
-test("buildTimelineFromLayout animates slide backgrounds by default", () => {
+test("buildTimelineFromLayout animates backgrounds after the first slide", () => {
   const tpl: TemplateDoc = {
     width: 1920,
     height: 1080,
@@ -522,6 +523,23 @@ test("buildTimelineFromLayout animates slide backgrounds by default", () => {
           },
         ],
       },
+      {
+        type: "composition",
+        name: "Slide_1",
+        duration: 5,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-1",
+            x: "10%",
+            y: "60%",
+            width: "80%",
+            height: "30%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+          },
+        ],
+      },
     ],
   } as any;
   const prevImages = paths.images;
@@ -529,18 +547,24 @@ test("buildTimelineFromLayout animates slide backgrounds by default", () => {
   const tmpDir = mkdtempSync(join(process.cwd(), "timeline-bg-"));
   try {
     writeFileSync(join(tmpDir, "img0.jpg"), "");
+    writeFileSync(join(tmpDir, "img1.jpg"), "");
     paths.images = tmpDir;
     paths.tts = tmpDir;
 
-    const slides = buildTimelineFromLayout({}, tpl, {
-      videoW: 1920,
-      videoH: 1080,
-      fps: 30,
-      defaultDur: 5,
-    });
+    const slides = buildTimelineFromLayout(
+      { "Testo-0": "ciao", "Testo-1": "ciao" },
+      tpl,
+      {
+        videoW: 1920,
+        videoH: 1080,
+        fps: 30,
+        defaultDur: 5,
+      }
+    );
 
-    assert.equal(slides.length, 1);
-    assert.equal(slides[0].backgroundAnimated, true);
+    assert.equal(slides.length, 2);
+    assert.equal(slides[0].backgroundAnimated, undefined);
+    assert.equal(slides[1].backgroundAnimated, true);
   } finally {
     paths.images = prevImages;
     paths.tts = prevTts;
@@ -597,7 +621,7 @@ test("buildTimelineFromLayout keeps outro background static", () => {
     paths.images = tmpDir;
     paths.tts = tmpDir;
 
-    const slides = buildTimelineFromLayout({}, tpl, {
+    const slides = buildTimelineFromLayout({ "Testo-0": "ciao" }, tpl, {
       videoW: 1920,
       videoH: 1080,
       fps: 30,
@@ -605,7 +629,7 @@ test("buildTimelineFromLayout keeps outro background static", () => {
     });
 
     assert.ok(slides.length >= 2);
-    assert.equal(slides[0].backgroundAnimated, true);
+    assert.equal(slides[0].backgroundAnimated, undefined);
     const outro = slides[slides.length - 1];
     assert.equal(outro.backgroundAnimated, undefined);
   } finally {

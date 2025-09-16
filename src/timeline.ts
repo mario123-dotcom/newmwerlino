@@ -828,6 +828,7 @@ export function buildTimelineFromLayout(
         logoHeight: fLogo.h,
         logoX: fLogo.x,
         logoY: fLogo.y,
+        backgroundAnimated: false,
       });
       prevEnd = start;
     }
@@ -924,6 +925,8 @@ export function buildTimelineFromLayout(
       animations: perLineAnims[idx].length ? perLineAnims[idx] : undefined,
     }));
 
+    const isFillerSlide = !ttsPath && !txtStr;
+
     const slide: SlideSpec = {
       width: videoW,
       height: videoH,
@@ -947,7 +950,9 @@ export function buildTimelineFromLayout(
       shadowEnabled: slideHasShadow ? true : undefined,
     };
 
-    if (bgImagePath) {
+    if (isFillerSlide) {
+      slide.backgroundAnimated = false;
+    } else if (bgImagePath && i > 0) {
       slide.backgroundAnimated = true;
     }
 

@@ -60,14 +60,14 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
     if (animateBackground && dur > 0) {
       const animFps = fps > 0 ? fps : 30;
       const frameCount = Math.max(1, Math.round(animFps * dur));
-      const targetZoom = 1.015;
+      const targetZoom = 1.02;
       const zoomStep = (targetZoom - 1) / frameCount;
-      const zoomExpr = `min(${targetZoom.toFixed(6)},max(zoom,1.0)+${zoomStep.toFixed(7)})`;
+      const zoomExpr = `if(eq(on,0),1.0,min(${targetZoom.toFixed(6)},zoom+${zoomStep.toFixed(7)}))`;
       const yExpr = `max(0,(ih/zoom-oh)/2)`;
       f.push(
         `[1:v]format=rgba,` +
           `scale=${W}:${H}:force_original_aspect_ratio=increase,` +
-          `zoompan=z='${zoomExpr}':d=${frameCount}:s=${W}x${H}:fps=${animFps.toFixed(6)}:x='0':y='${yExpr}',` +
+          `zoompan=z='${zoomExpr}':d=1:s=${W}x${H}:fps=${animFps.toFixed(6)}:x='0':y='${yExpr}',` +
           `setsar=1[bg]`
       );
     } else {
