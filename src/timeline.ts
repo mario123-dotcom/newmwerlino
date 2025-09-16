@@ -832,15 +832,15 @@ export function buildTimelineFromLayout(
     const fontPath = fontFamily ? findFontPath(fontFamily) : undefined;
 
     const bgShadowCandidates = slideBackgroundNameCandidates(i);
-    const slideShadow = mergeShadows(
-      extractShadow(comp, videoW, videoH),
-      extractShadow(findShadowSource(comp, bgShadowCandidates), videoW, videoH),
-      extractShadowFromMods(mods, `Slide_${i}`, videoW, videoH),
-      ...bgShadowCandidates.map((name) =>
-        extractShadowFromMods(mods, name, videoW, videoH)
-      )
-    );
-    const slideHasShadow = slideShadow.declared === true;
+    const slideShadowSources: Array<() => ShadowInfo | undefined> = [
+      () => extractShadow(comp, videoW, videoH),
+      () => extractShadow(findShadowSource(comp, bgShadowCandidates), videoW, videoH),
+      () => extractShadowFromMods(mods, `Slide_${i}`, videoW, videoH),
+      ...bgShadowCandidates.map(
+        (name) => () => extractShadowFromMods(mods, name, videoW, videoH)
+      ),
+    ];
+    const slideHasShadow = slideShadowSources.some((get) => !!get());
 
     const texts: TextBlockSpec[] = textFiles.map((tf, idx) => ({
       ...baseBlock,
@@ -870,10 +870,6 @@ export function buildTimelineFromLayout(
       texts: texts.length ? texts : undefined,
 
       shadowEnabled: slideHasShadow ? true : undefined,
-      shadowColor: slideShadow.color,
-      shadowAlpha: slideShadow.alpha,
-      shadowW: slideShadow.w,
-      shadowH: slideShadow.h,
     };
 
     console.log(
@@ -930,13 +926,15 @@ export function buildTimelineFromLayout(
     const fontFam = getFontFamilyFromTemplate(template, "Outro", "Testo-outro");
     const fontPath = fontFam ? findFontPath(fontFam) : undefined;
     const outroBgNames = outroBackgroundNameCandidates();
-    const outroShadow = mergeShadows(
-      extractShadow(outroComp, videoW, videoH),
-      extractShadow(findShadowSource(outroComp, outroBgNames), videoW, videoH),
-      extractShadowFromMods(mods, "Outro", videoW, videoH),
-      ...outroBgNames.map((name) => extractShadowFromMods(mods, name, videoW, videoH))
-    );
-    const outroHasShadow = outroShadow.declared === true;
+    const outroShadowSources: Array<() => ShadowInfo | undefined> = [
+      () => extractShadow(outroComp, videoW, videoH),
+      () => extractShadow(findShadowSource(outroComp, outroBgNames), videoW, videoH),
+      () => extractShadowFromMods(mods, "Outro", videoW, videoH),
+      ...outroBgNames.map(
+        (name) => () => extractShadowFromMods(mods, name, videoW, videoH)
+      ),
+    ];
+    const outroHasShadow = outroShadowSources.some((get) => !!get());
     const txt = textEl?.text as string | undefined;
     let texts: TextBlockSpec[] | undefined;
     if (txt && textBox) {
@@ -1009,10 +1007,6 @@ export function buildTimelineFromLayout(
       fontFile: fontPath,
       texts,
       shadowEnabled: outroHasShadow ? true : undefined,
-      shadowColor: outroShadow.color,
-      shadowAlpha: outroShadow.alpha,
-      shadowW: outroShadow.w,
-      shadowH: outroShadow.h,
     });
   }
 
