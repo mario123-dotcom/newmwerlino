@@ -4,6 +4,7 @@ import { request as httpRequest } from "http";
 import { request as httpsRequest } from "https";
 import { paths } from "./paths";
 import { loadModifications, loadTemplate, TemplateElement } from "./template";
+import { fontFamilyToFileBase } from "./fonts";
 
 function ensureDir(dir: string) {
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
@@ -115,8 +116,9 @@ export async function fetchAssets() {
       if (!match) return;
       const fontUrl = match[1];
       const ext = fontUrl.split(".").pop()?.split("?")[0] || "ttf";
-      const safe = family.replace(/\s+/g, "_").toLowerCase();
-      await downloadFile(fontUrl, join(paths.fonts, `${safe}.${ext}`));
+      const safe = fontFamilyToFileBase(family);
+      const fileName = safe ? `${safe}.${ext}` : `${encodeURIComponent(family)}.${ext}`;
+      await downloadFile(fontUrl, join(paths.fonts, fileName));
     } catch (err) {
       console.warn(`Impossibile scaricare il font ${family}:`, err);
     }

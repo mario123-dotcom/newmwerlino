@@ -4,6 +4,7 @@ import { paths } from "./paths";
 import { findComposition, findChildByName, pctToPx } from "./template";
 import type { TemplateDoc, TemplateElement } from "./template";
 import { probeDurationSec } from "./ffmpeg/probe";
+import { fileNameMatchesFamily } from "./fonts";
 
 /* ---------- Tipi usati da composition.ts ---------- */
 export type AnimationSpec =
@@ -616,10 +617,11 @@ function findTTSForSlide(i: number): string | undefined {
 }
 
 function findFontPath(family: string): string | undefined {
-  const base = family.replace(/\s+/g, "").toLowerCase();
   try {
     for (const f of readdirSync(paths.fonts)) {
-      if (f.toLowerCase().startsWith(base)) return join(paths.fonts, f);
+      if (fileNameMatchesFamily(f, family)) {
+        return join(paths.fonts, f);
+      }
     }
   } catch {}
   return undefined;
