@@ -60,7 +60,7 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
     if (animateBackground && dur > 0) {
       const animFps = fps > 0 ? fps : 30;
       const frameCount = Math.max(1, Math.ceil(animFps * dur));
-      const targetZoom = 1.06;
+      const targetZoom = 1.12;
       const steps = Math.max(1, frameCount - 1);
       const zoomStep = (targetZoom - 1) / steps;
       const zoomExpr = `min(${targetZoom.toFixed(6)},1+${zoomStep.toFixed(7)}*on)`;
