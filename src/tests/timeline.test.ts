@@ -253,6 +253,71 @@ test("buildTimelineFromLayout prefers weighted font variant", () => {
   }
 });
 
+test("buildTimelineFromLayout stabilizes font after single-line fallback", () => {
+  const tpl: TemplateDoc = {
+    width: 1920,
+    height: 1080,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 1,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "0%",
+            y: "0%",
+            width: "80%",
+            height: "60%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+            line_height: "135%",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const text = "Ciao mondo meraviglioso";
+  const box = getTextBoxFromTemplate(tpl, 0)!;
+  const fallbackFont = 24;
+  const approxCharWidth = 0.52;
+  const fallbackMaxChars = Math.floor(box.w / (fallbackFont * approxCharWidth));
+  const fallbackLayout = wrapText(text, fallbackMaxChars);
+  assert.equal(fallbackLayout.length, 1);
+
+  const prevImages = paths.images;
+  const prevTts = paths.tts;
+  paths.images = "/tmp/no_img";
+  paths.tts = "/tmp/no_tts";
+
+  try {
+    const slides = buildTimelineFromLayout({ "Testo-0": text }, tpl, {
+      videoW: 1920,
+      videoH: 1080,
+      fps: 25,
+      defaultDur: 1,
+    });
+    const slide = slides[0];
+    assert.ok(slide);
+    const block = slide.texts?.[0];
+    assert.ok(block);
+    const linesCount = slide.texts?.length ?? 0;
+    assert(linesCount > 1);
+
+    const lineHeightFactor = 1.35;
+    const expectedFont = Math.round((box.h / linesCount) / lineHeightFactor);
+    assert.equal(block.fontSize, expectedFont);
+
+    const maxSingleLineFont = Math.round(box.h / lineHeightFactor);
+    assert(block.fontSize < maxSingleLineFont);
+  } finally {
+    paths.images = prevImages;
+    paths.tts = prevTts;
+  }
+});
+
 test("wrapText splits by length", () => {
   const lines = wrapText("uno due tre quattro cinque", 7);
   assert.deepEqual(lines, ["uno due", "tre", "quattro", "cinque"]);
