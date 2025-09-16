@@ -515,12 +515,20 @@ function slideBackgroundNameCandidates(index: number): string[] {
   ]);
 }
 
+function isPlainObject(value: any): value is Record<string, any> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
 function parseTagList(raw: any): string[] {
   if (raw == null) return [];
   if (Array.isArray(raw)) {
     const tags: string[] = [];
     for (const item of raw) {
-      tags.push(...parseTagList(item));
+      if (isPlainObject(item) || Array.isArray(item)) {
+        tags.push(...parseTagStructure(item));
+      } else {
+        tags.push(...parseTagList(item));
+      }
     }
     return tags;
   }
@@ -534,6 +542,131 @@ function parseTagList(raw: any): string[] {
   return [];
 }
 
+function parseTagStructure(raw: any): string[] {
+  if (raw == null) return [];
+  if (typeof raw === "string" || Array.isArray(raw)) {
+    return parseTagList(raw);
+  }
+  if (!isPlainObject(raw)) return [];
+
+  const tags: string[] = [];
+  if ("tag" in raw) {
+    tags.push(...parseTagStructure((raw as any).tag));
+  }
+  if ("tags" in raw) {
+    tags.push(...parseTagStructure((raw as any).tags));
+  }
+  for (const [key, value] of Object.entries(raw)) {
+    if (key === "tag" || key === "tags") continue;
+    const bool = readBooleanish(value);
+    if (bool !== undefined) {
+      if (bool) tags.push(key);
+      continue;
+    }
+    const nested = parseTagStructure(value);
+    if (nested.length) {
+      tags.push(...nested.map((t) => (t ? `${key}.${t}` : key)));
+    }
+  }
+  return tags;
+}
+
+function isTagKeyName(key: string): boolean {
+  const lower = key.toLowerCase();
+  if (lower === "tag" || lower === "tags") return true;
+  for (const prefix of ["tag", "tags"]) {
+    if (lower.startsWith(prefix)) {
+      const next = lower.slice(prefix.length, prefix.length + 1);
+      if (!next || next === "." || next === "_" || next === "-" || next === "[") {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function cleanTagKeySuffix(key: string): string {
+  return key
+    .replace(/^tags?[-_.\[]*/i, "")
+    .replace(/]$/, "")
+    .trim();
+}
+
+function normalizeKey(key: string): string {
+  return key.trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function findModGroup(
+  mods: Record<string, any>,
+  prefix: string
+): Record<string, any> | undefined {
+  const direct = mods[prefix];
+  if (isPlainObject(direct)) return direct;
+  const lower = prefix.toLowerCase();
+  for (const key of Object.keys(mods)) {
+    if (typeof key !== "string") continue;
+    if (key.toLowerCase() === lower && isPlainObject(mods[key])) {
+      return mods[key];
+    }
+  }
+  return undefined;
+}
+
+function collectTagsFromModGroup(group: Record<string, any>): string[] {
+  const tags: string[] = [];
+  const stack: any[] = [group];
+  const seen = new Set<any>();
+
+  while (stack.length) {
+    const current = stack.pop();
+    if (!current) continue;
+    if (seen.has(current)) continue;
+    seen.add(current);
+
+    if (Array.isArray(current)) {
+      for (const item of current) {
+        if (isPlainObject(item) || Array.isArray(item)) {
+          stack.push(item);
+        } else {
+          tags.push(...parseTagList(item));
+        }
+      }
+      continue;
+    }
+
+    if (!isPlainObject(current)) continue;
+
+    for (const [rawKey, value] of Object.entries(current)) {
+      if (typeof rawKey !== "string") continue;
+
+      if (isTagKeyName(rawKey)) {
+        const cleaned = cleanTagKeySuffix(rawKey);
+        const bool = readBooleanish(value);
+        if (bool !== undefined) {
+          if (bool && cleaned) tags.push(cleaned);
+        } else {
+          const nested = parseTagStructure(value);
+          if (!nested.length) {
+            if (cleaned) tags.push(cleaned);
+          } else if (cleaned) {
+            for (const tag of nested) {
+              tags.push(tag ? `${cleaned}.${tag}` : cleaned);
+            }
+          } else {
+            tags.push(...nested);
+          }
+        }
+      }
+
+      if (isPlainObject(value) || Array.isArray(value)) {
+        stack.push(value);
+      }
+    }
+  }
+
+  return tags;
+}
+
 function collectTagsFromElement(element: TemplateElement | undefined): string[] {
   if (!element) return [];
   const tags: string[] = [];
@@ -545,9 +678,17 @@ function collectTagsFromElement(element: TemplateElement | undefined): string[] 
 
 function collectTagsFromMods(mods: Record<string, any>, prefix: string): string[] {
   if (!mods) return [];
-  const tags: string[] = [];
-  tags.push(...parseTagList(mods[`${prefix}.tags`]));
-  tags.push(...parseTagList(mods[`${prefix}.tag`]));
+
+  const tagSet = new Set<string>();
+  const addTags = (values: string[]) => {
+    for (const raw of values) {
+      const tag = typeof raw === "string" ? raw.trim() : "";
+      if (tag) tagSet.add(tag);
+    }
+  };
+
+  addTags(parseTagList(mods[`${prefix}.tags`]));
+  addTags(parseTagList(mods[`${prefix}.tag`]));
 
   const prefixLower = `${prefix.toLowerCase()}.`;
   for (const key of Object.keys(mods)) {
@@ -555,32 +696,33 @@ function collectTagsFromMods(mods: Record<string, any>, prefix: string): string[
     const lowerKey = key.toLowerCase();
     if (!lowerKey.startsWith(prefixLower)) continue;
     const suffix = key.slice(prefix.length + 1);
-    const suffixLower = suffix.toLowerCase();
-    const isTagKey =
-      suffixLower === "tag" ||
-      suffixLower === "tags" ||
-      suffixLower.startsWith("tag.") ||
-      suffixLower.startsWith("tags.") ||
-      suffixLower.startsWith("tag_") ||
-      suffixLower.startsWith("tags_") ||
-      suffixLower.startsWith("tag-") ||
-      suffixLower.startsWith("tags-") ||
-      suffixLower.startsWith("tag[") ||
-      suffixLower.startsWith("tags[");
-    if (!isTagKey) continue;
+    if (!suffix) continue;
+    if (!isTagKeyName(suffix)) continue;
+    const cleaned = cleanTagKeySuffix(suffix);
     const value = mods[key];
     const bool = readBooleanish(value);
     if (bool !== undefined) {
-      if (bool) {
-        const cleaned = suffix.replace(/^tags?[-_.\[]*/i, "").replace(/]$/, "");
-        if (cleaned.trim()) tags.push(cleaned.trim());
-      }
+      if (bool && cleaned) addTags([cleaned]);
       continue;
     }
-    tags.push(...parseTagList(value));
+    const nested = parseTagStructure(value);
+    if (!nested.length) {
+      if (cleaned) addTags([cleaned]);
+    } else if (cleaned) {
+      addTags(nested.map((t) => (t ? `${cleaned}.${t}` : cleaned)));
+    } else {
+      addTags(nested);
+    }
   }
 
-  return tags;
+  const modGroup = findModGroup(mods, prefix);
+  if (modGroup) {
+    addTags(parseTagList((modGroup as any).tags));
+    addTags(parseTagList((modGroup as any).tag));
+    addTags(collectTagsFromModGroup(modGroup));
+  }
+
+  return Array.from(tagSet);
 }
 
 const BACKGROUND_ANIMATION_KEYS = [
@@ -595,6 +737,10 @@ const BACKGROUND_ANIMATION_KEYS = [
   "animateBg",
 ];
 
+const NORMALIZED_BACKGROUND_ANIMATION_KEYS = new Set(
+  BACKGROUND_ANIMATION_KEYS.map(normalizeKey)
+);
+
 function readBackgroundAnimationFlag(
   mods: Record<string, any>,
   prefix: string
@@ -603,6 +749,39 @@ function readBackgroundAnimationFlag(
     const value = mods[`${prefix}.${key}`];
     const parsed = readBooleanish(value);
     if (parsed !== undefined) return parsed;
+  }
+  const modGroup = findModGroup(mods, prefix);
+  if (modGroup) {
+    for (const [rawKey, value] of Object.entries(modGroup)) {
+      if (typeof rawKey !== "string") continue;
+      if (NORMALIZED_BACKGROUND_ANIMATION_KEYS.has(normalizeKey(rawKey))) {
+        const parsed = readBooleanish(value);
+        if (parsed !== undefined) return parsed;
+      }
+    }
+    const nested = readBackgroundAnimationFlagFromObject(modGroup);
+    if (nested !== undefined) return nested;
+  }
+  return undefined;
+}
+
+function readBackgroundAnimationFlagFromObject(value: any): boolean | undefined {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const nested = readBackgroundAnimationFlagFromObject(item);
+      if (nested !== undefined) return nested;
+    }
+    return undefined;
+  }
+  if (!isPlainObject(value)) return undefined;
+  for (const [rawKey, nestedValue] of Object.entries(value)) {
+    if (typeof rawKey !== "string") continue;
+    if (NORMALIZED_BACKGROUND_ANIMATION_KEYS.has(normalizeKey(rawKey))) {
+      const parsed = readBooleanish(nestedValue);
+      if (parsed !== undefined) return parsed;
+    }
+    const nested = readBackgroundAnimationFlagFromObject(nestedValue);
+    if (nested !== undefined) return nested;
   }
   return undefined;
 }

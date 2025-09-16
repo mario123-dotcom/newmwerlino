@@ -662,6 +662,79 @@ test("buildTimelineFromLayout infers animated backgrounds from split background/
   assert.equal(slidesMissingZoom[0].backgroundAnimated, undefined);
 });
 
+test("buildTimelineFromLayout recognises nested tag containers in modifications", () => {
+  const tpl: TemplateDoc = {
+    width: 1920,
+    height: 1080,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 5,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "10%",
+            y: "10%",
+            width: "80%",
+            height: "30%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+          },
+        ],
+      },
+    ],
+  } as any;
+  paths.images = "/tmp/no_img";
+  paths.tts = "/tmp/no_tts";
+
+  const baseMods = { "Testo-0": "demo" };
+
+  const slidesFromNestedTags = buildTimelineFromLayout(
+    {
+      ...baseMods,
+      Slide_0: { metadata: { tags: { background: true, zoom: true } } },
+    },
+    tpl,
+    { videoW: 1920, videoH: 1080, fps: 30, defaultDur: 5 }
+  );
+  assert.equal(slidesFromNestedTags[0].backgroundAnimated, true);
+
+  const slidesFromNestedArrays = buildTimelineFromLayout(
+    {
+      ...baseMods,
+      Slide_0: { tags: ["background", { zoom: { animated: true } }] },
+    },
+    tpl,
+    { videoW: 1920, videoH: 1080, fps: 30, defaultDur: 5 }
+  );
+  assert.equal(slidesFromNestedArrays[0].backgroundAnimated, true);
+
+  const slidesWithNestedFlag = buildTimelineFromLayout(
+    {
+      ...baseMods,
+      Slide_0: { settings: { backgroundAnimated: "true" } },
+    },
+    tpl,
+    { videoW: 1920, videoH: 1080, fps: 30, defaultDur: 5 }
+  );
+  assert.equal(slidesWithNestedFlag[0].backgroundAnimated, true);
+
+  const slidesWithNestedOverride = buildTimelineFromLayout(
+    {
+      ...baseMods,
+      Slide_0: {
+        metadata: { tags_background: { animated: true } },
+        backgroundAnimated: false,
+      },
+    },
+    tpl,
+    { videoW: 1920, videoH: 1080, fps: 30, defaultDur: 5 }
+  );
+  assert.equal(slidesWithNestedOverride[0].backgroundAnimated, undefined);
+});
+
 test("buildTimelineFromLayout ignores fade-out animations", () => {
   const tpl: TemplateDoc = {
     width: 100,
