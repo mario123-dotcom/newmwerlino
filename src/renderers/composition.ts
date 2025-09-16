@@ -64,26 +64,49 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
     lastV = "v0";
   }
 
-  if (
-    slide.shadowColor &&
-    typeof slide.shadowW === "number" &&
-    slide.shadowW > 0 &&
-    typeof slide.shadowH === "number" &&
-    slide.shadowH > 0
-  ) {
-    const sc = slide.shadowColor;
-    const sa = Math.min(1, (slide.shadowAlpha ?? 1) * 3);
-    const sw = slide.shadowW;
-    const sh = slide.shadowH;
-    const alpha = (sa * 255).toFixed(2);
-    f.push(
-      `color=c=${sc}@1:s=${W}x${H}:d=${dur},format=rgba,` +
-        `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${alpha}*max(${sw}-X,0)/${sw}*max(Y-(H-${sh}),0)/${sh}'[shdw]`
-    );
-    f.push(
-      `[${lastV}][shdw]overlay=x=0:y=0:enable='between(t,0,${dur})'[v_sh]`
-    );
-    lastV = "v_sh";
+  const wantsShadow =
+    hasBG &&
+    (slide.shadowEnabled ||
+      slide.shadowColor != null ||
+      slide.shadowAlpha != null ||
+      slide.shadowW != null ||
+      slide.shadowH != null);
+
+  if (wantsShadow) {
+    const sc =
+      slide.shadowColor && slide.shadowColor.trim()
+        ? slide.shadowColor
+        : "black";
+    const alphaRaw =
+      typeof slide.shadowAlpha === "number" && Number.isFinite(slide.shadowAlpha)
+        ? slide.shadowAlpha
+        : undefined;
+    const fallbackAlpha = 0.6;
+    const sa = Math.min(Math.max(alphaRaw ?? fallbackAlpha, 0), 1);
+    if (sa > 0) {
+      const swRaw =
+        typeof slide.shadowW === "number" && Number.isFinite(slide.shadowW)
+          ? slide.shadowW
+          : W;
+      const shRaw =
+        typeof slide.shadowH === "number" && Number.isFinite(slide.shadowH)
+          ? slide.shadowH
+          : H;
+      const sw = Math.max(swRaw, W * 3);
+      const sh = Math.max(shRaw, H * 3);
+      const alphaBase = Number((255 * sa).toFixed(6));
+      const xTerm = `max(${sw}-X,0)/${sw}`;
+      const yTerm = `max(${sh}-(${H - 1}-Y),0)/${sh}`;
+      const falloff = `pow(${xTerm},4)*pow(${yTerm},4)`;
+      f.push(
+        `color=c=${sc}@1:s=${W}x${H}:d=${dur},format=rgba,` +
+          `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${alphaBase}*${falloff}'[shdw]`
+      );
+      f.push(
+        `[${lastV}][shdw]overlay=x=0:y=0:enable='between(t,0,${dur})'[v_sh]`
+      );
+      lastV = "v_sh";
+    }
   }
 
   // Logo (preserva AR dentro al box indicato)

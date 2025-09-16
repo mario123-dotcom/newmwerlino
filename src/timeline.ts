@@ -1,12 +1,8 @@
 import { join } from "path";
 import { existsSync, mkdirSync, writeFileSync, readdirSync } from "fs";
 import { paths } from "./paths";
-import {
-  TemplateDoc,
-  findComposition,
-  findChildByName,
-  pctToPx,
-} from "./template";
+import { findComposition, findChildByName, pctToPx } from "./template";
+import type { TemplateDoc, TemplateElement } from "./template";
 import { probeDurationSec } from "./ffmpeg/probe";
 
 /* ---------- Tipi usati da composition.ts ---------- */
@@ -63,6 +59,7 @@ export type SlideSpec = {
   texts?: TextBlockSpec[];
 
   // overlay shadow on background
+  shadowEnabled?: boolean;
   shadowColor?: string;
   shadowAlpha?: number;
   shadowW?: number;
@@ -108,9 +105,467 @@ function lenToPx(v: any, W: number, H: number): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
+function parseAlpha(val: any): number | undefined {
+  if (typeof val === "number" && Number.isFinite(val)) return val;
+  if (typeof val !== "string") return undefined;
+  const s = val.trim().toLowerCase();
+  if (!s) return undefined;
+  if (s.endsWith("%")) {
+    const n = parseFloat(s.slice(0, -1));
+    return Number.isFinite(n) ? n / 100 : undefined;
+  }
+  const n = parseFloat(s);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function parseShadowColor(raw: any): { color: string; alpha?: number } | undefined {
+  if (typeof raw !== "string") return undefined;
+  const input = raw.trim();
+  if (!input) return undefined;
+  const rgba = parseRGBA(input);
+  if (rgba) return rgba;
+  const hex = input.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (hex) {
+    let value = hex[1];
+    if (value.length === 3) {
+      value = value
+        .split("")
+        .map((c) => c + c)
+        .join("");
+    }
+    return { color: `#${value.toLowerCase()}` };
+  }
+  return { color: input };
+}
+
+function parseShadowLength(
+  v: any,
+  axis: "x" | "y",
+  W: number,
+  H: number
+): number | undefined {
+  if (v == null) return undefined;
+  if (typeof v === "string") {
+    const s = v.trim().toLowerCase();
+    if (!s) return undefined;
+    if (s.endsWith("%")) {
+      const n = parseFloat(s.slice(0, -1));
+      if (!Number.isFinite(n)) return undefined;
+      const base = axis === "x" ? W : H;
+      return (n / 100) * base;
+    }
+  }
+  return lenToPx(v, W, H);
+}
+
+type ShadowInfo = {
+  color?: string;
+  alpha?: number;
+  w?: number;
+  h?: number;
+  declared?: boolean;
+};
+
+function isShadowCandidate(element: TemplateElement | undefined): boolean {
+  if (!element) return false;
+  if ((element as any)?.visible === false) return false;
+  const type = typeof element.type === "string" ? element.type.toLowerCase() : "";
+  if (type === "text" || type === "audio") return false;
+  const name = typeof element.name === "string" ? element.name.trim().toLowerCase() : "";
+  if (
+    name.startsWith("logo") ||
+    name.startsWith("avatar") ||
+    name.startsWith("copyright") ||
+    name.startsWith("testo")
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function hasShadowHintElement(element: TemplateElement | undefined): boolean {
+  if (!element) return false;
+  if (isGradientShadowElement(element)) return true;
+  if (isShadowCandidate(element)) {
+    for (const key of Object.keys(element as any)) {
+      if (key.toLowerCase().includes("shadow")) {
+        const value = (element as any)[key];
+        if (
+          value === false ||
+          value === 0 ||
+          (typeof value === "string" && value.trim().toLowerCase() === "false")
+        ) {
+          continue;
+        }
+        return true;
+      }
+    }
+  }
+  if (Array.isArray((element as any)?.elements)) {
+    for (const child of (element as any).elements as TemplateElement[]) {
+      if (hasShadowHintElement(child)) return true;
+    }
+  }
+  return false;
+}
+
+function isGradientShadowElement(element: TemplateElement | undefined): boolean {
+  if (!element) return false;
+  if ((element as any)?.visible === false) return false;
+  const type = typeof element.type === "string" ? element.type.toLowerCase() : "";
+  if (type !== "shape") return false;
+  const fill = (element as any)?.fill_color ?? (element as any)?.fillColor;
+  if (!Array.isArray(fill) || fill.length < 2) return false;
+  const name = typeof element.name === "string" ? element.name.trim().toLowerCase() : "";
+  if (name.includes("gradient") || name.includes("ombra") || name.includes("shadow")) {
+    return true;
+  }
+  let hasTransparentStop = false;
+  let hasOpaqueStop = false;
+  for (const stop of fill) {
+    const color = typeof stop?.color === "string" ? stop.color : undefined;
+    const parsed = parseShadowColor(color);
+    if (!parsed) continue;
+    if (parsed.alpha !== undefined && parsed.alpha <= 0.001) {
+      hasTransparentStop = true;
+    } else {
+      hasOpaqueStop = true;
+    }
+  }
+  return hasTransparentStop && hasOpaqueStop;
+}
+
+function extractGradientShadow(
+  source: TemplateElement,
+  W: number,
+  H: number
+): ShadowInfo | undefined {
+  if (!isGradientShadowElement(source)) return undefined;
+  const fill = ((source as any)?.fill_color ?? (source as any)?.fillColor) as any[];
+  const info: ShadowInfo = { declared: true };
+
+  for (const stop of fill) {
+    const color = typeof stop?.color === "string" ? stop.color : undefined;
+    const parsed = parseShadowColor(color);
+    if (!parsed) continue;
+    if (parsed.color) info.color = parsed.color;
+    if (parsed.alpha !== undefined) info.alpha = parsed.alpha;
+  }
+
+  const widthPx = pctToPx((source as any)?.width, W);
+  const heightPx = pctToPx((source as any)?.height, H);
+  if (typeof widthPx === "number" && Number.isFinite(widthPx) && widthPx > 0) {
+    info.w = widthPx;
+  }
+  if (typeof heightPx === "number" && Number.isFinite(heightPx) && heightPx > 0) {
+    info.h = heightPx;
+  }
+  if (info.w === undefined) info.w = W;
+  if (info.h === undefined) info.h = H;
+
+  const opacity = parseAlpha((source as any)?.opacity);
+  if (opacity !== undefined) {
+    const base = info.alpha ?? 1;
+    info.alpha = Math.max(0, Math.min(1, base * opacity));
+  }
+
+  return info;
+}
+
+function extractShadowFromElementProps(
+  source: TemplateElement,
+  W: number,
+  H: number
+): ShadowInfo | undefined {
+  const rawColor =
+    (source as any)?.shadow_color ??
+    (source as any)?.shadowColor ??
+    (source as any)?.background_shadow_color ??
+    (source as any)?.backgroundShadowColor;
+  const rawAlpha =
+    (source as any)?.shadow_alpha ??
+    (source as any)?.shadowAlpha ??
+    (source as any)?.shadow_opacity ??
+    (source as any)?.shadowOpacity ??
+    (source as any)?.background_shadow_alpha ??
+    (source as any)?.backgroundShadowAlpha ??
+    (source as any)?.background_shadow_opacity ??
+    (source as any)?.backgroundShadowOpacity;
+  const rawX =
+    (source as any)?.shadow_x ??
+    (source as any)?.shadowX ??
+    (source as any)?.shadow_width ??
+    (source as any)?.shadowWidth ??
+    (source as any)?.background_shadow_x ??
+    (source as any)?.backgroundShadowX ??
+    (source as any)?.background_shadow_width ??
+    (source as any)?.backgroundShadowWidth;
+  const rawY =
+    (source as any)?.shadow_y ??
+    (source as any)?.shadowY ??
+    (source as any)?.shadow_height ??
+    (source as any)?.shadowHeight ??
+    (source as any)?.background_shadow_y ??
+    (source as any)?.backgroundShadowY ??
+    (source as any)?.background_shadow_height ??
+    (source as any)?.backgroundShadowHeight;
+
+  const declared =
+    rawColor != null || rawAlpha != null || rawX != null || rawY != null;
+  if (!declared) return undefined;
+
+  const info: ShadowInfo = { declared: true };
+  const parsedColor = parseShadowColor(rawColor);
+  if (parsedColor?.color) info.color = parsedColor.color;
+  if (parsedColor?.alpha !== undefined) info.alpha = parsedColor.alpha;
+
+  const parsedAlpha = parseAlpha(rawAlpha);
+  if (parsedAlpha !== undefined) info.alpha = parsedAlpha;
+
+  const sw = parseShadowLength(rawX, "x", W, H);
+  if (typeof sw === "number" && Number.isFinite(sw)) info.w = sw;
+  const sh = parseShadowLength(rawY, "y", W, H);
+  if (typeof sh === "number" && Number.isFinite(sh)) info.h = sh;
+
+  return info;
+}
+
+function extractShadow(
+  source: TemplateElement | undefined,
+  W: number,
+  H: number
+): ShadowInfo | undefined {
+  if (!source) return undefined;
+  const merged = mergeShadows(
+    extractGradientShadow(source, W, H),
+    extractShadowFromElementProps(source, W, H)
+  );
+  if (merged.declared) return merged;
+  return hasShadowHintElement(source) ? { declared: true } : undefined;
+}
+
+function readShadowMod(
+  mods: Record<string, any>,
+  prefix: string,
+  keys: string[]
+): any {
+  for (const key of keys) {
+    const full = `${prefix}.${key}`;
+    if (mods[full] !== undefined) return mods[full];
+  }
+  return undefined;
+}
+
+function extractShadowFromMods(
+  mods: Record<string, any>,
+  prefix: string,
+  W: number,
+  H: number
+): ShadowInfo | undefined {
+  const rawColor = readShadowMod(mods, prefix, [
+    "shadow_color",
+    "shadowColor",
+    "shadow-colour",
+    "shadowColour",
+    "background_shadow_color",
+    "backgroundShadowColor",
+  ]);
+  const rawAlpha = readShadowMod(mods, prefix, [
+    "shadow_alpha",
+    "shadowAlpha",
+    "shadow_opacity",
+    "shadowOpacity",
+    "background_shadow_alpha",
+    "backgroundShadowAlpha",
+    "background_shadow_opacity",
+    "backgroundShadowOpacity",
+  ]);
+  const rawX = readShadowMod(mods, prefix, [
+    "shadow_x",
+    "shadowX",
+    "shadow_width",
+    "shadowWidth",
+    "background_shadow_x",
+    "backgroundShadowX",
+    "background_shadow_width",
+    "backgroundShadowWidth",
+  ]);
+  const rawY = readShadowMod(mods, prefix, [
+    "shadow_y",
+    "shadowY",
+    "shadow_height",
+    "shadowHeight",
+    "background_shadow_y",
+    "backgroundShadowY",
+    "background_shadow_height",
+    "backgroundShadowHeight",
+  ]);
+
+  if (rawColor == null && rawAlpha == null && rawX == null && rawY == null) {
+    return hasShadowHintInMods(mods, prefix) ? { declared: true } : undefined;
+  }
+
+  const info: ShadowInfo = { declared: true };
+  const parsedColor = parseShadowColor(rawColor);
+  if (parsedColor?.color) info.color = parsedColor.color;
+  if (parsedColor?.alpha !== undefined) info.alpha = parsedColor.alpha;
+
+  const parsedAlpha = parseAlpha(rawAlpha);
+  if (parsedAlpha !== undefined) info.alpha = parsedAlpha;
+
+  const sw = parseShadowLength(rawX, "x", W, H);
+  if (typeof sw === "number" && Number.isFinite(sw)) info.w = sw;
+  const sh = parseShadowLength(rawY, "y", W, H);
+  if (typeof sh === "number" && Number.isFinite(sh)) info.h = sh;
+
+  return info;
+}
+
+function mergeShadows(...parts: (ShadowInfo | undefined)[]): ShadowInfo {
+  const merged: ShadowInfo = {};
+  for (const part of parts) {
+    if (!part) continue;
+    if (part.declared) merged.declared = true;
+    if (part.color !== undefined) merged.color = part.color;
+    if (part.alpha !== undefined) merged.alpha = part.alpha;
+    if (part.w !== undefined) merged.w = part.w;
+    if (part.h !== undefined) merged.h = part.h;
+  }
+  return merged;
+}
+
+function hasShadowHintInMods(mods: Record<string, any>, prefix: string): boolean {
+  if (!mods) return false;
+  const prefixLower = prefix.toLowerCase();
+  const prefixDot = `${prefixLower}.`;
+  for (const key of Object.keys(mods)) {
+    if (typeof key !== "string") continue;
+    const lowerKey = key.toLowerCase();
+    if (!lowerKey.startsWith(prefixDot)) continue;
+    if (!lowerKey.includes("shadow")) continue;
+    const value = mods[key];
+    if (
+      value === false ||
+      value === 0 ||
+      (typeof value === "string" && value.trim().toLowerCase() === "false")
+    ) {
+      continue;
+    }
+    return true;
+  }
+  return false;
+}
+
+function uniqueNames(names: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of names) {
+    const name = typeof raw === "string" ? raw.trim() : "";
+    if (!name) continue;
+    if (!seen.has(name)) {
+      seen.add(name);
+      out.push(name);
+    }
+  }
+  return out;
+}
+
+function slideBackgroundNameCandidates(index: number): string[] {
+  const idx = String(index);
+  return uniqueNames([
+    `Immagine-${idx}`,
+    `Immagine_${idx}`,
+    `Immagine ${idx}`,
+    `Image-${idx}`,
+    `Image_${idx}`,
+    `Image ${idx}`,
+    `Background-${idx}`,
+    `Background_${idx}`,
+    `Background ${idx}`,
+    `Media-${idx}`,
+    `Media_${idx}`,
+    `Media ${idx}`,
+    `Video-${idx}`,
+    `Video_${idx}`,
+    `Video ${idx}`,
+    `Foto-${idx}`,
+    `Foto_${idx}`,
+    `Foto ${idx}`,
+    "Immagine",
+    "Image",
+    "Background",
+    "Media",
+    "Video",
+    "Foto",
+  ]);
+}
+
+function outroBackgroundNameCandidates(): string[] {
+  return uniqueNames([
+    "Immagine-outro",
+    "Immagine_outro",
+    "Immagine outro",
+    "Image-outro",
+    "Image_outro",
+    "Image outro",
+    "Background-outro",
+    "Background_outro",
+    "Background outro",
+    "Media-outro",
+    "Media_outro",
+    "Media outro",
+    "Video-outro",
+    "Video_outro",
+    "Video outro",
+    "Foto-outro",
+    "Foto_outro",
+    "Foto outro",
+    "Immagine",
+    "Image",
+    "Background",
+    "Media",
+    "Video",
+    "Foto",
+  ]);
+}
+
+function findShadowBearingDescendant(
+  parent: TemplateElement | undefined
+): TemplateElement | undefined {
+  if (!parent || !Array.isArray(parent.elements)) return undefined;
+  for (const child of parent.elements) {
+    if (!child) continue;
+    const hasShadowProps =
+      (child as any)?.shadow_color != null ||
+      (child as any)?.shadow_x != null ||
+      (child as any)?.shadow_y != null;
+    const gradientCandidate = isGradientShadowElement(child);
+    if ((hasShadowProps || gradientCandidate) && isShadowCandidate(child)) {
+      return child;
+    }
+    const nested = findShadowBearingDescendant(child);
+    if (nested) return nested;
+  }
+  return undefined;
+}
+
+function findShadowSource(
+  comp: TemplateElement | undefined,
+  candidates: string[]
+): TemplateElement | undefined {
+  if (!comp) return undefined;
+  for (const name of candidates) {
+    const found = findChildByName(comp, name);
+    if (found) return found;
+  }
+  return findShadowBearingDescendant(comp);
+}
+
 function parseRGBA(c: any): { color: string; alpha: number } | undefined {
   if (typeof c !== "string") return undefined;
-  const m = c.trim().match(/^rgba?\((\d+),(\d+),(\d+)(?:,(\d*(?:\.\d+)?))?\)$/i);
+  const m = c
+    .trim()
+    .match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*(\d*(?:\.\d+)?))?\s*\)$/i);
   if (!m) return undefined;
   const r = Math.max(0, Math.min(255, parseInt(m[1], 10)));
   const g = Math.max(0, Math.min(255, parseInt(m[2], 10)));
@@ -434,9 +889,16 @@ export function buildTimelineFromLayout(
     const fontFamily = getFontFamilyFromTemplate(template, i);
     const fontPath = fontFamily ? findFontPath(fontFamily) : undefined;
 
-    const compShadow = parseRGBA((comp as any)?.shadow_color);
-    const compShadowW = lenToPx((comp as any)?.shadow_x, videoW, videoH);
-    const compShadowH = lenToPx((comp as any)?.shadow_y, videoW, videoH);
+    const bgShadowCandidates = slideBackgroundNameCandidates(i);
+    const slideShadowSources: Array<() => ShadowInfo | undefined> = [
+      () => extractShadow(comp, videoW, videoH),
+      () => extractShadow(findShadowSource(comp, bgShadowCandidates), videoW, videoH),
+      () => extractShadowFromMods(mods, `Slide_${i}`, videoW, videoH),
+      ...bgShadowCandidates.map(
+        (name) => () => extractShadowFromMods(mods, name, videoW, videoH)
+      ),
+    ];
+    const slideHasShadow = slideShadowSources.some((get) => !!get());
 
     const texts: TextBlockSpec[] = textFiles.map((tf, idx) => ({
       ...baseBlock,
@@ -465,10 +927,7 @@ export function buildTimelineFromLayout(
 
       texts: texts.length ? texts : undefined,
 
-      shadowColor: compShadow?.color,
-      shadowAlpha: compShadow?.alpha,
-      shadowW: typeof compShadowW === "number" ? compShadowW : undefined,
-      shadowH: typeof compShadowH === "number" ? compShadowH : undefined,
+      shadowEnabled: slideHasShadow ? true : undefined,
     };
 
     console.log(
@@ -524,9 +983,16 @@ export function buildTimelineFromLayout(
     const textBox = getTextBoxFromTemplate(template, "Outro", "Testo-outro");
     const fontFam = getFontFamilyFromTemplate(template, "Outro", "Testo-outro");
     const fontPath = fontFam ? findFontPath(fontFam) : undefined;
-    const outShadow = parseRGBA((outroComp as any)?.shadow_color);
-    const outShadowW = lenToPx((outroComp as any)?.shadow_x, videoW, videoH);
-    const outShadowH = lenToPx((outroComp as any)?.shadow_y, videoW, videoH);
+    const outroBgNames = outroBackgroundNameCandidates();
+    const outroShadowSources: Array<() => ShadowInfo | undefined> = [
+      () => extractShadow(outroComp, videoW, videoH),
+      () => extractShadow(findShadowSource(outroComp, outroBgNames), videoW, videoH),
+      () => extractShadowFromMods(mods, "Outro", videoW, videoH),
+      ...outroBgNames.map(
+        (name) => () => extractShadowFromMods(mods, name, videoW, videoH)
+      ),
+    ];
+    const outroHasShadow = outroShadowSources.some((get) => !!get());
     const txt = textEl?.text as string | undefined;
     let texts: TextBlockSpec[] | undefined;
     if (txt && textBox) {
@@ -598,10 +1064,7 @@ export function buildTimelineFromLayout(
       logoY: logoBox.y ?? Math.round((videoH - (logoBox.h ?? 140)) / 2),
       fontFile: fontPath,
       texts,
-      shadowColor: outShadow?.color,
-      shadowAlpha: outShadow?.alpha,
-      shadowW: typeof outShadowW === "number" ? outShadowW : undefined,
-      shadowH: typeof outShadowH === "number" ? outShadowH : undefined,
+      shadowEnabled: outroHasShadow ? true : undefined,
     });
   }
 
