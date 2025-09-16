@@ -639,6 +639,186 @@ test("buildTimelineFromLayout keeps outro background static", () => {
   }
 });
 
+test("buildTimelineFromLayout reads background animation tags from modifications", () => {
+  const tpl: TemplateDoc = {
+    width: 1920,
+    height: 1080,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 5,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "10%",
+            y: "10%",
+            width: "80%",
+            height: "30%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+          },
+          { type: "image", name: "Logo", x: "90%", y: "10%", width: "10%", height: "10%" },
+        ],
+      },
+      {
+        type: "composition",
+        name: "Slide_1",
+        duration: 5,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-1",
+            x: "10%",
+            y: "10%",
+            width: "80%",
+            height: "30%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+          },
+          { type: "image", name: "Logo", x: "90%", y: "10%", width: "10%", height: "10%" },
+        ],
+      },
+    ],
+  } as any;
+  const prevImages = paths.images;
+  const prevTts = paths.tts;
+  const tmpDir = mkdtempSync(join(process.cwd(), "timeline-bg-tags-"));
+  try {
+    writeFileSync(join(tmpDir, "img0.jpg"), "");
+    writeFileSync(join(tmpDir, "img1.jpg"), "");
+    paths.images = tmpDir;
+    paths.tts = tmpDir;
+
+    const slides = buildTimelineFromLayout(
+      {
+        "Testo-0": "ciao",
+        "Testo-1": "ciao",
+        "Slide_0.tags": "bg-animate",
+        "Slide_1": {
+          metadata: {
+            extra: { tags: ["background-kenburns"] },
+          },
+        },
+      },
+      tpl,
+      {
+        videoW: 1920,
+        videoH: 1080,
+        fps: 30,
+        defaultDur: 5,
+      }
+    );
+
+    assert.equal(slides.length, 2);
+    assert.equal(slides[0].backgroundAnimated, true);
+    assert.equal(slides[1].backgroundAnimated, true);
+  } finally {
+    paths.images = prevImages;
+    paths.tts = prevTts;
+    rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test("buildTimelineFromLayout honours animation disable hints", () => {
+  const tpl: TemplateDoc = {
+    width: 1920,
+    height: 1080,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 5,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "10%",
+            y: "10%",
+            width: "80%",
+            height: "30%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+          },
+        ],
+      },
+      {
+        type: "composition",
+        name: "Slide_1",
+        duration: 5,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-1",
+            x: "10%",
+            y: "10%",
+            width: "80%",
+            height: "30%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+          },
+        ],
+      },
+      {
+        type: "composition",
+        name: "Slide_2",
+        duration: 5,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-2",
+            x: "10%",
+            y: "10%",
+            width: "80%",
+            height: "30%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const prevImages = paths.images;
+  const prevTts = paths.tts;
+  const tmpDir = mkdtempSync(join(process.cwd(), "timeline-bg-disable-"));
+  try {
+    writeFileSync(join(tmpDir, "img0.jpg"), "");
+    writeFileSync(join(tmpDir, "img1.jpg"), "");
+    writeFileSync(join(tmpDir, "img2.jpg"), "");
+    paths.images = tmpDir;
+    paths.tts = tmpDir;
+
+    const slides = buildTimelineFromLayout(
+      {
+        "Testo-0": "uno",
+        "Testo-1": "due",
+        "Testo-2": "tre",
+        "Slide_0.tags": "sfondo-animato",
+        "Slide_1.backgroundAnimated": "false",
+        "Slide_2.tags": "bg-no-zoom",
+      },
+      tpl,
+      {
+        videoW: 1920,
+        videoH: 1080,
+        fps: 30,
+        defaultDur: 5,
+      }
+    );
+
+    assert.equal(slides.length, 3);
+    assert.equal(slides[0].backgroundAnimated, true);
+    assert.equal(slides[1].backgroundAnimated, false);
+    assert.equal(slides[2].backgroundAnimated, false);
+  } finally {
+    paths.images = prevImages;
+    paths.tts = prevTts;
+    rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
 test("buildTimelineFromLayout ignores fade-out animations", () => {
   const tpl: TemplateDoc = {
     width: 100,
