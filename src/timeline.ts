@@ -770,6 +770,30 @@ const DEFAULT_CHARS_PER_LINE = 40;
 const APPROX_CHAR_WIDTH_RATIO = 0.52;
 const MIN_FONT_SIZE = 24;
 
+function clamp01(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  if (value <= 0) return 0;
+  if (value >= 1) return 1;
+  return value;
+}
+
+function parseAlignmentFactor(raw: any): number | undefined {
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    const normalized = raw > 1 ? raw / 100 : raw;
+    return clamp01(normalized);
+  }
+  if (typeof raw !== "string") return undefined;
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  if (trimmed.endsWith("%")) {
+    const n = parseFloat(trimmed.slice(0, -1));
+    return Number.isFinite(n) ? clamp01(n / 100) : undefined;
+  }
+  const n = parseFloat(trimmed);
+  if (!Number.isFinite(n)) return undefined;
+  return clamp01(n > 1 ? n / 100 : n);
+}
+
 function maxCharsForWidth(width: number, fontSize: number): number {
   if (!(width > 0) || !(fontSize > 0)) return DEFAULT_CHARS_PER_LINE;
   const approxChar = fontSize * APPROX_CHAR_WIDTH_RATIO;
@@ -946,6 +970,21 @@ export function buildTimelineFromLayout(
         if (nextLines.length) {
           lines = nextLines;
           applyMetrics(lines.length || 1);
+        }
+      }
+    }
+
+    const alignY = parseAlignmentFactor((txtEl as any)?.y_alignment) ?? 0;
+    baseBlock.y = txtBox.y;
+    if (lines.length && txtBox.h > 0) {
+      const font = baseBlock.fontSize ?? initialFontSize;
+      const spacing = baseBlock.lineSpacing ?? 0;
+      const usedHeight = font * lines.length + spacing * Math.max(0, lines.length - 1);
+      if (usedHeight > 0) {
+        const free = txtBox.h - usedHeight;
+        if (free > 0 && alignY > 0) {
+          const offset = Math.round(Math.min(free, Math.max(0, free * alignY)));
+          baseBlock.y = txtBox.y + offset;
         }
       }
     }
@@ -1161,6 +1200,21 @@ export function buildTimelineFromLayout(
           if (nextLines.length) {
             linesOut = nextLines;
             applyOutMetrics(linesOut.length || 1);
+          }
+        }
+      }
+
+      const alignY = parseAlignmentFactor(textEl?.y_alignment) ?? 0;
+      baseOut.y = textBox.y;
+      if (linesOut.length && textBox.h > 0) {
+        const font = baseOut.fontSize ?? initialOutSize;
+        const spacing = baseOut.lineSpacing ?? 0;
+        const usedHeight = font * linesOut.length + spacing * Math.max(0, linesOut.length - 1);
+        if (usedHeight > 0) {
+          const free = textBox.h - usedHeight;
+          if (free > 0 && alignY > 0) {
+            const offset = Math.round(Math.min(free, Math.max(0, free * alignY)));
+            baseOut.y = textBox.y + offset;
           }
         }
       }
