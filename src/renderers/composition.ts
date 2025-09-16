@@ -92,12 +92,14 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
           : H;
       const sw = Math.max(swRaw, W);
       const sh = Math.max(shRaw, H);
-      const alphaBase = Number((255 * sa).toFixed(6));
-      const xTerm = `max(${sw}-(${W - 1}-X),0)/${sw}`;
+      const boostedAlpha = Math.min(sa * 1.35, 1);
+      const alphaBase = Number((255 * boostedAlpha).toFixed(6));
+      const xTerm = `max(${sw}-X,0)/${sw}`;
       const yTerm = `max(${sh}-(${H - 1}-Y),0)/${sh}`;
+      const falloff = `pow(${xTerm},2.2)*pow(${yTerm},1.2)`;
       f.push(
         `color=c=${sc}@1:s=${W}x${H}:d=${dur},format=rgba,` +
-          `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${alphaBase}*pow(${xTerm}*${yTerm},0.25)'[shdw]`
+          `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${alphaBase}*${falloff}'[shdw]`
       );
       f.push(
         `[${lastV}][shdw]overlay=x=0:y=0:enable='between(t,0,${dur})'[v_sh]`
