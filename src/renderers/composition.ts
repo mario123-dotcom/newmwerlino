@@ -81,7 +81,8 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
       typeof slide.shadowAlpha === "number" && Number.isFinite(slide.shadowAlpha)
         ? slide.shadowAlpha
         : undefined;
-    const sa = Math.min(Math.max(alphaRaw ?? 1, 0), 1);
+    const fallbackAlpha = 0.6;
+    const sa = Math.min(Math.max(alphaRaw ?? fallbackAlpha, 0), 1);
     if (sa > 0) {
       const swRaw =
         typeof slide.shadowW === "number" && Number.isFinite(slide.shadowW)
@@ -93,8 +94,7 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
           : H;
       const sw = Math.max(swRaw, W * 3);
       const sh = Math.max(shRaw, H * 3);
-      const boostedAlpha = Math.min(sa * 1.35, 1);
-      const alphaBase = Number((255 * boostedAlpha).toFixed(6));
+      const alphaBase = Number((255 * sa).toFixed(6));
       const xTerm = `max(${sw}-X,0)/${sw}`;
       const yTerm = `max(${sh}-(${H - 1}-Y),0)/${sh}`;
       const falloff = `pow(${xTerm},0.25)*pow(${yTerm},0.25)`;
