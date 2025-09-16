@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, writeFileSync, readdirSync, rmSync } from "fs";
 import { join } from "path";
 import { request as httpRequest } from "http";
 import { request as httpsRequest } from "https";
+import { brotliDecompressSync, gunzipSync, inflateSync } from "zlib";
 import { paths } from "./paths";
 import { loadModifications, loadTemplate, TemplateElement } from "./template";
 import { fontFamilyToFileBase } from "./fonts";
@@ -16,33 +17,79 @@ function clearDir(dir: string) {
   }
 }
 
-function httpGet(url: string): Promise<Buffer> {
-  const lib = url.startsWith("https") ? httpsRequest : httpRequest;
+const DEFAULT_HEADERS = {
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+};
+
+type HttpGetOptions = {
+  headers?: Record<string, string>;
+};
+
+type HttpHeaders = Record<string, string | string[] | undefined>;
+
+type HttpResponse = {
+  buffer: Buffer;
+  headers: HttpHeaders;
+};
+
+function httpGet(url: string, options: HttpGetOptions = {}): Promise<HttpResponse> {
+  const target = new URL(url);
+  const lib = target.protocol === "https:" ? httpsRequest : httpRequest;
+  const headers = { ...DEFAULT_HEADERS, ...options.headers };
   return new Promise((resolve, reject) => {
-    const req = lib(url, (res) => {
-      const status = res.statusCode ?? 0;
-      const loc = res.headers.location;
-      if (status >= 300 && status < 400 && loc) {
-        httpGet(loc).then(resolve, reject);
-        return;
+    const req = lib(
+      {
+        protocol: target.protocol,
+        hostname: target.hostname,
+        port: target.port,
+        path: `${target.pathname}${target.search}`,
+        headers,
+      },
+      (res) => {
+        const status = res.statusCode ?? 0;
+        const loc = res.headers.location;
+        if (status >= 300 && status < 400 && loc) {
+          const next = new URL(loc, target).toString();
+          httpGet(next, options).then(resolve, reject);
+          return;
+        }
+        if (status !== 200) {
+          reject(new Error(`HTTP ${status}`));
+          return;
+        }
+        const chunks: Buffer[] = [];
+        res.on("data", (c) => chunks.push(c));
+        res.on("end", () => resolve({ buffer: Buffer.concat(chunks), headers: res.headers }));
       }
-      if (status !== 200) {
-        reject(new Error(`HTTP ${status}`));
-        return;
-      }
-      const chunks: Buffer[] = [];
-      res.on("data", (c) => chunks.push(c));
-      res.on("end", () => resolve(Buffer.concat(chunks)));
-    });
+    );
     req.on("error", reject);
     req.end();
   });
 }
 
-async function downloadFile(url: string, outPath: string) {
-  const buf = await httpGet(url);
+function decodeTextResponse(res: HttpResponse): string {
+  const enc = String(res.headers["content-encoding"] || "").toLowerCase();
+  try {
+    if (enc.includes("br")) {
+      return brotliDecompressSync(res.buffer).toString("utf8");
+    }
+    if (enc.includes("gzip")) {
+      return gunzipSync(res.buffer).toString("utf8");
+    }
+    if (enc.includes("deflate")) {
+      return inflateSync(res.buffer).toString("utf8");
+    }
+  } catch (err) {
+    console.warn("Impossibile decodificare la risposta compressa:", err);
+  }
+  return res.buffer.toString("utf8");
+}
+
+async function downloadFile(url: string, outPath: string, options?: HttpGetOptions) {
+  const { buffer } = await httpGet(url, options);
   ensureDir(join(outPath, ".."));
-  writeFileSync(outPath, buf);
+  writeFileSync(outPath, buffer);
   console.log(`Scaricato: ${outPath}`);
 }
 
@@ -108,10 +155,17 @@ export async function fetchAssets() {
   async function downloadFont(family: string) {
     const famParam = family.trim().replace(/\s+/g, "+");
     try {
-      const cssBuf = await httpGet(
-        `https://fonts.googleapis.com/css2?family=${encodeURIComponent(famParam)}`
+      const cssRes = await httpGet(
+        `https://fonts.googleapis.com/css2?family=${encodeURIComponent(famParam)}`,
+        {
+          headers: {
+            Accept: "text/css,*/*;q=0.1",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "identity",
+          },
+        }
       );
-      const css = cssBuf.toString("utf8");
+      const css = decodeTextResponse(cssRes);
       const match = css.match(/url\((https:[^\)]+)\)/);
       if (!match) return;
       const fontUrl = match[1];
