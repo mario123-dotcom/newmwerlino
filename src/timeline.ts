@@ -4,7 +4,11 @@ import { paths } from "./paths";
 import { findComposition, findChildByName, pctToPx } from "./template";
 import type { TemplateDoc, TemplateElement } from "./template";
 import { probeDurationSec } from "./ffmpeg/probe";
-import { fileNameMatchesFamily } from "./fonts";
+import {
+  extractFontWeightFromFileName,
+  fileNameMatchesFamily,
+  parseFontWeight,
+} from "./fonts";
 
 /* ---------- Tipi usati da composition.ts ---------- */
 export type AnimationSpec =
@@ -616,13 +620,18 @@ function findTTSForSlide(i: number): string | undefined {
   return cand.find(existsSync);
 }
 
-function findFontPath(family: string): string | undefined {
+function findFontPath(family: string, weight?: number): string | undefined {
   try {
-    for (const f of readdirSync(paths.fonts)) {
-      if (fileNameMatchesFamily(f, family)) {
-        return join(paths.fonts, f);
-      }
+    const candidates = readdirSync(paths.fonts)
+      .filter((f) => fileNameMatchesFamily(f, family))
+      .map((file) => ({ file, weight: extractFontWeightFromFileName(file) ?? 0 }));
+    if (!candidates.length) return undefined;
+    if (typeof weight === "number") {
+      const exact = candidates.find((c) => c.weight === weight);
+      if (exact) return join(paths.fonts, exact.file);
     }
+    const sorted = [...candidates].sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0));
+    return join(paths.fonts, sorted[0].file);
   } catch {}
   return undefined;
 }
@@ -740,7 +749,51 @@ export function getFontFamilyFromTemplate(
   return typeof fam === "string" ? fam : undefined;
 }
 
+export function getFontWeightFromTemplate(
+  tpl: TemplateDoc,
+  slideIndexOrName: number | string,
+  textName?: string
+): number | undefined {
+  const compName =
+    typeof slideIndexOrName === "number"
+      ? `Slide_${slideIndexOrName}`
+      : slideIndexOrName;
+  const txtName =
+    textName ??
+    (typeof slideIndexOrName === "number" ? `Testo-${slideIndexOrName}` : undefined);
+  const comp = findComposition(tpl, compName);
+  const txtEl = txtName ? (findChildByName(comp, txtName) as any) : undefined;
+  return parseFontWeight(txtEl?.font_weight);
+}
+
 const DEFAULT_CHARS_PER_LINE = 40;
+const APPROX_CHAR_WIDTH_RATIO = 0.52;
+const MIN_FONT_SIZE = 24;
+
+function maxCharsForWidth(width: number, fontSize: number): number {
+  if (!(width > 0) || !(fontSize > 0)) return DEFAULT_CHARS_PER_LINE;
+  const approxChar = fontSize * APPROX_CHAR_WIDTH_RATIO;
+  if (!(approxChar > 0)) return DEFAULT_CHARS_PER_LINE;
+  const maxChars = Math.floor(width / approxChar);
+  return Math.max(1, maxChars || 0);
+}
+
+function parseLineHeightFactor(raw: any): number | undefined {
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    if (raw <= 0) return undefined;
+    return raw > 10 ? raw / 100 : raw;
+  }
+  if (typeof raw !== "string") return undefined;
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  if (trimmed.endsWith("%")) {
+    const n = parseFloat(trimmed.slice(0, -1));
+    return Number.isFinite(n) ? n / 100 : undefined;
+  }
+  const n = parseFloat(trimmed);
+  if (!Number.isFinite(n)) return undefined;
+  return n > 10 ? n / 100 : n;
+}
 
 export function wrapText(text: string, maxPerLine: number): string[] {
   const words = text.split(/\s+/).filter(Boolean);
@@ -848,15 +901,6 @@ export function buildTimelineFromLayout(
     const txtStr = typeof mods[`Testo-${i}`] === "string" ? mods[`Testo-${i}`].trim() : "";
 
     const txtBox = getTextBoxFromTemplate(template, i) || { x: 120, y: 160, w: 0, h: 0 };
-    const lines = txtStr
-      ? wrapText(
-          txtStr,
-          txtBox.w > 0 ? Math.max(1, Math.floor(txtBox.w / (60 * 0.6))) : DEFAULT_CHARS_PER_LINE
-        )
-      : [];
-    const textFiles = lines.length ? writeTextFilesForSlide(i, lines) : [];
-
-    // Animazioni per ciascuna linea
     const baseBlock = defaultTextBlock(txtBox.x, txtBox.y);
     if (txtEl) {
       const bg = parseRGBA((txtEl as any).background_color);
@@ -866,6 +910,49 @@ export function buildTimelineFromLayout(
         baseBlock.boxAlpha = bg.alpha;
       }
     }
+
+    const initialFontSize = baseBlock.fontSize ?? 60;
+    const initialMaxChars =
+      txtBox.w > 0 ? maxCharsForWidth(txtBox.w, initialFontSize) : DEFAULT_CHARS_PER_LINE;
+    let lines = txtStr ? wrapText(txtStr, initialMaxChars) : [];
+    const lineHeightFactor =
+      parseLineHeightFactor((txtEl as any)?.line_height) ?? 1.35;
+
+    if (txtBox.h > 0 && lines.length) {
+      const applyMetrics = (lineCount: number) => {
+        const safeCount = Math.max(1, lineCount);
+        const lineHeightPx = txtBox.h / safeCount;
+        let derivedFont = Math.round(lineHeightPx / lineHeightFactor);
+        if (!Number.isFinite(derivedFont) || derivedFont <= 0) {
+          derivedFont = baseBlock.fontSize ?? initialFontSize;
+        }
+        derivedFont = Math.max(MIN_FONT_SIZE, derivedFont);
+        let spacing = Math.round(lineHeightPx - derivedFont);
+        if (!Number.isFinite(spacing) || spacing < 0) spacing = 0;
+        baseBlock.fontSize = derivedFont;
+        baseBlock.lineSpacing = spacing;
+        return derivedFont;
+      };
+
+      let derivedFontSize = applyMetrics(lines.length);
+      let maxChars = txtBox.w > 0 ? maxCharsForWidth(txtBox.w, derivedFontSize) : DEFAULT_CHARS_PER_LINE;
+      if (maxChars !== initialMaxChars) {
+        lines = txtStr ? wrapText(txtStr, maxChars) : lines;
+      }
+      derivedFontSize = applyMetrics(lines.length || 1);
+      const secondMax = txtBox.w > 0 ? maxCharsForWidth(txtBox.w, derivedFontSize) : DEFAULT_CHARS_PER_LINE;
+      if (secondMax !== maxChars) {
+        const nextLines = txtStr ? wrapText(txtStr, secondMax) : lines;
+        if (nextLines.length) {
+          lines = nextLines;
+          applyMetrics(lines.length || 1);
+        }
+      }
+    }
+
+    const textFiles = lines.length ? writeTextFilesForSlide(i, lines) : [];
+
+    // Animazioni per ciascuna linea
     const lineHeight = (baseBlock.fontSize ?? 60) + (baseBlock.lineSpacing ?? 8);
     const perLineAnims: AnimationSpec[][] = textFiles.map(() => []);
     const anims = (txtEl as any)?.animations;
@@ -905,7 +992,8 @@ export function buildTimelineFromLayout(
 
     const logoBox = getLogoBoxFromTemplate(template, i);
     const fontFamily = getFontFamilyFromTemplate(template, i);
-    const fontPath = fontFamily ? findFontPath(fontFamily) : undefined;
+    const fontWeight = getFontWeightFromTemplate(template, i);
+    const fontPath = fontFamily ? findFontPath(fontFamily, fontWeight) : undefined;
 
     const bgShadowCandidates = slideBackgroundNameCandidates(i);
     const slideShadowSources: Array<() => ShadowInfo | undefined> = [
@@ -1014,7 +1102,8 @@ export function buildTimelineFromLayout(
     const textEl = findChildByName(outroComp, "Testo-outro") as any;
     const textBox = getTextBoxFromTemplate(template, "Outro", "Testo-outro");
     const fontFam = getFontFamilyFromTemplate(template, "Outro", "Testo-outro");
-    const fontPath = fontFam ? findFontPath(fontFam) : undefined;
+    const fontWeight = getFontWeightFromTemplate(template, "Outro", "Testo-outro");
+    const fontPath = fontFam ? findFontPath(fontFam, fontWeight) : undefined;
     const outroBgNames = outroBackgroundNameCandidates();
     const outroShadowSources: Array<() => ShadowInfo | undefined> = [
       () => extractShadow(outroComp, videoW, videoH),
@@ -1028,11 +1117,6 @@ export function buildTimelineFromLayout(
     const txt = textEl?.text as string | undefined;
     let texts: TextBlockSpec[] | undefined;
     if (txt && textBox) {
-      const linesOut = wrapText(
-        txt,
-        textBox.w > 0 ? Math.max(1, Math.floor(textBox.w / (60 * 0.6))) : DEFAULT_CHARS_PER_LINE
-      );
-      const txtFiles = writeTextFilesForSlide(slides.length, linesOut);
       const baseOut = defaultTextBlock(textBox.x, textBox.y);
       const bg = parseRGBA(textEl?.background_color);
       if (bg) {
@@ -1040,6 +1124,48 @@ export function buildTimelineFromLayout(
         baseOut.boxColor = bg.color;
         baseOut.boxAlpha = bg.alpha;
       }
+      const initialOutSize = baseOut.fontSize ?? 60;
+      const initialOutMax =
+        textBox.w > 0 ? maxCharsForWidth(textBox.w, initialOutSize) : DEFAULT_CHARS_PER_LINE;
+      let linesOut = wrapText(txt, initialOutMax);
+      const lineHeightFactorOut =
+        parseLineHeightFactor(textEl?.line_height) ?? 1.35;
+
+      if (textBox.h > 0 && linesOut.length) {
+        const applyOutMetrics = (lineCount: number) => {
+          const safeCount = Math.max(1, lineCount);
+          const lineHeightPx = textBox.h / safeCount;
+          let derivedFont = Math.round(lineHeightPx / lineHeightFactorOut);
+          if (!Number.isFinite(derivedFont) || derivedFont <= 0) {
+            derivedFont = baseOut.fontSize ?? initialOutSize;
+          }
+          derivedFont = Math.max(MIN_FONT_SIZE, derivedFont);
+          let spacing = Math.round(lineHeightPx - derivedFont);
+          if (!Number.isFinite(spacing) || spacing < 0) spacing = 0;
+          baseOut.fontSize = derivedFont;
+          baseOut.lineSpacing = spacing;
+          return derivedFont;
+        };
+
+        let derivedFontSize = applyOutMetrics(linesOut.length);
+        let maxChars =
+          textBox.w > 0 ? maxCharsForWidth(textBox.w, derivedFontSize) : DEFAULT_CHARS_PER_LINE;
+        if (maxChars !== initialOutMax) {
+          linesOut = wrapText(txt, maxChars);
+        }
+        derivedFontSize = applyOutMetrics(linesOut.length || 1);
+        const secondMax =
+          textBox.w > 0 ? maxCharsForWidth(textBox.w, derivedFontSize) : DEFAULT_CHARS_PER_LINE;
+        if (secondMax !== maxChars) {
+          const nextLines = wrapText(txt, secondMax);
+          if (nextLines.length) {
+            linesOut = nextLines;
+            applyOutMetrics(linesOut.length || 1);
+          }
+        }
+      }
+
+      const txtFiles = writeTextFilesForSlide(slides.length, linesOut);
       const lineH = (baseOut.fontSize ?? 60) + (baseOut.lineSpacing ?? 8);
       const perLine: AnimationSpec[][] = txtFiles.map(() => []);
       const anims = textEl?.animations;
