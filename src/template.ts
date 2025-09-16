@@ -1,6 +1,19 @@
 import { readFileSync, existsSync } from "fs";
 import { paths } from "./paths";
 
+function findInElements(
+  elements: TemplateElement[] | undefined,
+  predicate: (el: TemplateElement) => boolean
+): TemplateElement | undefined {
+  if (!Array.isArray(elements)) return undefined;
+  for (const el of elements) {
+    if (predicate(el)) return el;
+    const nested = findInElements(el.elements, predicate);
+    if (nested) return nested;
+  }
+  return undefined;
+}
+
 /** Elemento generico del template Creatomate */
 export type TemplateElement = {
   name?: string;
@@ -88,15 +101,16 @@ export function loadModifications(): Record<string, any> {
 
 /** Trova una composition per nome (Slide_0, Slide_1, Intro, Outro, ...) */
 export function findComposition(tpl: TemplateDoc, name: string): TemplateElement | undefined {
-  return tpl.elements.find(
-    (e) => e.type === "composition" && e.name === name
-  );
+  return findInElements(tpl.elements, (e) => e.type === "composition" && e.name === name);
 }
 
 /** Trova un figlio per nome dentro una composition */
-export function findChildByName(parent: TemplateElement | undefined, name: string): TemplateElement | undefined {
-  if (!parent || !Array.isArray(parent.elements)) return undefined;
-  return parent.elements.find((e) => e.name === name);
+export function findChildByName(
+  parent: TemplateElement | undefined,
+  name: string
+): TemplateElement | undefined {
+  if (!parent) return undefined;
+  return findInElements(parent.elements, (e) => e.name === name);
 }
 
 /** Converte percentuali o stringhe in pixel, altrimenti restituisce numeri come sono. */

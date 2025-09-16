@@ -277,6 +277,72 @@ test("buildTimelineFromLayout parses slide shadow", () => {
   assert.equal(s0.shadowH, 20);
 });
 
+test("buildTimelineFromLayout reads nested background shadow metadata", () => {
+  const tpl: TemplateDoc = {
+    width: 200,
+    height: 100,
+    elements: [
+      {
+        type: "composition",
+        name: "Wrapper",
+        elements: [
+          {
+            type: "composition",
+            name: "Slide_0",
+            duration: 1,
+            elements: [
+              {
+                type: "composition",
+                name: "BackgroundGroup",
+                elements: [
+                  {
+                    type: "image",
+                    name: "Immagine-0",
+                    shadow_color: "rgba(10,20,30,0.75)",
+                    shadow_x: "50px",
+                    shadow_y: "25px",
+                  },
+                ],
+              },
+              {
+                type: "composition",
+                name: "TextGroup",
+                elements: [
+                  {
+                    type: "text",
+                    name: "Testo-0",
+                    x: "0%",
+                    y: "0%",
+                    width: "10%",
+                    height: "10%",
+                    x_anchor: "0%",
+                    y_anchor: "0%",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  } as any;
+  const mods = { "Testo-0": "ombra" };
+  paths.images = "/tmp/no_img";
+  paths.tts = "/tmp/no_tts";
+  const slides = buildTimelineFromLayout(mods, tpl, {
+    videoW: 200,
+    videoH: 100,
+    fps: 30,
+    defaultDur: 1,
+  });
+  assert.equal(slides.length, 1);
+  const s0 = slides[0];
+  assert.equal(s0.shadowColor, "#0a141e");
+  assert.equal(s0.shadowAlpha, 0.75);
+  assert.equal(s0.shadowW, 50);
+  assert.equal(s0.shadowH, 25);
+});
+
 test("buildTimelineFromLayout ignores fade-out animations", () => {
   const tpl: TemplateDoc = {
     width: 100,

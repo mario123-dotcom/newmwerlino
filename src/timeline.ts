@@ -1,12 +1,8 @@
 import { join } from "path";
 import { existsSync, mkdirSync, writeFileSync, readdirSync } from "fs";
 import { paths } from "./paths";
-import {
-  TemplateDoc,
-  findComposition,
-  findChildByName,
-  pctToPx,
-} from "./template";
+import { findComposition, findChildByName, pctToPx } from "./template";
+import type { TemplateDoc, TemplateElement } from "./template";
 import { probeDurationSec } from "./ffmpeg/probe";
 
 /* ---------- Tipi usati da composition.ts ---------- */
@@ -106,6 +102,156 @@ function lenToPx(v: any, W: number, H: number): number | undefined {
   }
   const n = parseFloat(s);
   return Number.isFinite(n) ? n : undefined;
+}
+
+type ShadowInfo = {
+  color?: string;
+  alpha?: number;
+  w?: number;
+  h?: number;
+};
+
+function extractShadow(
+  source: TemplateElement | undefined,
+  W: number,
+  H: number
+): ShadowInfo | undefined {
+  if (!source) return undefined;
+  const info: ShadowInfo = {};
+  const rgba = parseRGBA((source as any)?.shadow_color);
+  if (rgba) {
+    info.color = rgba.color;
+    info.alpha = rgba.alpha;
+  }
+  const sw = lenToPx((source as any)?.shadow_x, W, H);
+  if (typeof sw === "number" && Number.isFinite(sw)) info.w = sw;
+  const sh = lenToPx((source as any)?.shadow_y, W, H);
+  if (typeof sh === "number" && Number.isFinite(sh)) info.h = sh;
+  return Object.keys(info).length ? info : undefined;
+}
+
+function mergeShadows(...parts: (ShadowInfo | undefined)[]): ShadowInfo {
+  const merged: ShadowInfo = {};
+  for (const part of parts) {
+    if (!part) continue;
+    if (part.color !== undefined) merged.color = part.color;
+    if (part.alpha !== undefined) merged.alpha = part.alpha;
+    if (part.w !== undefined) merged.w = part.w;
+    if (part.h !== undefined) merged.h = part.h;
+  }
+  return merged;
+}
+
+function uniqueNames(names: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of names) {
+    const name = typeof raw === "string" ? raw.trim() : "";
+    if (!name) continue;
+    if (!seen.has(name)) {
+      seen.add(name);
+      out.push(name);
+    }
+  }
+  return out;
+}
+
+function slideBackgroundNameCandidates(index: number): string[] {
+  const idx = String(index);
+  return uniqueNames([
+    `Immagine-${idx}`,
+    `Immagine_${idx}`,
+    `Immagine ${idx}`,
+    `Image-${idx}`,
+    `Image_${idx}`,
+    `Image ${idx}`,
+    `Background-${idx}`,
+    `Background_${idx}`,
+    `Background ${idx}`,
+    `Media-${idx}`,
+    `Media_${idx}`,
+    `Media ${idx}`,
+    `Video-${idx}`,
+    `Video_${idx}`,
+    `Video ${idx}`,
+    `Foto-${idx}`,
+    `Foto_${idx}`,
+    `Foto ${idx}`,
+    "Immagine",
+    "Image",
+    "Background",
+    "Media",
+    "Video",
+    "Foto",
+  ]);
+}
+
+function outroBackgroundNameCandidates(): string[] {
+  return uniqueNames([
+    "Immagine-outro",
+    "Immagine_outro",
+    "Immagine outro",
+    "Image-outro",
+    "Image_outro",
+    "Image outro",
+    "Background-outro",
+    "Background_outro",
+    "Background outro",
+    "Media-outro",
+    "Media_outro",
+    "Media outro",
+    "Video-outro",
+    "Video_outro",
+    "Video outro",
+    "Foto-outro",
+    "Foto_outro",
+    "Foto outro",
+    "Immagine",
+    "Image",
+    "Background",
+    "Media",
+    "Video",
+    "Foto",
+  ]);
+}
+
+function findShadowBearingDescendant(
+  parent: TemplateElement | undefined
+): TemplateElement | undefined {
+  if (!parent || !Array.isArray(parent.elements)) return undefined;
+  for (const child of parent.elements) {
+    if (!child) continue;
+    const type = typeof child.type === "string" ? child.type.toLowerCase() : "";
+    const name = typeof child.name === "string" ? child.name.trim().toLowerCase() : "";
+    const hasShadowProps =
+      (child as any)?.shadow_color != null ||
+      (child as any)?.shadow_x != null ||
+      (child as any)?.shadow_y != null;
+    const skipByName =
+      name.startsWith("logo") ||
+      name.startsWith("avatar") ||
+      name.startsWith("copyright") ||
+      name.startsWith("testo");
+    const allowedType = type !== "text" && type !== "audio";
+    if (hasShadowProps && allowedType && !skipByName) {
+      return child;
+    }
+    const nested = findShadowBearingDescendant(child);
+    if (nested) return nested;
+  }
+  return undefined;
+}
+
+function findShadowSource(
+  comp: TemplateElement | undefined,
+  candidates: string[]
+): TemplateElement | undefined {
+  if (!comp) return undefined;
+  for (const name of candidates) {
+    const found = findChildByName(comp, name);
+    if (found) return found;
+  }
+  return findShadowBearingDescendant(comp);
 }
 
 function parseRGBA(c: any): { color: string; alpha: number } | undefined {
@@ -434,9 +580,14 @@ export function buildTimelineFromLayout(
     const fontFamily = getFontFamilyFromTemplate(template, i);
     const fontPath = fontFamily ? findFontPath(fontFamily) : undefined;
 
-    const compShadow = parseRGBA((comp as any)?.shadow_color);
-    const compShadowW = lenToPx((comp as any)?.shadow_x, videoW, videoH);
-    const compShadowH = lenToPx((comp as any)?.shadow_y, videoW, videoH);
+    const slideShadow = mergeShadows(
+      extractShadow(comp, videoW, videoH),
+      extractShadow(
+        findShadowSource(comp, slideBackgroundNameCandidates(i)),
+        videoW,
+        videoH
+      )
+    );
 
     const texts: TextBlockSpec[] = textFiles.map((tf, idx) => ({
       ...baseBlock,
@@ -465,10 +616,10 @@ export function buildTimelineFromLayout(
 
       texts: texts.length ? texts : undefined,
 
-      shadowColor: compShadow?.color,
-      shadowAlpha: compShadow?.alpha,
-      shadowW: typeof compShadowW === "number" ? compShadowW : undefined,
-      shadowH: typeof compShadowH === "number" ? compShadowH : undefined,
+      shadowColor: slideShadow.color,
+      shadowAlpha: slideShadow.alpha,
+      shadowW: slideShadow.w,
+      shadowH: slideShadow.h,
     };
 
     console.log(
@@ -524,9 +675,14 @@ export function buildTimelineFromLayout(
     const textBox = getTextBoxFromTemplate(template, "Outro", "Testo-outro");
     const fontFam = getFontFamilyFromTemplate(template, "Outro", "Testo-outro");
     const fontPath = fontFam ? findFontPath(fontFam) : undefined;
-    const outShadow = parseRGBA((outroComp as any)?.shadow_color);
-    const outShadowW = lenToPx((outroComp as any)?.shadow_x, videoW, videoH);
-    const outShadowH = lenToPx((outroComp as any)?.shadow_y, videoW, videoH);
+    const outroShadow = mergeShadows(
+      extractShadow(outroComp, videoW, videoH),
+      extractShadow(
+        findShadowSource(outroComp, outroBackgroundNameCandidates()),
+        videoW,
+        videoH
+      )
+    );
     const txt = textEl?.text as string | undefined;
     let texts: TextBlockSpec[] | undefined;
     if (txt && textBox) {
@@ -598,10 +754,10 @@ export function buildTimelineFromLayout(
       logoY: logoBox.y ?? Math.round((videoH - (logoBox.h ?? 140)) / 2),
       fontFile: fontPath,
       texts,
-      shadowColor: outShadow?.color,
-      shadowAlpha: outShadow?.alpha,
-      shadowW: typeof outShadowW === "number" ? outShadowW : undefined,
-      shadowH: typeof outShadowH === "number" ? outShadowH : undefined,
+      shadowColor: outroShadow.color,
+      shadowAlpha: outroShadow.alpha,
+      shadowW: outroShadow.w,
+      shadowH: outroShadow.h,
     });
   }
 
