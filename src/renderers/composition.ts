@@ -67,7 +67,7 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
       f.push(
         `[1:v]format=rgba,` +
           `scale=${W}:${H}:force_original_aspect_ratio=increase,` +
-          `zoompan=z='${zoomExpr}':d=1:s=${W}x${H}:fps=${animFps.toFixed(6)}:x='0':y='${yExpr}',` +
+          `zoompan=z='${zoomExpr}':d=${frameCount}:s=${W}x${H}:fps=${animFps.toFixed(6)}:x='0':y='${yExpr}',` +
           `setsar=1[bg]`
       );
     } else {
