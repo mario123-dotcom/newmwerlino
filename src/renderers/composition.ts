@@ -97,7 +97,7 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
       const alphaBase = Number((255 * sa).toFixed(6));
       const xTerm = `max(${sw}-X,0)/${sw}`;
       const yTerm = `max(${sh}-(${H - 1}-Y),0)/${sh}`;
-      const falloff = `pow(${xTerm},0.25)*pow(${yTerm},0.25)`;
+      const falloff = `pow(${xTerm},4)*pow(${yTerm},4)`;
       f.push(
         `color=c=${sc}@1:s=${W}x${H}:d=${dur},format=rgba,` +
           `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${alphaBase}*${falloff}'[shdw]`
