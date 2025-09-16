@@ -66,7 +66,8 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
 
   const wantsShadow =
     hasBG &&
-    (slide.shadowColor != null ||
+    (slide.shadowEnabled ||
+      slide.shadowColor != null ||
       slide.shadowAlpha != null ||
       slide.shadowW != null ||
       slide.shadowH != null);
