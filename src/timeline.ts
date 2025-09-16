@@ -166,12 +166,74 @@ type ShadowInfo = {
   declared?: boolean;
 };
 
-function extractShadow(
-  source: TemplateElement | undefined,
+function isGradientShadowElement(element: TemplateElement | undefined): boolean {
+  if (!element) return false;
+  if ((element as any)?.visible === false) return false;
+  const type = typeof element.type === "string" ? element.type.toLowerCase() : "";
+  if (type !== "shape") return false;
+  const fill = (element as any)?.fill_color ?? (element as any)?.fillColor;
+  if (!Array.isArray(fill) || fill.length < 2) return false;
+  const name = typeof element.name === "string" ? element.name.trim().toLowerCase() : "";
+  if (name.includes("gradient") || name.includes("ombra") || name.includes("shadow")) {
+    return true;
+  }
+  let hasTransparentStop = false;
+  let hasOpaqueStop = false;
+  for (const stop of fill) {
+    const color = typeof stop?.color === "string" ? stop.color : undefined;
+    const parsed = parseShadowColor(color);
+    if (!parsed) continue;
+    if (parsed.alpha !== undefined && parsed.alpha <= 0.001) {
+      hasTransparentStop = true;
+    } else {
+      hasOpaqueStop = true;
+    }
+  }
+  return hasTransparentStop && hasOpaqueStop;
+}
+
+function extractGradientShadow(
+  source: TemplateElement,
   W: number,
   H: number
 ): ShadowInfo | undefined {
-  if (!source) return undefined;
+  if (!isGradientShadowElement(source)) return undefined;
+  const fill = ((source as any)?.fill_color ?? (source as any)?.fillColor) as any[];
+  const info: ShadowInfo = { declared: true };
+
+  for (const stop of fill) {
+    const color = typeof stop?.color === "string" ? stop.color : undefined;
+    const parsed = parseShadowColor(color);
+    if (!parsed) continue;
+    if (parsed.color) info.color = parsed.color;
+    if (parsed.alpha !== undefined) info.alpha = parsed.alpha;
+  }
+
+  const widthPx = pctToPx((source as any)?.width, W);
+  const heightPx = pctToPx((source as any)?.height, H);
+  if (typeof widthPx === "number" && Number.isFinite(widthPx) && widthPx > 0) {
+    info.w = widthPx;
+  }
+  if (typeof heightPx === "number" && Number.isFinite(heightPx) && heightPx > 0) {
+    info.h = heightPx;
+  }
+  if (info.w === undefined) info.w = W;
+  if (info.h === undefined) info.h = H;
+
+  const opacity = parseAlpha((source as any)?.opacity);
+  if (opacity !== undefined) {
+    const base = info.alpha ?? 1;
+    info.alpha = Math.max(0, Math.min(1, base * opacity));
+  }
+
+  return info;
+}
+
+function extractShadowFromElementProps(
+  source: TemplateElement,
+  W: number,
+  H: number
+): ShadowInfo | undefined {
   const rawColor =
     (source as any)?.shadow_color ??
     (source as any)?.shadowColor ??
@@ -223,6 +285,19 @@ function extractShadow(
   if (typeof sh === "number" && Number.isFinite(sh)) info.h = sh;
 
   return info;
+}
+
+function extractShadow(
+  source: TemplateElement | undefined,
+  W: number,
+  H: number
+): ShadowInfo | undefined {
+  if (!source) return undefined;
+  const merged = mergeShadows(
+    extractGradientShadow(source, W, H),
+    extractShadowFromElementProps(source, W, H)
+  );
+  return merged.declared ? merged : undefined;
 }
 
 function readShadowMod(
@@ -400,13 +475,14 @@ function findShadowBearingDescendant(
       (child as any)?.shadow_color != null ||
       (child as any)?.shadow_x != null ||
       (child as any)?.shadow_y != null;
+    const gradientCandidate = isGradientShadowElement(child);
     const skipByName =
       name.startsWith("logo") ||
       name.startsWith("avatar") ||
       name.startsWith("copyright") ||
       name.startsWith("testo");
     const allowedType = type !== "text" && type !== "audio";
-    if (hasShadowProps && allowedType && !skipByName) {
+    if ((hasShadowProps || gradientCandidate) && allowedType && !skipByName) {
       return child;
     }
     const nested = findShadowBearingDescendant(child);

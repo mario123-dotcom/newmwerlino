@@ -383,6 +383,55 @@ test("buildTimelineFromLayout reads shadow overrides from modifications", () => 
   assert.equal(s0.shadowH, 25);
 });
 
+test("buildTimelineFromLayout detects gradient background shapes as shadows", () => {
+  const tpl: TemplateDoc = {
+    width: 1920,
+    height: 1080,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 5,
+        elements: [
+          {
+            type: "shape",
+            name: "Shape-gradient",
+            width: "100%",
+            height: "100%",
+            fill_color: [
+              { offset: "0%", color: "rgba(0,0,0,0)" },
+              { offset: "100%", color: "#000000" },
+            ],
+          } as any,
+        ],
+      },
+      { type: "composition", name: "Slide_1", duration: 5, elements: [] },
+    ],
+  } as any;
+  const mods = {
+    "Testo-0": "ombra",
+    "Testo-1": "no ombra",
+    "Slide_0.time": "0 s",
+    "Slide_1.time": "5 s",
+  };
+  paths.images = "/tmp/no_img";
+  paths.tts = "/tmp/no_tts";
+  const slides = buildTimelineFromLayout(mods, tpl, {
+    videoW: 1920,
+    videoH: 1080,
+    fps: 30,
+    defaultDur: 5,
+  });
+  assert.ok(slides.length >= 2);
+  const s0 = slides[0];
+  assert.equal(s0.shadowEnabled, true);
+  assert.equal(s0.shadowColor, "#000000");
+  assert.equal(s0.shadowW, 1920);
+  assert.equal(s0.shadowH, 1080);
+  const s1 = slides[1];
+  assert.equal(s1.shadowEnabled, undefined);
+});
+
 test("buildTimelineFromLayout ignores fade-out animations", () => {
   const tpl: TemplateDoc = {
     width: 100,
