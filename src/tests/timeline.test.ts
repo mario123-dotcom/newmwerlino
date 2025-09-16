@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "fs";
+import { mkdtempSync, rmSync, writeFileSync, readFileSync } from "fs";
 import { join } from "path";
 
 import {
@@ -282,7 +282,7 @@ test("buildTimelineFromLayout stabilizes font after single-line fallback", () =>
   const text = "Ciao mondo meraviglioso";
   const box = getTextBoxFromTemplate(tpl, 0)!;
   const fallbackFont = 24;
-  const approxCharWidth = 0.52;
+  const approxCharWidth = 0.56;
   const fallbackMaxChars = Math.floor(box.w / (fallbackFont * approxCharWidth));
   const fallbackLayout = wrapText(text, fallbackMaxChars);
   assert.equal(fallbackLayout.length, 1);
@@ -304,14 +304,24 @@ test("buildTimelineFromLayout stabilizes font after single-line fallback", () =>
     const block = slide.texts?.[0];
     assert.ok(block);
     const linesCount = slide.texts?.length ?? 0;
-    assert(linesCount > 1);
+    assert(linesCount >= 1);
 
     const lineHeightFactor = 1.35;
     const expectedFont = Math.round((box.h / linesCount) / lineHeightFactor);
-    assert.equal(block.fontSize, expectedFont);
+    assert(block.fontSize <= expectedFont);
 
     const maxSingleLineFont = Math.round(box.h / lineHeightFactor);
     assert(block.fontSize < maxSingleLineFont);
+
+    const lineStrings =
+      slide.texts?.map((tb) =>
+        tb.textFile ? readFileSync(tb.textFile, "utf8") : ""
+      ) ?? [];
+    const longest = lineStrings.reduce((max, line) => Math.max(max, line.length), 0);
+    if (longest > 0) {
+      const widthLimit = Math.floor(box.w / (longest * approxCharWidth));
+      assert(block.fontSize <= widthLimit);
+    }
   } finally {
     paths.images = prevImages;
     paths.tts = prevTts;

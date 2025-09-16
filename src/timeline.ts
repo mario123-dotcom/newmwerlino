@@ -767,7 +767,7 @@ export function getFontWeightFromTemplate(
 }
 
 const DEFAULT_CHARS_PER_LINE = 40;
-const APPROX_CHAR_WIDTH_RATIO = 0.52;
+const APPROX_CHAR_WIDTH_RATIO = 0.56;
 const MIN_FONT_SIZE = 24;
 const MAX_FONT_LAYOUT_ITERATIONS = 6;
 
@@ -847,6 +847,95 @@ function linesEqual(a: string[], b: string[]): boolean {
     if (a[i] !== b[i]) return false;
   }
   return true;
+}
+
+type TextLayoutResult = { lines: string[]; font: number; spacing: number };
+
+function resolveTextLayout(
+  text: string,
+  box: { w?: number; h?: number },
+  initialFont: number,
+  lineHeightFactor: number
+): TextLayoutResult | undefined {
+  if (!text) return undefined;
+  const width = typeof box.w === "number" ? box.w : 0;
+  const height = typeof box.h === "number" ? box.h : 0;
+  const safeInitial =
+    Number.isFinite(initialFont) && initialFont > 0
+      ? Math.round(initialFont)
+      : MIN_FONT_SIZE;
+  let fontGuess = Math.max(MIN_FONT_SIZE, safeInitial);
+  let prevLines: string[] | undefined;
+  let prevFont = fontGuess;
+  const layouts: TextLayoutResult[] = [];
+
+  for (let iter = 0; iter < MAX_FONT_LAYOUT_ITERATIONS; iter++) {
+    const maxChars = width > 0 ? maxCharsForWidth(width, fontGuess) : DEFAULT_CHARS_PER_LINE;
+    const lines = wrapText(text, maxChars);
+    if (!lines.length) break;
+
+    const safeCount = Math.max(1, lines.length);
+    const lineHeightPx = height > 0 ? height / safeCount : fontGuess * lineHeightFactor;
+
+    let heightFont = Math.round(lineHeightPx / lineHeightFactor);
+    if (!Number.isFinite(heightFont) || heightFont <= 0) {
+      heightFont = fontGuess;
+    }
+    heightFont = Math.max(MIN_FONT_SIZE, heightFont);
+
+    let widthFont = heightFont;
+    if (width > 0) {
+      const longest = lines.reduce((max, line) => Math.max(max, line.length), 0);
+      if (longest > 0) {
+        const approx = Math.floor(width / (longest * APPROX_CHAR_WIDTH_RATIO));
+        if (Number.isFinite(approx) && approx > 0) {
+          widthFont = Math.max(MIN_FONT_SIZE, approx);
+        }
+      }
+    }
+
+    let nextFont = Math.max(MIN_FONT_SIZE, Math.min(heightFont, widthFont));
+    if (!Number.isFinite(nextFont) || nextFont <= 0) {
+      nextFont = fontGuess;
+    }
+
+    const targetSpacing = Math.round(nextFont * Math.max(0, lineHeightFactor - 1));
+    const availableSpacing = Math.round(Math.max(0, lineHeightPx - nextFont));
+    const spacing = Math.min(targetSpacing, availableSpacing);
+
+    const layout: TextLayoutResult = { lines: [...lines], font: nextFont, spacing };
+    layouts.push(layout);
+
+    const fontDiff = Math.abs(nextFont - prevFont);
+    if (fontDiff === 0 && prevLines && linesEqual(lines, prevLines)) {
+      break;
+    }
+    if (prevLines && linesEqual(lines, prevLines) && fontDiff <= 1) {
+      prevFont = nextFont;
+      break;
+    }
+    if (fontDiff <= 1 && (!prevLines || linesEqual(lines, prevLines))) {
+      prevFont = nextFont;
+      break;
+    }
+
+    prevLines = [...lines];
+    prevFont = nextFont;
+    fontGuess = nextFont;
+  }
+
+  if (!layouts.length) return undefined;
+
+  for (let idx = layouts.length - 1; idx >= 0; idx--) {
+    const candidate = layouts[idx];
+    const maxChars = width > 0 ? maxCharsForWidth(width, candidate.font) : DEFAULT_CHARS_PER_LINE;
+    const recomputed = wrapText(text, maxChars);
+    if (linesEqual(recomputed, candidate.lines)) {
+      return candidate;
+    }
+  }
+
+  return layouts[layouts.length - 1];
 }
 
 /* ============================================================
@@ -952,84 +1041,18 @@ export function buildTimelineFromLayout(
     const lineHeightFactor =
       parseLineHeightFactor((txtEl as any)?.line_height) ?? 1.35;
 
-    if (txtBox.h > 0 && lines.length) {
-      const applyMetrics = (lineCount: number) => {
-        const safeCount = Math.max(1, lineCount);
-        const lineHeightPx = txtBox.h / safeCount;
-        let derivedFont = Math.round(lineHeightPx / lineHeightFactor);
-        if (!Number.isFinite(derivedFont) || derivedFont <= 0) {
-          derivedFont = baseBlock.fontSize ?? initialFontSize;
-        }
-        derivedFont = Math.max(MIN_FONT_SIZE, derivedFont);
-        let spacing = Math.round(lineHeightPx - derivedFont);
-        if (!Number.isFinite(spacing) || spacing < 0) spacing = 0;
-        baseBlock.fontSize = derivedFont;
-        baseBlock.lineSpacing = spacing;
-        return derivedFont;
-      };
-
-      const layoutResults: Array<{ lines: string[]; font: number; spacing: number }> = [];
-      let candidateLines = [...lines];
-      const seenLayouts = new Set<string>();
-      seenLayouts.add(candidateLines.join("\n"));
-
-      for (
-        let iter = 0;
-        iter < MAX_FONT_LAYOUT_ITERATIONS && candidateLines.length;
-        iter++
-      ) {
-        const derivedFont = applyMetrics(candidateLines.length);
-        const font = baseBlock.fontSize ?? derivedFont;
-        const spacing = baseBlock.lineSpacing ?? 0;
-        layoutResults.push({ lines: [...candidateLines], font, spacing });
-
-        const maxChars =
-          txtBox.w > 0 ? maxCharsForWidth(txtBox.w, font) : DEFAULT_CHARS_PER_LINE;
-        const nextLines = wrapText(txtStr, maxChars);
-        if (!nextLines.length) {
-          candidateLines = nextLines;
-          break;
-        }
-        if (linesEqual(nextLines, candidateLines)) {
-          candidateLines = nextLines;
-          break;
-        }
-        const signature = nextLines.join("\n");
-        if (seenLayouts.has(signature)) {
-          candidateLines = nextLines;
-          break;
-        }
-        seenLayouts.add(signature);
-        candidateLines = nextLines;
+    if (lines.length) {
+      const layout = resolveTextLayout(
+        txtStr,
+        txtBox,
+        baseBlock.fontSize ?? initialFontSize,
+        lineHeightFactor
+      );
+      if (layout) {
+        lines = [...layout.lines];
+        baseBlock.fontSize = layout.font;
+        baseBlock.lineSpacing = layout.spacing;
       }
-
-      let finalLayout = layoutResults[layoutResults.length - 1];
-      let stableFound = false;
-      for (let idx = layoutResults.length - 1; idx >= 0; idx--) {
-        const candidate = layoutResults[idx];
-        const maxChars =
-          txtBox.w > 0 ? maxCharsForWidth(txtBox.w, candidate.font) : DEFAULT_CHARS_PER_LINE;
-        const recomputed = wrapText(txtStr, maxChars);
-        if (linesEqual(recomputed, candidate.lines)) {
-          finalLayout = candidate;
-          stableFound = true;
-          break;
-        }
-      }
-
-      if (!stableFound && layoutResults.length > 1) {
-        finalLayout = layoutResults.reduce((best, current) => {
-          if (current.lines.length > best.lines.length) return current;
-          if (current.lines.length === best.lines.length && current.font < best.font) {
-            return current;
-          }
-          return best;
-        }, finalLayout);
-      }
-
-      lines = [...finalLayout.lines];
-      baseBlock.fontSize = finalLayout.font;
-      baseBlock.lineSpacing = finalLayout.spacing;
     }
 
     const alignY = parseAlignmentFactor((txtEl as any)?.y_alignment) ?? 0;
@@ -1228,84 +1251,18 @@ export function buildTimelineFromLayout(
       const lineHeightFactorOut =
         parseLineHeightFactor(textEl?.line_height) ?? 1.35;
 
-      if (textBox.h > 0 && linesOut.length) {
-        const applyOutMetrics = (lineCount: number) => {
-          const safeCount = Math.max(1, lineCount);
-          const lineHeightPx = textBox.h / safeCount;
-          let derivedFont = Math.round(lineHeightPx / lineHeightFactorOut);
-          if (!Number.isFinite(derivedFont) || derivedFont <= 0) {
-            derivedFont = baseOut.fontSize ?? initialOutSize;
-          }
-          derivedFont = Math.max(MIN_FONT_SIZE, derivedFont);
-          let spacing = Math.round(lineHeightPx - derivedFont);
-          if (!Number.isFinite(spacing) || spacing < 0) spacing = 0;
-          baseOut.fontSize = derivedFont;
-          baseOut.lineSpacing = spacing;
-          return derivedFont;
-        };
-
-        const layoutResults: Array<{ lines: string[]; font: number; spacing: number }> = [];
-        let candidateLines = [...linesOut];
-        const seenLayouts = new Set<string>();
-        seenLayouts.add(candidateLines.join("\n"));
-
-        for (
-          let iter = 0;
-          iter < MAX_FONT_LAYOUT_ITERATIONS && candidateLines.length;
-          iter++
-        ) {
-          const derivedFont = applyOutMetrics(candidateLines.length);
-          const font = baseOut.fontSize ?? derivedFont;
-          const spacing = baseOut.lineSpacing ?? 0;
-          layoutResults.push({ lines: [...candidateLines], font, spacing });
-
-          const maxChars =
-            textBox.w > 0 ? maxCharsForWidth(textBox.w, font) : DEFAULT_CHARS_PER_LINE;
-          const nextLines = wrapText(txt, maxChars);
-          if (!nextLines.length) {
-            candidateLines = nextLines;
-            break;
-          }
-          if (linesEqual(nextLines, candidateLines)) {
-            candidateLines = nextLines;
-            break;
-          }
-          const signature = nextLines.join("\n");
-          if (seenLayouts.has(signature)) {
-            candidateLines = nextLines;
-            break;
-          }
-          seenLayouts.add(signature);
-          candidateLines = nextLines;
+      if (linesOut.length) {
+        const layout = resolveTextLayout(
+          txt,
+          textBox,
+          baseOut.fontSize ?? initialOutSize,
+          lineHeightFactorOut
+        );
+        if (layout) {
+          linesOut = [...layout.lines];
+          baseOut.fontSize = layout.font;
+          baseOut.lineSpacing = layout.spacing;
         }
-
-        let finalLayout = layoutResults[layoutResults.length - 1];
-        let stableFound = false;
-        for (let idx = layoutResults.length - 1; idx >= 0; idx--) {
-          const candidate = layoutResults[idx];
-          const maxChars =
-            textBox.w > 0 ? maxCharsForWidth(textBox.w, candidate.font) : DEFAULT_CHARS_PER_LINE;
-          const recomputed = wrapText(txt, maxChars);
-          if (linesEqual(recomputed, candidate.lines)) {
-            finalLayout = candidate;
-            stableFound = true;
-            break;
-          }
-        }
-
-        if (!stableFound && layoutResults.length > 1) {
-          finalLayout = layoutResults.reduce((best, current) => {
-            if (current.lines.length > best.lines.length) return current;
-            if (current.lines.length === best.lines.length && current.font < best.font) {
-              return current;
-            }
-            return best;
-          }, finalLayout);
-        }
-
-        linesOut = [...finalLayout.lines];
-        baseOut.fontSize = finalLayout.font;
-        baseOut.lineSpacing = finalLayout.spacing;
       }
 
       const alignY = parseAlignmentFactor(textEl?.y_alignment) ?? 0;
