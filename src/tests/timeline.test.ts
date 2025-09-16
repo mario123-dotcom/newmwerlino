@@ -498,6 +498,117 @@ test("buildTimelineFromLayout honours boolean shadow modifications", () => {
   assert.equal(slidesStringFalse[0].shadowEnabled, undefined);
 });
 
+test("buildTimelineFromLayout marks animated background from template tags", () => {
+  const tpl: TemplateDoc = {
+    width: 1920,
+    height: 1080,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 5,
+        tags: ["background-animated"],
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "10%",
+            y: "10%",
+            width: "80%",
+            height: "30%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+          },
+          {
+            type: "image",
+            name: "Logo",
+            x: "90%",
+            y: "90%",
+            width: "10%",
+            height: "10%",
+            x_anchor: "100%",
+            y_anchor: "100%",
+          },
+        ],
+      },
+    ],
+  } as any;
+  const mods = { "Testo-0": "demo" };
+  paths.images = "/tmp/no_img";
+  paths.tts = "/tmp/no_tts";
+
+  const slides = buildTimelineFromLayout(mods, tpl, {
+    videoW: 1920,
+    videoH: 1080,
+    fps: 30,
+    defaultDur: 5,
+  });
+
+  assert.equal(slides.length, 1);
+  assert.equal(slides[0].backgroundAnimated, true);
+});
+
+test("buildTimelineFromLayout reads animated background flags from modifications", () => {
+  const tpl: TemplateDoc = {
+    width: 1920,
+    height: 1080,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 5,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "10%",
+            y: "10%",
+            width: "80%",
+            height: "30%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+          },
+          {
+            type: "image",
+            name: "Logo",
+            x: "90%",
+            y: "90%",
+            width: "10%",
+            height: "10%",
+            x_anchor: "100%",
+            y_anchor: "100%",
+          },
+        ],
+      },
+    ],
+  } as any;
+  paths.images = "/tmp/no_img";
+  paths.tts = "/tmp/no_tts";
+
+  const baseMods = { "Testo-0": "demo" };
+
+  const slidesByFlag = buildTimelineFromLayout(
+    { ...baseMods, "Slide_0.backgroundAnimated": true },
+    tpl,
+    { videoW: 1920, videoH: 1080, fps: 30, defaultDur: 5 }
+  );
+  assert.equal(slidesByFlag[0].backgroundAnimated, true);
+
+  const slidesByTags = buildTimelineFromLayout(
+    { ...baseMods, "Slide_0.tags": "background animated" },
+    tpl,
+    { videoW: 1920, videoH: 1080, fps: 30, defaultDur: 5 }
+  );
+  assert.equal(slidesByTags[0].backgroundAnimated, true);
+
+  const slidesOverride = buildTimelineFromLayout(
+    { ...baseMods, "Slide_0.tags": "background animated", "Slide_0.backgroundAnimated": "false" },
+    tpl,
+    { videoW: 1920, videoH: 1080, fps: 30, defaultDur: 5 }
+  );
+  assert.equal(slidesOverride[0].backgroundAnimated, undefined);
+});
+
 test("buildTimelineFromLayout ignores fade-out animations", () => {
   const tpl: TemplateDoc = {
     width: 100,

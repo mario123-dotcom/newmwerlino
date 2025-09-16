@@ -46,6 +46,10 @@ export type TemplateElement = {
   // figli (quando type === 'composition' o gruppi con layers)
   elements?: TemplateElement[];
 
+  // metadati opzionali
+  tags?: string | string[];
+  tag?: string | string[];
+
   // animazioni opzionali (es. fade, text-reveal...)
   animations?: {
     time?: number | string;

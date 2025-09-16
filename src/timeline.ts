@@ -50,6 +50,8 @@ export type SlideSpec = {
   ttsPath?: string;
   fontFile?: string;
 
+  backgroundAnimated?: boolean;
+
   // Posizionamento e dimensione logo (px)
   logoWidth?: number;
   logoHeight?: number;
@@ -116,6 +118,19 @@ function parseAlpha(val: any): number | undefined {
   }
   const n = parseFloat(s);
   return Number.isFinite(n) ? n : undefined;
+}
+
+function readBooleanish(val: any): boolean | undefined {
+  if (typeof val === "boolean") return val;
+  if (typeof val === "number" && Number.isFinite(val)) {
+    return val === 0 ? false : true;
+  }
+  if (typeof val !== "string") return undefined;
+  const s = val.trim().toLowerCase();
+  if (!s) return undefined;
+  if (["true", "yes", "on", "1"].includes(s)) return true;
+  if (["false", "no", "off", "0"].includes(s)) return false;
+  return undefined;
 }
 
 function parseShadowColor(raw: any): { color: string; alpha?: number } | undefined {
@@ -498,6 +513,118 @@ function slideBackgroundNameCandidates(index: number): string[] {
     "Video",
     "Foto",
   ]);
+}
+
+function parseTagList(raw: any): string[] {
+  if (raw == null) return [];
+  if (Array.isArray(raw)) {
+    const tags: string[] = [];
+    for (const item of raw) {
+      tags.push(...parseTagList(item));
+    }
+    return tags;
+  }
+  if (typeof raw === "string") {
+    const parts = raw
+      .split(/[;,\n]/)
+      .map((p) => p.trim())
+      .filter(Boolean);
+    return parts.length ? parts : [];
+  }
+  return [];
+}
+
+function collectTagsFromElement(element: TemplateElement | undefined): string[] {
+  if (!element) return [];
+  const tags: string[] = [];
+  const anyEl = element as any;
+  tags.push(...parseTagList(anyEl?.tags));
+  tags.push(...parseTagList(anyEl?.tag));
+  return tags;
+}
+
+function collectTagsFromMods(mods: Record<string, any>, prefix: string): string[] {
+  if (!mods) return [];
+  const tags: string[] = [];
+  tags.push(...parseTagList(mods[`${prefix}.tags`]));
+  tags.push(...parseTagList(mods[`${prefix}.tag`]));
+
+  const prefixLower = `${prefix.toLowerCase()}.`;
+  for (const key of Object.keys(mods)) {
+    if (typeof key !== "string") continue;
+    const lowerKey = key.toLowerCase();
+    if (!lowerKey.startsWith(prefixLower)) continue;
+    const suffix = key.slice(prefix.length + 1);
+    const suffixLower = suffix.toLowerCase();
+    const isTagKey =
+      suffixLower === "tag" ||
+      suffixLower === "tags" ||
+      suffixLower.startsWith("tag.") ||
+      suffixLower.startsWith("tags.") ||
+      suffixLower.startsWith("tag_") ||
+      suffixLower.startsWith("tags_") ||
+      suffixLower.startsWith("tag-") ||
+      suffixLower.startsWith("tags-") ||
+      suffixLower.startsWith("tag[") ||
+      suffixLower.startsWith("tags[");
+    if (!isTagKey) continue;
+    const value = mods[key];
+    const bool = readBooleanish(value);
+    if (bool !== undefined) {
+      if (bool) {
+        const cleaned = suffix.replace(/^tags?[-_.\[]*/i, "").replace(/]$/, "");
+        if (cleaned.trim()) tags.push(cleaned.trim());
+      }
+      continue;
+    }
+    tags.push(...parseTagList(value));
+  }
+
+  return tags;
+}
+
+const BACKGROUND_ANIMATION_KEYS = [
+  "backgroundAnimated",
+  "animatedBackground",
+  "animateBackground",
+  "backgroundAnimation",
+  "background_animation",
+  "backgroundAnimate",
+  "bgAnimated",
+  "bgAnimation",
+  "animateBg",
+];
+
+function readBackgroundAnimationFlag(
+  mods: Record<string, any>,
+  prefix: string
+): boolean | undefined {
+  for (const key of BACKGROUND_ANIMATION_KEYS) {
+    const value = mods[`${prefix}.${key}`];
+    const parsed = readBooleanish(value);
+    if (parsed !== undefined) return parsed;
+  }
+  return undefined;
+}
+
+function hasBackgroundAnimationTag(tags: string[]): boolean {
+  for (const raw of tags) {
+    const tag = typeof raw === "string" ? raw.trim() : "";
+    if (!tag) continue;
+    const lower = tag.toLowerCase();
+    const compact = lower.replace(/[^a-z0-9]+/g, "");
+    const hasBackground =
+      lower.includes("background") ||
+      lower.includes("bg") ||
+      compact.includes("background");
+    const hasAnimCue =
+      lower.includes("anim") ||
+      lower.includes("zoom") ||
+      lower.includes("kenburn") ||
+      compact.includes("anim");
+    if (hasBackground && hasAnimCue) return true;
+  }
+  return false;
 }
 
 function outroBackgroundNameCandidates(): string[] {
@@ -900,6 +1027,29 @@ export function buildTimelineFromLayout(
     ];
     const slideHasShadow = slideShadowSources.some((get) => !!get());
 
+    const bgElements = bgShadowCandidates
+      .map((name) => findChildByName(comp, name))
+      .filter((el): el is TemplateElement => !!el);
+    const tagSources = [
+      ...collectTagsFromElement(comp),
+      ...bgElements.flatMap((el) => collectTagsFromElement(el)),
+      ...collectTagsFromMods(mods, `Slide_${i}`),
+      ...bgShadowCandidates.flatMap((name) => collectTagsFromMods(mods, name)),
+    ];
+    const bgAnimFlagFromSlide = readBackgroundAnimationFlag(mods, `Slide_${i}`);
+    let bgAnimFlagFromMedia: boolean | undefined;
+    for (const name of bgShadowCandidates) {
+      const flag = readBackgroundAnimationFlag(mods, name);
+      if (flag !== undefined) {
+        bgAnimFlagFromMedia = flag;
+        break;
+      }
+    }
+    const shouldAnimateBackground =
+      bgAnimFlagFromSlide ??
+      bgAnimFlagFromMedia ??
+      (hasBackgroundAnimationTag(tagSources) ? true : undefined);
+
     const texts: TextBlockSpec[] = textFiles.map((tf, idx) => ({
       ...baseBlock,
       y: baseBlock.y + idx * lineHeight,
@@ -930,9 +1080,17 @@ export function buildTimelineFromLayout(
       shadowEnabled: slideHasShadow ? true : undefined,
     };
 
-    console.log(
-      `[timeline] slide ${i} -> img=${!!slide.bgImagePath} tts=${!!slide.ttsPath} text=${txtStr ? "✓" : "—"} dur=${slideDur}s`
-    );
+    if (shouldAnimateBackground) {
+      slide.backgroundAnimated = true;
+    }
+
+    if (process.env.DEBUG_TIMELINE) {
+      console.log(
+        `[timeline] slide ${i} -> img=${!!slide.bgImagePath} tts=${!!slide.ttsPath} text=${
+          txtStr ? "✓" : "—"
+        } dur=${slideDur}s`
+      );
+    }
 
     slides.push(slide);
     prevEnd = start + slideDur;
@@ -993,6 +1151,28 @@ export function buildTimelineFromLayout(
       ),
     ];
     const outroHasShadow = outroShadowSources.some((get) => !!get());
+    const outroBgElements = outroBgNames
+      .map((name) => findChildByName(outroComp, name))
+      .filter((el): el is TemplateElement => !!el);
+    const outroTags = [
+      ...collectTagsFromElement(outroComp),
+      ...outroBgElements.flatMap((el) => collectTagsFromElement(el)),
+      ...collectTagsFromMods(mods, "Outro"),
+      ...outroBgNames.flatMap((name) => collectTagsFromMods(mods, name)),
+    ];
+    const outroAnimFlag = readBackgroundAnimationFlag(mods, "Outro");
+    let outroMediaAnimFlag: boolean | undefined;
+    for (const name of outroBgNames) {
+      const flag = readBackgroundAnimationFlag(mods, name);
+      if (flag !== undefined) {
+        outroMediaAnimFlag = flag;
+        break;
+      }
+    }
+    const outroShouldAnimate =
+      outroAnimFlag ??
+      outroMediaAnimFlag ??
+      (hasBackgroundAnimationTag(outroTags) ? true : undefined);
     const txt = textEl?.text as string | undefined;
     let texts: TextBlockSpec[] | undefined;
     if (txt && textBox) {
@@ -1065,6 +1245,7 @@ export function buildTimelineFromLayout(
       fontFile: fontPath,
       texts,
       shadowEnabled: outroHasShadow ? true : undefined,
+      backgroundAnimated: outroShouldAnimate ? true : undefined,
     });
   }
 
