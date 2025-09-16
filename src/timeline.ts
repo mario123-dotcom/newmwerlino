@@ -50,6 +50,8 @@ export type SlideSpec = {
   ttsPath?: string;
   fontFile?: string;
 
+  backgroundAnimated?: boolean;
+
   // Posizionamento e dimensione logo (px)
   logoWidth?: number;
   logoHeight?: number;
@@ -116,6 +118,19 @@ function parseAlpha(val: any): number | undefined {
   }
   const n = parseFloat(s);
   return Number.isFinite(n) ? n : undefined;
+}
+
+function readBooleanish(val: any): boolean | undefined {
+  if (typeof val === "boolean") return val;
+  if (typeof val === "number" && Number.isFinite(val)) {
+    return val === 0 ? false : true;
+  }
+  if (typeof val !== "string") return undefined;
+  const s = val.trim().toLowerCase();
+  if (!s) return undefined;
+  if (["true", "yes", "on", "1"].includes(s)) return true;
+  if (["false", "no", "off", "0"].includes(s)) return false;
+  return undefined;
 }
 
 function parseShadowColor(raw: any): { color: string; alpha?: number } | undefined {
@@ -813,6 +828,7 @@ export function buildTimelineFromLayout(
         logoHeight: fLogo.h,
         logoX: fLogo.x,
         logoY: fLogo.y,
+        backgroundAnimated: false,
       });
       prevEnd = start;
     }
@@ -900,12 +916,16 @@ export function buildTimelineFromLayout(
     ];
     const slideHasShadow = slideShadowSources.some((get) => !!get());
 
+    const bgImagePath = findImageForSlide(i);
+
     const texts: TextBlockSpec[] = textFiles.map((tf, idx) => ({
       ...baseBlock,
       y: baseBlock.y + idx * lineHeight,
       textFile: tf,
       animations: perLineAnims[idx].length ? perLineAnims[idx] : undefined,
     }));
+
+    const isFillerSlide = !ttsPath && !txtStr;
 
     const slide: SlideSpec = {
       width: videoW,
@@ -914,7 +934,7 @@ export function buildTimelineFromLayout(
       durationSec: slideDur,
       outPath: "",
 
-      bgImagePath: findImageForSlide(i),
+      bgImagePath,
       logoPath: join(paths.images, "logo.png"),
       ttsPath,
 
@@ -930,9 +950,19 @@ export function buildTimelineFromLayout(
       shadowEnabled: slideHasShadow ? true : undefined,
     };
 
-    console.log(
-      `[timeline] slide ${i} -> img=${!!slide.bgImagePath} tts=${!!slide.ttsPath} text=${txtStr ? "✓" : "—"} dur=${slideDur}s`
-    );
+    if (isFillerSlide) {
+      slide.backgroundAnimated = false;
+    } else if (bgImagePath && i > 0) {
+      slide.backgroundAnimated = true;
+    }
+
+    if (process.env.DEBUG_TIMELINE) {
+      console.log(
+        `[timeline] slide ${i} -> img=${!!slide.bgImagePath} tts=${!!slide.ttsPath} text=${
+          txtStr ? "✓" : "—"
+        } dur=${slideDur}s`
+      );
+    }
 
     slides.push(slide);
     prevEnd = start + slideDur;

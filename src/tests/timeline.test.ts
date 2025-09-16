@@ -1,5 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync, writeFileSync } from "fs";
+import { join } from "path";
 
 import { getTextBoxFromTemplate, getLogoBoxFromTemplate, getFontFamilyFromTemplate, wrapText, buildTimelineFromLayout } from "../timeline";
 import type { TemplateDoc } from "../template";
@@ -175,6 +177,7 @@ test("buildTimelineFromLayout includes filler slide and outro", () => {
   assert.equal(slides[0].durationSec, 2);
   assert.equal(slides[1].ttsPath, undefined); // filler has no tts
   assert.equal(slides[1].durationSec, 1);
+  assert.equal(slides[1].backgroundAnimated, false);
   assert.equal(slides[2].durationSec, 2);
   assert.equal(slides[3].durationSec, 1);
 });
@@ -498,6 +501,238 @@ test("buildTimelineFromLayout honours boolean shadow modifications", () => {
   assert.equal(slidesStringFalse[0].shadowEnabled, undefined);
 });
 
+test("buildTimelineFromLayout animates backgrounds after the first slide", () => {
+  const tpl: TemplateDoc = {
+    width: 1920,
+    height: 1080,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 5,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "10%",
+            y: "10%",
+            width: "80%",
+            height: "30%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+          },
+        ],
+      },
+      {
+        type: "composition",
+        name: "Slide_1",
+        duration: 5,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-1",
+            x: "10%",
+            y: "60%",
+            width: "80%",
+            height: "30%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+          },
+        ],
+      },
+    ],
+  } as any;
+  const prevImages = paths.images;
+  const prevTts = paths.tts;
+  const tmpDir = mkdtempSync(join(process.cwd(), "timeline-bg-"));
+  try {
+    writeFileSync(join(tmpDir, "img0.jpg"), "");
+    writeFileSync(join(tmpDir, "img1.jpg"), "");
+    paths.images = tmpDir;
+    paths.tts = tmpDir;
+
+    const slides = buildTimelineFromLayout(
+      { "Testo-0": "ciao", "Testo-1": "ciao" },
+      tpl,
+      {
+        videoW: 1920,
+        videoH: 1080,
+        fps: 30,
+        defaultDur: 5,
+      }
+    );
+
+    assert.equal(slides.length, 2);
+    assert.equal(slides[0].backgroundAnimated, undefined);
+    assert.equal(slides[1].backgroundAnimated, true);
+  } finally {
+    paths.images = prevImages;
+    paths.tts = prevTts;
+    rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test("buildTimelineFromLayout keeps outro background static", () => {
+  const tpl: TemplateDoc = {
+    width: 1920,
+    height: 1080,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 5,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "10%",
+            y: "10%",
+            width: "80%",
+            height: "30%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+          },
+        ],
+      },
+      {
+        type: "composition",
+        name: "Outro",
+        duration: 3,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-outro",
+            x: "50%",
+            y: "50%",
+            width: "80%",
+            height: "20%",
+            x_anchor: "50%",
+            y_anchor: "50%",
+          },
+        ],
+      },
+    ],
+  } as any;
+  const prevImages = paths.images;
+  const prevTts = paths.tts;
+  const tmpDir = mkdtempSync(join(process.cwd(), "timeline-outro-"));
+  try {
+    writeFileSync(join(tmpDir, "img0.jpg"), "");
+    paths.images = tmpDir;
+    paths.tts = tmpDir;
+
+    const slides = buildTimelineFromLayout({ "Testo-0": "ciao" }, tpl, {
+      videoW: 1920,
+      videoH: 1080,
+      fps: 30,
+      defaultDur: 5,
+    });
+
+    assert.ok(slides.length >= 2);
+    assert.equal(slides[0].backgroundAnimated, undefined);
+    const outro = slides[slides.length - 1];
+    assert.equal(outro.backgroundAnimated, undefined);
+  } finally {
+    paths.images = prevImages;
+    paths.tts = prevTts;
+    rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test("buildTimelineFromLayout animates every non-intro, non-filler slide", () => {
+  const tpl: TemplateDoc = {
+    width: 1920,
+    height: 1080,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 5,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "10%",
+            y: "10%",
+            width: "80%",
+            height: "30%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+          },
+        ],
+      },
+      {
+        type: "composition",
+        name: "Slide_1",
+        duration: 5,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-1",
+            x: "10%",
+            y: "10%",
+            width: "80%",
+            height: "30%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+          },
+        ],
+      },
+      {
+        type: "composition",
+        name: "Slide_2",
+        duration: 5,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-2",
+            x: "10%",
+            y: "10%",
+            width: "80%",
+            height: "30%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const prevImages = paths.images;
+  const prevTts = paths.tts;
+  const tmpDir = mkdtempSync(join(process.cwd(), "timeline-bg-default-"));
+  try {
+    writeFileSync(join(tmpDir, "img0.jpg"), "");
+    writeFileSync(join(tmpDir, "img1.jpg"), "");
+    writeFileSync(join(tmpDir, "img2.jpg"), "");
+    paths.images = tmpDir;
+    paths.tts = tmpDir;
+
+    const slides = buildTimelineFromLayout(
+      {
+        "Testo-0": "uno",
+        "Testo-2": "tre",
+      },
+      tpl,
+      {
+        videoW: 1920,
+        videoH: 1080,
+        fps: 30,
+        defaultDur: 5,
+      }
+    );
+
+    assert.equal(slides.length, 3);
+    assert.equal(slides[0].backgroundAnimated, undefined);
+    assert.equal(slides[1].backgroundAnimated, false);
+    assert.equal(slides[2].backgroundAnimated, true);
+  } finally {
+    paths.images = prevImages;
+    paths.tts = prevTts;
+    rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
 test("buildTimelineFromLayout ignores fade-out animations", () => {
   const tpl: TemplateDoc = {
     width: 100,
@@ -529,7 +764,12 @@ test("buildTimelineFromLayout ignores fade-out animations", () => {
   const mods = { "Testo-0": "hi" };
   paths.images = "/tmp/no_img";
   paths.tts = "/tmp/no_tts";
-  const slides = buildTimelineFromLayout(mods, tpl, { videoW: 100, videoH: 100, fps: 30, defaultDur: 2 });
+  const slides = buildTimelineFromLayout(mods, tpl, {
+    videoW: 100,
+    videoH: 100,
+    fps: 30,
+    defaultDur: 2,
+  });
   const anims = slides[0].texts![0].animations!;
   assert.equal(anims.length, 1);
   assert.equal(anims[0].type, "fade");
