@@ -142,6 +142,7 @@ export async function fetchAssets() {
 
   // Font dal template
   const tpl = loadTemplate();
+  const BOLD_FONT_WEIGHT = 700;
   const fontRequests = new Map<string, { includeDefault: boolean; weights: Set<number> }>();
   function registerFont(family: string, weightValue: unknown) {
     const fam = family.trim();
@@ -150,6 +151,7 @@ export async function fetchAssets() {
     const parsedWeight = parseFontWeight(weightValue);
     if (parsedWeight != null) info.weights.add(parsedWeight);
     else info.includeDefault = true;
+    info.weights.add(BOLD_FONT_WEIGHT);
     fontRequests.set(fam, info);
   }
   function collectFonts(el: TemplateElement) {
