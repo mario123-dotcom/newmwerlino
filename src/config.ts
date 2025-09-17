@@ -29,8 +29,8 @@ export const TEXT = {
   LEFT_MARGIN_P: 0.08,
   /** rapporto medio larghezza/carattere in px ≈ k * fontsize */
   CHAR_WIDTH_K: 0.55, // 0.52–0.58 a seconda del font
-  /** box padding (in multipli del font size) */
-  BOX_PAD_FACTOR: 0.20,
+  /** padding extra per gli sfondi del testo (in multipli del font size) */
+  BOX_PAD_FACTOR: 0.30,
 };
 
 /** Scale di base (fontsize ≈ scale * videoH) */

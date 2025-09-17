@@ -4,6 +4,12 @@ import { paths } from "./paths";
 import { findComposition, findChildByName, pctToPx } from "./template";
 import type { TemplateDoc, TemplateElement } from "./template";
 import { probeDurationSec } from "./ffmpeg/probe";
+import { TEXT } from "./config";
+import {
+  extractFontWeightFromFileName,
+  fileNameMatchesFamily,
+  parseFontWeight,
+} from "./fonts";
 
 /* ---------- Tipi usati da composition.ts ---------- */
 export type AnimationSpec =
@@ -34,6 +40,14 @@ export type TextBlockSpec = {
   boxColor?: string;
   boxAlpha?: number;
   boxBorderW?: number;
+  background?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    color: string;
+    alpha: number;
+  };
 
   animations?: AnimationSpec[];
 };
@@ -105,6 +119,79 @@ function lenToPx(v: any, W: number, H: number): number | undefined {
   }
   const n = parseFloat(s);
   return Number.isFinite(n) ? n : undefined;
+}
+
+function clampRect(
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  maxW: number,
+  maxH: number
+): { x: number; y: number; w: number; h: number } | undefined {
+  if (!(w > 0) || !(h > 0)) return undefined;
+  if (!(maxW > 0) || !(maxH > 0)) return undefined;
+
+  let left = x;
+  let top = y;
+  let right = x + w;
+  let bottom = y + h;
+
+  left = Math.max(0, Math.min(left, maxW));
+  top = Math.max(0, Math.min(top, maxH));
+  right = Math.max(left, Math.min(right, maxW));
+  bottom = Math.max(top, Math.min(bottom, maxH));
+
+  const width = right - left;
+  const height = bottom - top;
+  if (!(width > 0) || !(height > 0)) return undefined;
+
+  return {
+    x: Math.round(left),
+    y: Math.round(top),
+    w: Math.round(width),
+    h: Math.round(height),
+  };
+}
+
+function applyExtraBackgroundPadding(
+  block: TextBlockSpec,
+  fontPx: number | undefined,
+  maxW: number,
+  maxH: number
+): number {
+  if (!(fontPx && fontPx > 0)) return 0;
+  const extra = Math.round(fontPx * TEXT.BOX_PAD_FACTOR);
+  if (!(extra > 0)) return 0;
+
+  if (block.background) {
+    const grown = clampRect(
+      block.background.x - extra,
+      block.background.y - extra,
+      block.background.width + extra * 2,
+      block.background.height + extra * 2,
+      maxW,
+      maxH
+    );
+    if (grown) {
+      block.background = {
+        ...block.background,
+        x: grown.x,
+        y: grown.y,
+        width: grown.w,
+        height: grown.h,
+      };
+    }
+  }
+
+  if (block.box) {
+    const prev = block.boxBorderW ?? 0;
+    block.boxBorderW = prev + extra;
+  } else if (typeof block.boxBorderW === "number") {
+    block.boxBorderW = block.boxBorderW + extra;
+  }
+
+  return extra;
 }
 
 function parseAlpha(val: any): number | undefined {
@@ -615,12 +702,18 @@ function findTTSForSlide(i: number): string | undefined {
   return cand.find(existsSync);
 }
 
-function findFontPath(family: string): string | undefined {
-  const base = family.replace(/\s+/g, "").toLowerCase();
+function findFontPath(family: string, weight?: number): string | undefined {
   try {
-    for (const f of readdirSync(paths.fonts)) {
-      if (f.toLowerCase().startsWith(base)) return join(paths.fonts, f);
+    const candidates = readdirSync(paths.fonts)
+      .filter((f) => fileNameMatchesFamily(f, family))
+      .map((file) => ({ file, weight: extractFontWeightFromFileName(file) ?? 0 }));
+    if (!candidates.length) return undefined;
+    if (typeof weight === "number") {
+      const exact = candidates.find((c) => c.weight === weight);
+      if (exact) return join(paths.fonts, exact.file);
     }
+    const sorted = [...candidates].sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0));
+    return join(paths.fonts, sorted[0].file);
   } catch {}
   return undefined;
 }
@@ -738,7 +831,76 @@ export function getFontFamilyFromTemplate(
   return typeof fam === "string" ? fam : undefined;
 }
 
+export function getFontWeightFromTemplate(
+  tpl: TemplateDoc,
+  slideIndexOrName: number | string,
+  textName?: string
+): number | undefined {
+  const compName =
+    typeof slideIndexOrName === "number"
+      ? `Slide_${slideIndexOrName}`
+      : slideIndexOrName;
+  const txtName =
+    textName ??
+    (typeof slideIndexOrName === "number" ? `Testo-${slideIndexOrName}` : undefined);
+  const comp = findComposition(tpl, compName);
+  const txtEl = txtName ? (findChildByName(comp, txtName) as any) : undefined;
+  return parseFontWeight(txtEl?.font_weight);
+}
+
 const DEFAULT_CHARS_PER_LINE = 40;
+const APPROX_CHAR_WIDTH_RATIO = 0.56;
+const MIN_FONT_SIZE = 24;
+const MAX_FONT_LAYOUT_ITERATIONS = 6;
+
+function clamp01(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  if (value <= 0) return 0;
+  if (value >= 1) return 1;
+  return value;
+}
+
+function parseAlignmentFactor(raw: any): number | undefined {
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    const normalized = raw > 1 ? raw / 100 : raw;
+    return clamp01(normalized);
+  }
+  if (typeof raw !== "string") return undefined;
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  if (trimmed.endsWith("%")) {
+    const n = parseFloat(trimmed.slice(0, -1));
+    return Number.isFinite(n) ? clamp01(n / 100) : undefined;
+  }
+  const n = parseFloat(trimmed);
+  if (!Number.isFinite(n)) return undefined;
+  return clamp01(n > 1 ? n / 100 : n);
+}
+
+function maxCharsForWidth(width: number, fontSize: number): number {
+  if (!(width > 0) || !(fontSize > 0)) return DEFAULT_CHARS_PER_LINE;
+  const approxChar = fontSize * APPROX_CHAR_WIDTH_RATIO;
+  if (!(approxChar > 0)) return DEFAULT_CHARS_PER_LINE;
+  const maxChars = Math.floor(width / approxChar);
+  return Math.max(1, maxChars || 0);
+}
+
+function parseLineHeightFactor(raw: any): number | undefined {
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    if (raw <= 0) return undefined;
+    return raw > 10 ? raw / 100 : raw;
+  }
+  if (typeof raw !== "string") return undefined;
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  if (trimmed.endsWith("%")) {
+    const n = parseFloat(trimmed.slice(0, -1));
+    return Number.isFinite(n) ? n / 100 : undefined;
+  }
+  const n = parseFloat(trimmed);
+  if (!Number.isFinite(n)) return undefined;
+  return n > 10 ? n / 100 : n;
+}
 
 export function wrapText(text: string, maxPerLine: number): string[] {
   const words = text.split(/\s+/).filter(Boolean);
@@ -758,6 +920,104 @@ export function wrapText(text: string, maxPerLine: number): string[] {
   }
   if (line) lines.push(line);
   return lines;
+}
+
+function linesEqual(a: string[], b: string[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
+type TextLayoutResult = { lines: string[]; font: number; spacing: number };
+
+function resolveTextLayout(
+  text: string,
+  box: { w?: number; h?: number },
+  initialFont: number,
+  lineHeightFactor: number
+): TextLayoutResult | undefined {
+  if (!text) return undefined;
+  const width = typeof box.w === "number" ? box.w : 0;
+  const height = typeof box.h === "number" ? box.h : 0;
+  const safeInitial =
+    Number.isFinite(initialFont) && initialFont > 0
+      ? Math.round(initialFont)
+      : MIN_FONT_SIZE;
+  let fontGuess = Math.max(MIN_FONT_SIZE, safeInitial);
+  let prevLines: string[] | undefined;
+  let prevFont = fontGuess;
+  const layouts: TextLayoutResult[] = [];
+
+  for (let iter = 0; iter < MAX_FONT_LAYOUT_ITERATIONS; iter++) {
+    const maxChars = width > 0 ? maxCharsForWidth(width, fontGuess) : DEFAULT_CHARS_PER_LINE;
+    const lines = wrapText(text, maxChars);
+    if (!lines.length) break;
+
+    const safeCount = Math.max(1, lines.length);
+    const lineHeightPx = height > 0 ? height / safeCount : fontGuess * lineHeightFactor;
+
+    let heightFont = Math.round(lineHeightPx / lineHeightFactor);
+    if (!Number.isFinite(heightFont) || heightFont <= 0) {
+      heightFont = fontGuess;
+    }
+    heightFont = Math.max(MIN_FONT_SIZE, heightFont);
+
+    let widthFont = heightFont;
+    if (width > 0) {
+      const longest = lines.reduce((max, line) => Math.max(max, line.length), 0);
+      if (longest > 0) {
+        const approx = Math.floor(width / (longest * APPROX_CHAR_WIDTH_RATIO));
+        if (Number.isFinite(approx) && approx > 0) {
+          widthFont = Math.max(MIN_FONT_SIZE, approx);
+        }
+      }
+    }
+
+    let nextFont = Math.max(MIN_FONT_SIZE, Math.min(heightFont, widthFont));
+    if (!Number.isFinite(nextFont) || nextFont <= 0) {
+      nextFont = fontGuess;
+    }
+
+    const targetSpacing = Math.round(nextFont * Math.max(0, lineHeightFactor - 1));
+    const availableSpacing = Math.round(Math.max(0, lineHeightPx - nextFont));
+    const spacing = Math.min(targetSpacing, availableSpacing);
+
+    const layout: TextLayoutResult = { lines: [...lines], font: nextFont, spacing };
+    layouts.push(layout);
+
+    const fontDiff = Math.abs(nextFont - prevFont);
+    if (fontDiff === 0 && prevLines && linesEqual(lines, prevLines)) {
+      break;
+    }
+    if (prevLines && linesEqual(lines, prevLines) && fontDiff <= 1) {
+      prevFont = nextFont;
+      break;
+    }
+    if (fontDiff <= 1 && (!prevLines || linesEqual(lines, prevLines))) {
+      prevFont = nextFont;
+      break;
+    }
+
+    prevLines = [...lines];
+    prevFont = nextFont;
+    fontGuess = nextFont;
+  }
+
+  if (!layouts.length) return undefined;
+
+  for (let idx = layouts.length - 1; idx >= 0; idx--) {
+    const candidate = layouts[idx];
+    const maxChars = width > 0 ? maxCharsForWidth(width, candidate.font) : DEFAULT_CHARS_PER_LINE;
+    const recomputed = wrapText(text, maxChars);
+    if (linesEqual(recomputed, candidate.lines)) {
+      return candidate;
+    }
+  }
+
+  return layouts[layouts.length - 1];
 }
 
 /* ============================================================
@@ -846,24 +1106,88 @@ export function buildTimelineFromLayout(
     const txtStr = typeof mods[`Testo-${i}`] === "string" ? mods[`Testo-${i}`].trim() : "";
 
     const txtBox = getTextBoxFromTemplate(template, i) || { x: 120, y: 160, w: 0, h: 0 };
-    const lines = txtStr
-      ? wrapText(
-          txtStr,
-          txtBox.w > 0 ? Math.max(1, Math.floor(txtBox.w / (60 * 0.6))) : DEFAULT_CHARS_PER_LINE
-        )
-      : [];
-    const textFiles = lines.length ? writeTextFilesForSlide(i, lines) : [];
-
-    // Animazioni per ciascuna linea
     const baseBlock = defaultTextBlock(txtBox.x, txtBox.y);
     if (txtEl) {
       const bg = parseRGBA((txtEl as any).background_color);
       if (bg) {
+        const padX =
+          lenToPx((txtEl as any)?.x_padding, videoW, videoH) ?? 0;
+        const padY =
+          lenToPx((txtEl as any)?.y_padding, videoW, videoH) ?? 0;
+        const rect = clampRect(
+          txtBox.x - padX,
+          txtBox.y - padY,
+          txtBox.w > 0 ? txtBox.w + padX * 2 : 0,
+          txtBox.h > 0 ? txtBox.h + padY * 2 : 0,
+          videoW,
+          videoH
+        );
+        if (rect) {
+          baseBlock.background = {
+            x: rect.x,
+            y: rect.y,
+            width: rect.w,
+            height: rect.h,
+            color: bg.color,
+            alpha: bg.alpha,
+          };
+        }
         baseBlock.box = true;
         baseBlock.boxColor = bg.color;
         baseBlock.boxAlpha = bg.alpha;
+        const pad = Math.round(Math.max(padX, padY));
+        if (pad > 0) {
+          baseBlock.boxBorderW = pad;
+        }
       }
     }
+
+    const initialFontSize = baseBlock.fontSize ?? 60;
+    const initialMaxChars =
+      txtBox.w > 0 ? maxCharsForWidth(txtBox.w, initialFontSize) : DEFAULT_CHARS_PER_LINE;
+    let lines = txtStr ? wrapText(txtStr, initialMaxChars) : [];
+    const lineHeightFactor =
+      parseLineHeightFactor((txtEl as any)?.line_height) ?? 1.35;
+
+    if (lines.length) {
+      const layout = resolveTextLayout(
+        txtStr,
+        txtBox,
+        baseBlock.fontSize ?? initialFontSize,
+        lineHeightFactor
+      );
+      if (layout) {
+        lines = [...layout.lines];
+        baseBlock.fontSize = layout.font;
+        baseBlock.lineSpacing = layout.spacing;
+      }
+
+      applyExtraBackgroundPadding(
+        baseBlock,
+        baseBlock.fontSize ?? initialFontSize,
+        videoW,
+        videoH
+      );
+    }
+
+    const alignY = parseAlignmentFactor((txtEl as any)?.y_alignment) ?? 0;
+    baseBlock.y = txtBox.y;
+    if (lines.length && txtBox.h > 0) {
+      const font = baseBlock.fontSize ?? initialFontSize;
+      const spacing = baseBlock.lineSpacing ?? 0;
+      const usedHeight = font * lines.length + spacing * Math.max(0, lines.length - 1);
+      if (usedHeight > 0) {
+        const free = txtBox.h - usedHeight;
+        if (free > 0 && alignY > 0) {
+          const offset = Math.round(Math.min(free, Math.max(0, free * alignY)));
+          baseBlock.y = txtBox.y + offset;
+        }
+      }
+    }
+
+    const textFiles = lines.length ? writeTextFilesForSlide(i, lines) : [];
+
+    // Animazioni per ciascuna linea
     const lineHeight = (baseBlock.fontSize ?? 60) + (baseBlock.lineSpacing ?? 8);
     const perLineAnims: AnimationSpec[][] = textFiles.map(() => []);
     const anims = (txtEl as any)?.animations;
@@ -903,7 +1227,8 @@ export function buildTimelineFromLayout(
 
     const logoBox = getLogoBoxFromTemplate(template, i);
     const fontFamily = getFontFamilyFromTemplate(template, i);
-    const fontPath = fontFamily ? findFontPath(fontFamily) : undefined;
+    const fontWeight = getFontWeightFromTemplate(template, i);
+    const fontPath = fontFamily ? findFontPath(fontFamily, fontWeight) : undefined;
 
     const bgShadowCandidates = slideBackgroundNameCandidates(i);
     const slideShadowSources: Array<() => ShadowInfo | undefined> = [
@@ -918,8 +1243,10 @@ export function buildTimelineFromLayout(
 
     const bgImagePath = findImageForSlide(i);
 
+    const backgroundRect = baseBlock.background;
     const texts: TextBlockSpec[] = textFiles.map((tf, idx) => ({
       ...baseBlock,
+      background: idx === 0 ? backgroundRect : undefined,
       y: baseBlock.y + idx * lineHeight,
       textFile: tf,
       animations: perLineAnims[idx].length ? perLineAnims[idx] : undefined,
@@ -1012,7 +1339,8 @@ export function buildTimelineFromLayout(
     const textEl = findChildByName(outroComp, "Testo-outro") as any;
     const textBox = getTextBoxFromTemplate(template, "Outro", "Testo-outro");
     const fontFam = getFontFamilyFromTemplate(template, "Outro", "Testo-outro");
-    const fontPath = fontFam ? findFontPath(fontFam) : undefined;
+    const fontWeight = getFontWeightFromTemplate(template, "Outro", "Testo-outro");
+    const fontPath = fontFam ? findFontPath(fontFam, fontWeight) : undefined;
     const outroBgNames = outroBackgroundNameCandidates();
     const outroShadowSources: Array<() => ShadowInfo | undefined> = [
       () => extractShadow(outroComp, videoW, videoH),
@@ -1026,18 +1354,79 @@ export function buildTimelineFromLayout(
     const txt = textEl?.text as string | undefined;
     let texts: TextBlockSpec[] | undefined;
     if (txt && textBox) {
-      const linesOut = wrapText(
-        txt,
-        textBox.w > 0 ? Math.max(1, Math.floor(textBox.w / (60 * 0.6))) : DEFAULT_CHARS_PER_LINE
-      );
-      const txtFiles = writeTextFilesForSlide(slides.length, linesOut);
       const baseOut = defaultTextBlock(textBox.x, textBox.y);
       const bg = parseRGBA(textEl?.background_color);
       if (bg) {
-        baseOut.box = true;
-        baseOut.boxColor = bg.color;
-        baseOut.boxAlpha = bg.alpha;
+        const padX = lenToPx(textEl?.x_padding, videoW, videoH) ?? 0;
+        const padY = lenToPx(textEl?.y_padding, videoW, videoH) ?? 0;
+        const rect = clampRect(
+          textBox.x - padX,
+          textBox.y - padY,
+          textBox.w > 0 ? textBox.w + padX * 2 : 0,
+          textBox.h > 0 ? textBox.h + padY * 2 : 0,
+          videoW,
+          videoH
+        );
+        if (rect) {
+          baseOut.background = {
+            x: rect.x,
+            y: rect.y,
+            width: rect.w,
+            height: rect.h,
+            color: bg.color,
+            alpha: bg.alpha,
+          };
+          baseOut.box = false;
+        } else {
+          baseOut.box = true;
+          baseOut.boxColor = bg.color;
+          baseOut.boxAlpha = bg.alpha;
+        }
       }
+      const initialOutSize = baseOut.fontSize ?? 60;
+      const initialOutMax =
+        textBox.w > 0 ? maxCharsForWidth(textBox.w, initialOutSize) : DEFAULT_CHARS_PER_LINE;
+      let linesOut = wrapText(txt, initialOutMax);
+      const lineHeightFactorOut =
+        parseLineHeightFactor(textEl?.line_height) ?? 1.35;
+
+      if (linesOut.length) {
+        const layout = resolveTextLayout(
+          txt,
+          textBox,
+          baseOut.fontSize ?? initialOutSize,
+          lineHeightFactorOut
+        );
+        if (layout) {
+          linesOut = [...layout.lines];
+          baseOut.fontSize = layout.font;
+          baseOut.lineSpacing = layout.spacing;
+        }
+
+        applyExtraBackgroundPadding(
+          baseOut,
+          baseOut.fontSize ?? initialOutSize,
+          videoW,
+          videoH
+        );
+      }
+
+      const alignY = parseAlignmentFactor(textEl?.y_alignment) ?? 0;
+      baseOut.y = textBox.y;
+      if (linesOut.length && textBox.h > 0) {
+        const font = baseOut.fontSize ?? initialOutSize;
+        const spacing = baseOut.lineSpacing ?? 0;
+        const usedHeight = font * linesOut.length + spacing * Math.max(0, linesOut.length - 1);
+        if (usedHeight > 0) {
+          const free = textBox.h - usedHeight;
+          if (free > 0 && alignY > 0) {
+            const offset = Math.round(Math.min(free, Math.max(0, free * alignY)));
+            baseOut.y = textBox.y + offset;
+          }
+        }
+      }
+
+      const txtFiles = writeTextFilesForSlide(slides.length, linesOut);
       const lineH = (baseOut.fontSize ?? 60) + (baseOut.lineSpacing ?? 8);
       const perLine: AnimationSpec[][] = txtFiles.map(() => []);
       const anims = textEl?.animations;
@@ -1074,8 +1463,10 @@ export function buildTimelineFromLayout(
           }
         }
       }
+      const outroBackground = baseOut.background;
       texts = txtFiles.map((tf, idx) => ({
         ...baseOut,
+        background: idx === 0 ? outroBackground : undefined,
         y: baseOut.y + idx * lineH,
         textFile: tf,
         animations: perLine[idx].length ? perLine[idx] : undefined,

@@ -1,9 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "fs";
+import { mkdtempSync, rmSync, writeFileSync, readFileSync } from "fs";
 import { join } from "path";
 
-import { getTextBoxFromTemplate, getLogoBoxFromTemplate, getFontFamilyFromTemplate, wrapText, buildTimelineFromLayout } from "../timeline";
+import {
+  getTextBoxFromTemplate,
+  getLogoBoxFromTemplate,
+  getFontFamilyFromTemplate,
+  getFontWeightFromTemplate,
+  wrapText,
+  buildTimelineFromLayout,
+} from "../timeline";
+import { TEXT } from "../config";
 import type { TemplateDoc } from "../template";
 import { paths } from "../paths";
 
@@ -115,6 +123,279 @@ test("getFontFamilyFromTemplate reads font family", () => {
   };
   const fam = getFontFamilyFromTemplate(tpl, 0);
   assert.equal(fam, "Roboto");
+});
+
+test("getFontWeightFromTemplate parses weight", () => {
+  const tpl: TemplateDoc = {
+    width: 100,
+    height: 100,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        elements: [
+          { type: "text", name: "Testo-0", font_family: "Roboto", font_weight: "700" },
+        ],
+      },
+    ],
+  } as any;
+  const weight = getFontWeightFromTemplate(tpl, 0);
+  assert.equal(weight, 700);
+});
+
+test("buildTimelineFromLayout assigns downloaded font file", () => {
+  const tpl: TemplateDoc = {
+    width: 100,
+    height: 100,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 1,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "0%",
+            y: "0%",
+            width: "10%",
+            height: "10%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+            font_family: "Noto Sans",
+          },
+          { type: "image", name: "Logo", x: "0%", y: "0%", width: "10%", height: "10%" },
+        ],
+      },
+    ],
+  } as any;
+
+  const oldFonts = paths.fonts;
+  const tmpFonts = mkdtempSync(join(process.cwd(), "fonts-test-"));
+  const fontPath = join(tmpFonts, "notosans.ttf");
+  writeFileSync(fontPath, "dummy");
+
+  paths.fonts = tmpFonts;
+  const prevImages = paths.images;
+  const prevTts = paths.tts;
+  paths.images = "/tmp/no_img";
+  paths.tts = "/tmp/no_tts";
+
+  try {
+    const slides = buildTimelineFromLayout({ "Testo-0": "Ciao" }, tpl, {
+      videoW: 100,
+      videoH: 100,
+      fps: 25,
+      defaultDur: 1,
+    });
+    assert.equal(slides[0]?.fontFile, fontPath);
+  } finally {
+    paths.fonts = oldFonts;
+    paths.images = prevImages;
+    paths.tts = prevTts;
+    rmSync(tmpFonts, { recursive: true, force: true });
+  }
+});
+
+test("buildTimelineFromLayout prefers weighted font variant", () => {
+  const tpl: TemplateDoc = {
+    width: 100,
+    height: 100,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 1,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "0%",
+            y: "0%",
+            width: "10%",
+            height: "10%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+            font_family: "Archivo",
+            font_weight: "800",
+          },
+          { type: "image", name: "Logo", x: "0%", y: "0%", width: "10%", height: "10%" },
+        ],
+      },
+    ],
+  } as any;
+
+  const oldFonts = paths.fonts;
+  const tmpFonts = mkdtempSync(join(process.cwd(), "fonts-test-weight-"));
+  const lightFont = join(tmpFonts, "archivo.ttf");
+  const heavyFont = join(tmpFonts, "archivo-w800.ttf");
+  writeFileSync(lightFont, "light");
+  writeFileSync(heavyFont, "heavy");
+
+  paths.fonts = tmpFonts;
+  const prevImages = paths.images;
+  const prevTts = paths.tts;
+  paths.images = "/tmp/no_img";
+  paths.tts = "/tmp/no_tts";
+
+  try {
+    const slides = buildTimelineFromLayout({ "Testo-0": "Ciao" }, tpl, {
+      videoW: 100,
+      videoH: 100,
+      fps: 25,
+      defaultDur: 1,
+    });
+    assert.equal(slides[0]?.fontFile, heavyFont);
+  } finally {
+    paths.fonts = oldFonts;
+    paths.images = prevImages;
+    paths.tts = prevTts;
+    rmSync(tmpFonts, { recursive: true, force: true });
+  }
+});
+
+test("buildTimelineFromLayout stabilizes font after single-line fallback", () => {
+  const tpl: TemplateDoc = {
+    width: 1920,
+    height: 1080,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 1,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "0%",
+            y: "0%",
+            width: "80%",
+            height: "60%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+            line_height: "135%",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const text = "Ciao mondo meraviglioso";
+  const box = getTextBoxFromTemplate(tpl, 0)!;
+  const fallbackFont = 24;
+  const approxCharWidth = 0.56;
+  const fallbackMaxChars = Math.floor(box.w / (fallbackFont * approxCharWidth));
+  const fallbackLayout = wrapText(text, fallbackMaxChars);
+  assert.equal(fallbackLayout.length, 1);
+
+  const prevImages = paths.images;
+  const prevTts = paths.tts;
+  paths.images = "/tmp/no_img";
+  paths.tts = "/tmp/no_tts";
+
+  try {
+    const slides = buildTimelineFromLayout({ "Testo-0": text }, tpl, {
+      videoW: 1920,
+      videoH: 1080,
+      fps: 25,
+      defaultDur: 1,
+    });
+    const slide = slides[0];
+    assert.ok(slide);
+    const block = slide.texts?.[0];
+    assert.ok(block);
+    const linesCount = slide.texts?.length ?? 0;
+    assert(linesCount >= 1);
+
+    const lineHeightFactor = 1.35;
+    const expectedFont = Math.round((box.h / linesCount) / lineHeightFactor);
+    assert(block.fontSize <= expectedFont);
+
+    const maxSingleLineFont = Math.round(box.h / lineHeightFactor);
+    assert(block.fontSize < maxSingleLineFont);
+
+    const lineStrings =
+      slide.texts?.map((tb) =>
+        tb.textFile ? readFileSync(tb.textFile, "utf8") : ""
+      ) ?? [];
+    const longest = lineStrings.reduce((max, line) => Math.max(max, line.length), 0);
+    if (longest > 0) {
+      const widthLimit = Math.floor(box.w / (longest * approxCharWidth));
+      assert(block.fontSize <= widthLimit);
+    }
+  } finally {
+    paths.images = prevImages;
+    paths.tts = prevTts;
+  }
+});
+
+test("buildTimelineFromLayout adds extra padding to intro background", () => {
+  const tpl: TemplateDoc = {
+    width: 1920,
+    height: 1080,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 2,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "40%",
+            y: "90%",
+            width: "50%",
+            height: "40%",
+            x_anchor: "50%",
+            y_anchor: "100%",
+            line_height: "200%",
+            background_color: "rgba(0,0,0,0.8)",
+            font_family: "Archivo",
+          },
+          { type: "image", name: "Logo", x: "0%", y: "0%", width: "10%", height: "10%" },
+        ],
+      },
+    ],
+  } as any;
+
+  const box = getTextBoxFromTemplate(tpl, 0)!;
+  const prevImages = paths.images;
+  const prevTts = paths.tts;
+  paths.images = "/tmp/no_img";
+  paths.tts = "/tmp/no_tts";
+
+  try {
+    const slides = buildTimelineFromLayout({ "Testo-0": "Linea uno linea due" }, tpl, {
+      videoW: 1920,
+      videoH: 1080,
+      fps: 25,
+      defaultDur: 2,
+    });
+    const first = slides[0];
+    assert.ok(first);
+    const blocks = first.texts ?? [];
+    assert(blocks.length > 0);
+    const primary = blocks[0];
+    assert.ok(primary.background);
+    const pad = Math.round((primary.fontSize ?? 0) * TEXT.BOX_PAD_FACTOR);
+    assert.ok(pad > 0);
+    assert.equal(primary.background?.x, box.x - pad);
+    assert.equal(primary.background?.y, box.y - pad);
+    assert.equal(primary.background?.width, box.w + pad * 2);
+    assert.equal(primary.background?.height, box.h + pad * 2);
+    assert.equal(primary.background?.color, "#000000");
+    assert.equal(primary.background?.alpha, 0.8);
+    assert.equal(primary.box, true);
+    assert.equal(primary.boxColor, "#000000");
+    assert.equal(primary.boxAlpha, 0.8);
+    assert.equal(primary.boxBorderW, pad);
+    for (let idx = 1; idx < blocks.length; idx++) {
+      assert.equal(blocks[idx].background, undefined);
+    }
+  } finally {
+    paths.images = prevImages;
+    paths.tts = prevTts;
+  }
 });
 
 test("wrapText splits by length", () => {
