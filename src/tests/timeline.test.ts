@@ -143,6 +143,24 @@ test("getFontWeightFromTemplate parses weight", () => {
   assert.equal(weight, 700);
 });
 
+test("getFontWeightFromTemplate enforces bold minimum", () => {
+  const tpl: TemplateDoc = {
+    width: 100,
+    height: 100,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        elements: [
+          { type: "text", name: "Testo-0", font_family: "Roboto", font_weight: "400" },
+        ],
+      },
+    ],
+  } as any;
+  const weight = getFontWeightFromTemplate(tpl, 0);
+  assert.equal(weight, 700);
+});
+
 test("buildTimelineFromLayout assigns downloaded font file", () => {
   const tpl: TemplateDoc = {
     width: 100,
@@ -246,6 +264,63 @@ test("buildTimelineFromLayout prefers weighted font variant", () => {
       defaultDur: 1,
     });
     assert.equal(slides[0]?.fontFile, heavyFont);
+  } finally {
+    paths.fonts = oldFonts;
+    paths.images = prevImages;
+    paths.tts = prevTts;
+    rmSync(tmpFonts, { recursive: true, force: true });
+  }
+});
+
+test("buildTimelineFromLayout upgrades light weight to bold font", () => {
+  const tpl: TemplateDoc = {
+    width: 100,
+    height: 100,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 1,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "0%",
+            y: "0%",
+            width: "10%",
+            height: "10%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+            font_family: "Archivo",
+            font_weight: "400",
+          },
+          { type: "image", name: "Logo", x: "0%", y: "0%", width: "10%", height: "10%" },
+        ],
+      },
+    ],
+  } as any;
+
+  const oldFonts = paths.fonts;
+  const tmpFonts = mkdtempSync(join(process.cwd(), "fonts-test-bold-"));
+  const lightFont = join(tmpFonts, "archivo.ttf");
+  const boldFont = join(tmpFonts, "archivo-w900.ttf");
+  writeFileSync(lightFont, "light");
+  writeFileSync(boldFont, "bold");
+
+  paths.fonts = tmpFonts;
+  const prevImages = paths.images;
+  const prevTts = paths.tts;
+  paths.images = "/tmp/no_img";
+  paths.tts = "/tmp/no_tts";
+
+  try {
+    const slides = buildTimelineFromLayout({ "Testo-0": "Ciao" }, tpl, {
+      videoW: 100,
+      videoH: 100,
+      fps: 25,
+      defaultDur: 1,
+    });
+    assert.equal(slides[0]?.fontFile, boldFont);
   } finally {
     paths.fonts = oldFonts;
     paths.images = prevImages;

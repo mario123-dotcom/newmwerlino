@@ -97,6 +97,7 @@ export type SlideSpec = {
 
 /* ---------- Util ---------- */
 const LINE_WIPE_DURATION = 0.5;
+const MIN_BOLD_FONT_WEIGHT = 700;
 function ensureTempDir() {
   try { mkdirSync(paths.temp, { recursive: true }); } catch {}
 }
@@ -956,11 +957,15 @@ function findFontPath(family: string, weight?: number): string | undefined {
       .filter((f) => fileNameMatchesFamily(f, family))
       .map((file) => ({ file, weight: extractFontWeightFromFileName(file) ?? 0 }));
     if (!candidates.length) return undefined;
-    if (typeof weight === "number") {
-      const exact = candidates.find((c) => c.weight === weight);
-      if (exact) return join(paths.fonts, exact.file);
-    }
     const sorted = [...candidates].sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0));
+    const desiredWeight =
+      typeof weight === "number" && Number.isFinite(weight)
+        ? Math.max(weight, MIN_BOLD_FONT_WEIGHT)
+        : MIN_BOLD_FONT_WEIGHT;
+    const exact = candidates.find((c) => c.weight === desiredWeight);
+    if (exact) return join(paths.fonts, exact.file);
+    const boldVariant = sorted.find((c) => (c.weight ?? 0) >= desiredWeight);
+    if (boldVariant) return join(paths.fonts, boldVariant.file);
     return join(paths.fonts, sorted[0].file);
   } catch {}
   return undefined;
@@ -1093,7 +1098,12 @@ export function getFontWeightFromTemplate(
     (typeof slideIndexOrName === "number" ? `Testo-${slideIndexOrName}` : undefined);
   const comp = findComposition(tpl, compName);
   const txtEl = txtName ? (findChildByName(comp, txtName) as any) : undefined;
-  return parseFontWeight(txtEl?.font_weight);
+  if (!txtEl) return undefined;
+  const parsed = parseFontWeight(txtEl?.font_weight);
+  if (typeof parsed === "number") {
+    return Math.max(parsed, MIN_BOLD_FONT_WEIGHT);
+  }
+  return MIN_BOLD_FONT_WEIGHT;
 }
 
 const DEFAULT_CHARS_PER_LINE = 40;
