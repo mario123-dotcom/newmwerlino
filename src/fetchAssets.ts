@@ -4,8 +4,7 @@ import { request as httpRequest } from "http";
 import { request as httpsRequest } from "https";
 import { brotliDecompressSync, gunzipSync, inflateSync } from "zlib";
 import { paths } from "./paths";
-import { loadModifications, loadTemplate, TemplateElement } from "./template";
-import { fontFamilyToFileBase, parseFontWeight } from "./fonts";
+import { loadModifications } from "./template";
 
 function ensureDir(dir: string) {
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
@@ -96,12 +95,15 @@ async function downloadFile(url: string, outPath: string, options?: HttpGetOptio
 export async function fetchAssets() {
   const mods = loadModifications() || {};
 
-  // Pulisce completamente la cartella di download per evitare artefatti (es. "npm" o "img=true")
-  clearDir(paths.downloads);
+  ensureDir(paths.downloads);
 
+  // Pulisce le cartelle dinamiche ma lascia intatta la directory dei font locali
   ensureDir(paths.audio);
+  clearDir(paths.audio);
   ensureDir(paths.images);
+  clearDir(paths.images);
   ensureDir(paths.tts);
+  clearDir(paths.tts);
   ensureDir(paths.fonts);
 
   // Logo
@@ -137,173 +139,6 @@ export async function fetchAssets() {
         const safeExt = ext.length <= 5 ? ext : "jpg";
         await downloadFile(url, join(paths.images, `img${m[1]}.${safeExt}`));
       }
-    }
-  }
-
-  // Font dal template
-  const tpl = loadTemplate();
-  const fontRequests = new Map<string, { includeDefault: boolean; weights: Set<number> }>();
-  function registerFont(family: string, weightValue: unknown) {
-    const fam = family.trim();
-    if (!fam) return;
-    const info = fontRequests.get(fam) ?? { includeDefault: false, weights: new Set<number>() };
-    const parsedWeight = parseFontWeight(weightValue);
-    if (parsedWeight != null) info.weights.add(parsedWeight);
-    else info.includeDefault = true;
-    fontRequests.set(fam, info);
-  }
-  function collectFonts(el: TemplateElement) {
-    const fam = (el as any).font_family;
-    const weight = (el as any).font_weight;
-    if (typeof fam === "string" && fam.trim()) registerFont(fam, weight);
-    if (Array.isArray(el.elements)) {
-      for (const child of el.elements) collectFonts(child);
-    }
-  }
-  tpl.elements.forEach((e) => collectFonts(e));
-
-  type FontFaceDescriptor = {
-    url: string;
-    weightMin?: number;
-    weightMax?: number;
-    style?: string;
-  };
-
-  function parseFontFaces(css: string): FontFaceDescriptor[] {
-    const faces: FontFaceDescriptor[] = [];
-    const faceRe = /@font-face\s*{[^}]*}/gi;
-    let match: RegExpExecArray | null;
-    while ((match = faceRe.exec(css))) {
-      const block = match[0];
-      const urlMatch = block.match(/url\(([^)]+)\)/i);
-      if (!urlMatch) continue;
-      let url = urlMatch[1].trim();
-      if ((url.startsWith("\"") && url.endsWith("\"")) || (url.startsWith("'") && url.endsWith("'"))) {
-        url = url.slice(1, -1);
-      }
-      const weightMatch = block.match(/font-weight:\s*([^;]+);/i);
-      let weightMin: number | undefined;
-      let weightMax: number | undefined;
-      if (weightMatch) {
-        const raw = weightMatch[1].trim();
-        const parts = raw.split(/\s+/);
-        if (parts.length === 1) {
-          const n = parseFloat(parts[0]);
-          if (Number.isFinite(n)) {
-            const rounded = Math.round(n);
-            weightMin = rounded;
-            weightMax = rounded;
-          }
-        } else if (parts.length >= 2) {
-          const n1 = parseFloat(parts[0]);
-          const n2 = parseFloat(parts[1]);
-          if (Number.isFinite(n1) && Number.isFinite(n2)) {
-            weightMin = Math.round(Math.min(n1, n2));
-            weightMax = Math.round(Math.max(n1, n2));
-          }
-        }
-      }
-      const styleMatch = block.match(/font-style:\s*([^;]+);/i);
-      const style = styleMatch ? styleMatch[1].trim().toLowerCase() : undefined;
-      faces.push({ url, weightMin, weightMax, style });
-    }
-    return faces;
-  }
-
-  function compareFaces(a: FontFaceDescriptor, b: FontFaceDescriptor): number {
-    const styleA = (a.style ?? "normal") === "normal" ? 0 : 1;
-    const styleB = (b.style ?? "normal") === "normal" ? 0 : 1;
-    if (styleA !== styleB) return styleA - styleB;
-    const weightA =
-      typeof a.weightMax === "number"
-        ? a.weightMax
-        : typeof a.weightMin === "number"
-        ? a.weightMin
-        : 0;
-    const weightB =
-      typeof b.weightMax === "number"
-        ? b.weightMax
-        : typeof b.weightMin === "number"
-        ? b.weightMin
-        : 0;
-    return weightB - weightA;
-  }
-
-  function selectFontFace(css: string, targetWeight?: number): FontFaceDescriptor | undefined {
-    const faces = parseFontFaces(css);
-    if (!faces.length) return undefined;
-    if (typeof targetWeight === "number") {
-      const matches = faces.filter((face) => {
-        if (typeof face.weightMin === "number" && typeof face.weightMax === "number") {
-          return targetWeight >= face.weightMin && targetWeight <= face.weightMax;
-        }
-        if (typeof face.weightMin === "number") return targetWeight === face.weightMin;
-        if (typeof face.weightMax === "number") return targetWeight === face.weightMax;
-        return false;
-      });
-      if (matches.length) {
-        return [...matches].sort(compareFaces)[0];
-      }
-    }
-    return [...faces].sort(compareFaces)[0];
-  }
-
-  function buildFamilyQuery(family: string, weight?: number): string {
-    let param = family.trim().replace(/\s+/g, "+");
-    if (typeof weight === "number") {
-      param += `:wght@${weight}`;
-    }
-    return encodeURIComponent(param)
-      .replace(/%3A/g, ":")
-      .replace(/%40/g, "@")
-      .replace(/%2B/g, "+");
-  }
-
-  async function downloadFont(family: string, weight?: number) {
-    const query = buildFamilyQuery(family, weight);
-    try {
-      const cssRes = await httpGet(
-        `https://fonts.googleapis.com/css2?family=${query}`,
-        {
-          headers: {
-            Accept: "text/css,*/*;q=0.1",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Accept-Encoding": "identity",
-          },
-        }
-      );
-      const css = decodeTextResponse(cssRes);
-      const face = selectFontFace(css, weight);
-      if (!face) return;
-      const fontUrl = face.url.startsWith("http")
-        ? face.url
-        : `https://fonts.gstatic.com/${face.url.replace(/^\//, "")}`;
-      const urlObj = (() => {
-        try {
-          return new URL(fontUrl);
-        } catch {
-          return undefined;
-        }
-      })();
-      const ext = urlObj?.pathname.split(".").pop()?.split("?")[0] || "ttf";
-      const safeExt = ext.length <= 5 ? ext : "ttf";
-      const safe = fontFamilyToFileBase(family);
-      const suffix = typeof weight === "number" ? `-w${weight}` : "";
-      const fileName = safe
-        ? `${safe}${suffix}.${safeExt}`
-        : `${encodeURIComponent(family)}${suffix}.${safeExt}`;
-      await downloadFile(fontUrl, join(paths.fonts, fileName));
-    } catch (err) {
-      console.warn(`Impossibile scaricare il font ${family}:`, err);
-    }
-  }
-
-  for (const [fam, info] of fontRequests) {
-    if (info.includeDefault || info.weights.size === 0) {
-      await downloadFont(fam);
-    }
-    for (const w of info.weights) {
-      await downloadFont(fam, w);
     }
   }
 

@@ -5,11 +5,9 @@ import { findComposition, findChildByName, pctToPx } from "./template";
 import type { TemplateDoc, TemplateElement } from "./template";
 import { probeDurationSec } from "./ffmpeg/probe";
 import { TEXT } from "./config";
-import {
-  extractFontWeightFromFileName,
-  fileNameMatchesFamily,
-  parseFontWeight,
-} from "./fonts";
+import { fileNameMatchesFamily } from "./fonts";
+
+const TEXT_BOX_SCALE = 70 / 60;
 
 /* ---------- Tipi usati da composition.ts ---------- */
 export type AnimationSpec =
@@ -950,18 +948,13 @@ function findTTSForSlide(i: number): string | undefined {
   return cand.find(existsSync);
 }
 
-function findFontPath(family: string, weight?: number): string | undefined {
+function findFontPath(family: string): string | undefined {
   try {
-    const candidates = readdirSync(paths.fonts)
+    const matches = readdirSync(paths.fonts)
       .filter((f) => fileNameMatchesFamily(f, family))
-      .map((file) => ({ file, weight: extractFontWeightFromFileName(file) ?? 0 }));
-    if (!candidates.length) return undefined;
-    if (typeof weight === "number") {
-      const exact = candidates.find((c) => c.weight === weight);
-      if (exact) return join(paths.fonts, exact.file);
-    }
-    const sorted = [...candidates].sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0));
-    return join(paths.fonts, sorted[0].file);
+      .sort((a, b) => a.localeCompare(b));
+    if (!matches.length) return undefined;
+    return join(paths.fonts, matches[0]);
   } catch {}
   return undefined;
 }
@@ -1005,13 +998,17 @@ export function getTextBoxFromTemplate(
   const y = pctToPx(txtEl.y, H);
   if (typeof x !== "number" || typeof y !== "number") return undefined;
 
-  const w = pctToPx(txtEl.width, W) || 0;
-  const h = pctToPx(txtEl.height, H) || 0;
+  const rawW = pctToPx(txtEl.width, W) || 0;
+  const rawH = pctToPx(txtEl.height, H) || 0;
+  const w = rawW * TEXT_BOX_SCALE;
+  const h = rawH * TEXT_BOX_SCALE;
   const xAnchor = (pctToPx(txtEl.x_anchor, 100) || 0) / 100;
   const yAnchor = (pctToPx(txtEl.y_anchor, 100) || 0) / 100;
 
-  let left = x - w * xAnchor;
-  let top = y - h * yAnchor;
+  const baseLeft = x - rawW * xAnchor;
+  const baseTop = y - rawH * yAnchor;
+  let left = Math.max(baseLeft, x - w * xAnchor);
+  let top = Math.max(baseTop, y - h * yAnchor);
 
   if (w > 0) left = Math.max(0, Math.min(W - w, left));
   else left = Math.max(0, Math.min(W - 10, left));
@@ -1077,23 +1074,6 @@ export function getFontFamilyFromTemplate(
   const txtEl = txtName ? (findChildByName(comp, txtName) as any) : undefined;
   const fam = txtEl?.font_family;
   return typeof fam === "string" ? fam : undefined;
-}
-
-export function getFontWeightFromTemplate(
-  tpl: TemplateDoc,
-  slideIndexOrName: number | string,
-  textName?: string
-): number | undefined {
-  const compName =
-    typeof slideIndexOrName === "number"
-      ? `Slide_${slideIndexOrName}`
-      : slideIndexOrName;
-  const txtName =
-    textName ??
-    (typeof slideIndexOrName === "number" ? `Testo-${slideIndexOrName}` : undefined);
-  const comp = findComposition(tpl, compName);
-  const txtEl = txtName ? (findChildByName(comp, txtName) as any) : undefined;
-  return parseFontWeight(txtEl?.font_weight);
 }
 
 const DEFAULT_CHARS_PER_LINE = 40;
@@ -1376,8 +1356,7 @@ function buildCopyrightBlock(
   const bg = parseRGBA((element as any)?.background_color);
 
   const fontFamily = getFontFamilyFromTemplate(template, compName, elementName);
-  const fontWeight = getFontWeightFromTemplate(template, compName, elementName);
-  const fontPath = fontFamily ? findFontPath(fontFamily, fontWeight) : undefined;
+  const fontPath = fontFamily ? findFontPath(fontFamily) : undefined;
 
   const block: TextBlockSpec = {
     x: box.x,
@@ -1645,8 +1624,7 @@ export function buildTimelineFromLayout(
 
     const logoBox = getLogoBoxFromTemplate(template, i);
     const fontFamily = getFontFamilyFromTemplate(template, i);
-    const fontWeight = getFontWeightFromTemplate(template, i);
-    const fontPath = fontFamily ? findFontPath(fontFamily, fontWeight) : undefined;
+    const fontPath = fontFamily ? findFontPath(fontFamily) : undefined;
 
     const bgShadowCandidates = slideBackgroundNameCandidates(i);
     const slideShadowSources: Array<() => ShadowInfo | undefined> = [
@@ -1779,8 +1757,7 @@ export function buildTimelineFromLayout(
     const textEl = findChildByName(outroComp, "Testo-outro") as any;
     const textBox = getTextBoxFromTemplate(template, "Outro", "Testo-outro");
     const fontFam = getFontFamilyFromTemplate(template, "Outro", "Testo-outro");
-    const fontWeight = getFontWeightFromTemplate(template, "Outro", "Testo-outro");
-    const fontPath = fontFam ? findFontPath(fontFam, fontWeight) : undefined;
+    const fontPath = fontFam ? findFontPath(fontFam) : undefined;
     const outroBgNames = outroBackgroundNameCandidates();
     const outroShadowSources: Array<() => ShadowInfo | undefined> = [
       () => extractShadow(outroComp, videoW, videoH),
