@@ -143,6 +143,25 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
     for (let i = 0; i < slide.texts.length; i++) {
       const tb = slide.texts[i];
 
+      if (
+        tb.background &&
+        tb.background.width > 0 &&
+        tb.background.height > 0 &&
+        tb.background.alpha > 0
+      ) {
+        const bgLabel = `tx_${i}_bg`;
+        f.push(
+          `color=c=${tb.background.color}@${tb.background.alpha}:` +
+            `s=${tb.background.width}x${tb.background.height}:d=${dur},format=rgba[${bgLabel}]`
+        );
+        const bgOut = `v_bg${i}`;
+        f.push(
+          `[${lastV}][${bgLabel}]overlay=` +
+            `x=${tb.background.x}:y=${tb.background.y}:enable='between(t,0,${dur})'[${bgOut}]`
+        );
+        lastV = bgOut;
+      }
+
       // layer trasparente su cui disegnare il testo; il "blank" serve solo per xfade
       const wipeAnims = tb.animations?.filter((a) => a.type === "wipe") ?? [];
       let blankEnd = 0;

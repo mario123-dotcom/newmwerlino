@@ -328,6 +328,70 @@ test("buildTimelineFromLayout stabilizes font after single-line fallback", () =>
   }
 });
 
+test("buildTimelineFromLayout keeps template-sized background for intro text", () => {
+  const tpl: TemplateDoc = {
+    width: 1920,
+    height: 1080,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 2,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "40%",
+            y: "90%",
+            width: "50%",
+            height: "40%",
+            x_anchor: "50%",
+            y_anchor: "100%",
+            line_height: "200%",
+            background_color: "rgba(0,0,0,0.8)",
+            font_family: "Archivo",
+          },
+          { type: "image", name: "Logo", x: "0%", y: "0%", width: "10%", height: "10%" },
+        ],
+      },
+    ],
+  } as any;
+
+  const box = getTextBoxFromTemplate(tpl, 0)!;
+  const prevImages = paths.images;
+  const prevTts = paths.tts;
+  paths.images = "/tmp/no_img";
+  paths.tts = "/tmp/no_tts";
+
+  try {
+    const slides = buildTimelineFromLayout({ "Testo-0": "Linea uno linea due" }, tpl, {
+      videoW: 1920,
+      videoH: 1080,
+      fps: 25,
+      defaultDur: 2,
+    });
+    const first = slides[0];
+    assert.ok(first);
+    const blocks = first.texts ?? [];
+    assert(blocks.length > 0);
+    const primary = blocks[0];
+    assert.ok(primary.background);
+    assert.equal(primary.background?.x, box.x);
+    assert.equal(primary.background?.y, box.y);
+    assert.equal(primary.background?.width, box.w);
+    assert.equal(primary.background?.height, box.h);
+    assert.equal(primary.background?.color, "#000000");
+    assert.equal(primary.background?.alpha, 0.8);
+    assert.equal(primary.box, false);
+    for (let idx = 1; idx < blocks.length; idx++) {
+      assert.equal(blocks[idx].background, undefined);
+    }
+  } finally {
+    paths.images = prevImages;
+    paths.tts = prevTts;
+  }
+});
+
 test("wrapText splits by length", () => {
   const lines = wrapText("uno due tre quattro cinque", 7);
   assert.deepEqual(lines, ["uno due", "tre", "quattro", "cinque"]);

@@ -39,6 +39,14 @@ export type TextBlockSpec = {
   boxColor?: string;
   boxAlpha?: number;
   boxBorderW?: number;
+  background?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    color: string;
+    alpha: number;
+  };
 
   animations?: AnimationSpec[];
 };
@@ -110,6 +118,39 @@ function lenToPx(v: any, W: number, H: number): number | undefined {
   }
   const n = parseFloat(s);
   return Number.isFinite(n) ? n : undefined;
+}
+
+function clampRect(
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  maxW: number,
+  maxH: number
+): { x: number; y: number; w: number; h: number } | undefined {
+  if (!(w > 0) || !(h > 0)) return undefined;
+  if (!(maxW > 0) || !(maxH > 0)) return undefined;
+
+  let left = x;
+  let top = y;
+  let right = x + w;
+  let bottom = y + h;
+
+  left = Math.max(0, Math.min(left, maxW));
+  top = Math.max(0, Math.min(top, maxH));
+  right = Math.max(left, Math.min(right, maxW));
+  bottom = Math.max(top, Math.min(bottom, maxH));
+
+  const width = right - left;
+  const height = bottom - top;
+  if (!(width > 0) || !(height > 0)) return undefined;
+
+  return {
+    x: Math.round(left),
+    y: Math.round(top),
+    w: Math.round(width),
+    h: Math.round(height),
+  };
 }
 
 function parseAlpha(val: any): number | undefined {
@@ -1028,9 +1069,33 @@ export function buildTimelineFromLayout(
     if (txtEl) {
       const bg = parseRGBA((txtEl as any).background_color);
       if (bg) {
-        baseBlock.box = true;
-        baseBlock.boxColor = bg.color;
-        baseBlock.boxAlpha = bg.alpha;
+        const padX =
+          lenToPx((txtEl as any)?.x_padding, videoW, videoH) ?? 0;
+        const padY =
+          lenToPx((txtEl as any)?.y_padding, videoW, videoH) ?? 0;
+        const rect = clampRect(
+          txtBox.x - padX,
+          txtBox.y - padY,
+          txtBox.w > 0 ? txtBox.w + padX * 2 : 0,
+          txtBox.h > 0 ? txtBox.h + padY * 2 : 0,
+          videoW,
+          videoH
+        );
+        if (rect) {
+          baseBlock.background = {
+            x: rect.x,
+            y: rect.y,
+            width: rect.w,
+            height: rect.h,
+            color: bg.color,
+            alpha: bg.alpha,
+          };
+          baseBlock.box = false;
+        } else {
+          baseBlock.box = true;
+          baseBlock.boxColor = bg.color;
+          baseBlock.boxAlpha = bg.alpha;
+        }
       }
     }
 
@@ -1128,8 +1193,10 @@ export function buildTimelineFromLayout(
 
     const bgImagePath = findImageForSlide(i);
 
+    const backgroundRect = baseBlock.background;
     const texts: TextBlockSpec[] = textFiles.map((tf, idx) => ({
       ...baseBlock,
+      background: idx === 0 ? backgroundRect : undefined,
       y: baseBlock.y + idx * lineHeight,
       textFile: tf,
       animations: perLineAnims[idx].length ? perLineAnims[idx] : undefined,
@@ -1240,9 +1307,31 @@ export function buildTimelineFromLayout(
       const baseOut = defaultTextBlock(textBox.x, textBox.y);
       const bg = parseRGBA(textEl?.background_color);
       if (bg) {
-        baseOut.box = true;
-        baseOut.boxColor = bg.color;
-        baseOut.boxAlpha = bg.alpha;
+        const padX = lenToPx(textEl?.x_padding, videoW, videoH) ?? 0;
+        const padY = lenToPx(textEl?.y_padding, videoW, videoH) ?? 0;
+        const rect = clampRect(
+          textBox.x - padX,
+          textBox.y - padY,
+          textBox.w > 0 ? textBox.w + padX * 2 : 0,
+          textBox.h > 0 ? textBox.h + padY * 2 : 0,
+          videoW,
+          videoH
+        );
+        if (rect) {
+          baseOut.background = {
+            x: rect.x,
+            y: rect.y,
+            width: rect.w,
+            height: rect.h,
+            color: bg.color,
+            alpha: bg.alpha,
+          };
+          baseOut.box = false;
+        } else {
+          baseOut.box = true;
+          baseOut.boxColor = bg.color;
+          baseOut.boxAlpha = bg.alpha;
+        }
       }
       const initialOutSize = baseOut.fontSize ?? 60;
       const initialOutMax =
@@ -1317,8 +1406,10 @@ export function buildTimelineFromLayout(
           }
         }
       }
+      const outroBackground = baseOut.background;
       texts = txtFiles.map((tf, idx) => ({
         ...baseOut,
+        background: idx === 0 ? outroBackground : undefined,
         y: baseOut.y + idx * lineH,
         textFile: tf,
         animations: perLine[idx].length ? perLine[idx] : undefined,
