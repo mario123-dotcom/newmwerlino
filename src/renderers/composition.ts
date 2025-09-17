@@ -54,6 +54,13 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
   const f: string[] = [];
   f.push(`[0:v]format=rgba[base]`);
 
+  const targetAR = H > 0 ? W / H : 16 / 9;
+  const arExpr = targetAR.toFixed(10);
+  const cropWidthExpr = `min(iw,ih*${arExpr})`;
+  const cropHeightExpr = `min(ih,iw/${arExpr})`;
+  const cropFilter =
+    `crop=w='${cropWidthExpr}':h='${cropHeightExpr}':x='(iw-ow)/2':y='(ih-oh)/2'`;
+
   // Background: cover + crop (usa "increase", non 'cover' che in scale è una stringa non valida)
   let lastV = "base";
   if (hasBG) {
@@ -64,18 +71,22 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
       const steps = Math.max(1, frameCount - 1);
       const zoomStep = (targetZoom - 1) / steps;
       const zoomExpr = `min(${targetZoom.toFixed(6)},1+${zoomStep.toFixed(7)}*on)`;
-      const yExpr = `max(0,(ih/zoom-oh)/2)`;
+      const zoomScaleW = Math.max(W, Math.round(W * targetZoom));
+      const zoomScaleH = Math.max(H, Math.round(zoomScaleW / targetAR));
+      const centerXExpr = `max(0,(iw-iw/zoom)/2)`;
+      const centerYExpr = `max(0,(ih-ih/zoom)/2)`;
       f.push(
         `[1:v]format=rgba,` +
-          `scale=${W}:${H}:force_original_aspect_ratio=increase,` +
-          `zoompan=z='${zoomExpr}':d=${frameCount}:s=${W}x${H}:fps=${animFps.toFixed(6)}:x='0':y='${yExpr}',` +
+          `${cropFilter},` +
+          `scale=${zoomScaleW}:${zoomScaleH}:flags=lanczos,` +
+          `zoompan=z='${zoomExpr}':d=${frameCount}:s=${W}x${H}:fps=${animFps.toFixed(6)}:x='${centerXExpr}':y='${centerYExpr}',` +
           `setsar=1[bg]`
       );
     } else {
       f.push(
         `[1:v]format=rgba,` +
-          `scale=${W}:${H}:force_original_aspect_ratio=increase,` +
-          `crop=${W}:${H},setsar=1[bg]`
+          `${cropFilter},` +
+          `scale=${W}:${H}:flags=lanczos,setsar=1[bg]`
       );
     }
     f.push(`[${lastV}][bg]overlay=x=0:y=0:enable='between(t,0,${dur})'[v0]`);
