@@ -65,10 +65,11 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
       const zoomStep = (targetZoom - 1) / steps;
       const zoomExpr = `min(${targetZoom.toFixed(6)},1+${zoomStep.toFixed(7)}*on)`;
       const yExpr = `max(0,(ih/zoom-oh)/2)`;
+      const xExpr = `max(0,(iw/zoom-ow)/2)`;
       f.push(
         `[1:v]format=rgba,` +
           `scale=${W}:${H}:force_original_aspect_ratio=increase,` +
-          `zoompan=z='${zoomExpr}':d=${frameCount}:s=${W}x${H}:fps=${animFps.toFixed(6)}:x='0':y='${yExpr}',` +
+          `zoompan=z='${zoomExpr}':d=${frameCount}:s=${W}x${H}:fps=${animFps.toFixed(6)}:x='${xExpr}':y='${yExpr}',` +
           `setsar=1[bg]`
       );
     } else {
