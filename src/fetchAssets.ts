@@ -142,7 +142,6 @@ export async function fetchAssets() {
 
   // Font dal template
   const tpl = loadTemplate();
-  const BOLD_FONT_WEIGHT = 700;
   const fontRequests = new Map<string, { includeDefault: boolean; weights: Set<number> }>();
   function registerFont(family: string, weightValue: unknown) {
     const fam = family.trim();
@@ -151,7 +150,6 @@ export async function fetchAssets() {
     const parsedWeight = parseFontWeight(weightValue);
     if (parsedWeight != null) info.weights.add(parsedWeight);
     else info.includeDefault = true;
-    info.weights.add(BOLD_FONT_WEIGHT);
     fontRequests.set(fam, info);
   }
   function collectFonts(el: TemplateElement) {
@@ -250,19 +248,48 @@ export async function fetchAssets() {
     return [...faces].sort(compareFaces)[0];
   }
 
-  function buildFamilyQuery(family: string, weight?: number): string {
+  function buildFamilyQuery(family: string, weights?: number | number[]): string {
     let param = family.trim().replace(/\s+/g, "+");
-    if (typeof weight === "number") {
-      param += `:wght@${weight}`;
+    if (Array.isArray(weights)) {
+      const normalized = weights
+        .map((w) => parseFontWeight(w))
+        .filter((w): w is number => typeof w === "number");
+      const unique = [...new Set(normalized)].sort((a, b) => a - b);
+      if (unique.length) {
+        param += `:wght@${unique.join(";")}`;
+      }
+    } else if (typeof weights === "number") {
+      const normalized = parseFontWeight(weights);
+      if (typeof normalized === "number") {
+        param += `:wght@${normalized}`;
+      }
     }
     return encodeURIComponent(param)
       .replace(/%3A/g, ":")
       .replace(/%40/g, "@")
-      .replace(/%2B/g, "+");
+      .replace(/%2B/g, "+")
+      .replace(/%3B/g, ";")
+      .replace(/%2C/g, ",");
   }
 
-  async function downloadFont(family: string, weight?: number) {
-    const query = buildFamilyQuery(family, weight);
+  const HEAVY_WEIGHT_PROBE = [100, 200, 300, 400, 500, 600, 700, 800, 900];
+  const downloadedFontVariants = new Set<string>();
+
+  type FontDownloadOptions = {
+    targetWeight?: number;
+    weightQuery?: number[];
+    preferHeaviest?: boolean;
+    baseFile?: boolean;
+  };
+
+  async function downloadFont(
+    family: string,
+    { targetWeight, weightQuery, preferHeaviest, baseFile }: FontDownloadOptions = {}
+  ): Promise<number | undefined> {
+    const normalizedTarget =
+      typeof targetWeight === "number" ? parseFontWeight(targetWeight) : undefined;
+    const queryParam = Array.isArray(weightQuery) && weightQuery.length ? weightQuery : normalizedTarget;
+    const query = buildFamilyQuery(family, queryParam);
     try {
       const cssRes = await httpGet(
         `https://fonts.googleapis.com/css2?family=${query}`,
@@ -275,7 +302,11 @@ export async function fetchAssets() {
         }
       );
       const css = decodeTextResponse(cssRes);
-      const face = selectFontFace(css, weight);
+      const face = preferHeaviest
+        ? selectFontFace(css)
+        : typeof normalizedTarget === "number"
+        ? selectFontFace(css, normalizedTarget)
+        : selectFontFace(css);
       if (!face) return;
       const fontUrl = face.url.startsWith("http")
         ? face.url
@@ -289,23 +320,56 @@ export async function fetchAssets() {
       })();
       const ext = urlObj?.pathname.split(".").pop()?.split("?")[0] || "ttf";
       const safeExt = ext.length <= 5 ? ext : "ttf";
+      const faceWeight =
+        typeof face.weightMax === "number"
+          ? face.weightMax
+          : typeof face.weightMin === "number"
+          ? face.weightMin
+          : undefined;
+      const resolvedWeight = faceWeight ?? normalizedTarget;
+      const style = face.style && face.style !== "normal" ? face.style : undefined;
+      const normalizedFamily = family.trim().toLowerCase();
+      const keyParts = [normalizedFamily];
+      if (style) keyParts.push(style);
+      if (resolvedWeight != null && !baseFile) keyParts.push(String(resolvedWeight));
+      else if (preferHeaviest) keyParts.push("heaviest");
+      else if (baseFile) keyParts.push("base");
+      else keyParts.push("default");
+      const variantKey = keyParts.join("::");
+      if (downloadedFontVariants.has(variantKey)) {
+        return resolvedWeight;
+      }
+      downloadedFontVariants.add(variantKey);
+
       const safe = fontFamilyToFileBase(family);
-      const suffix = typeof weight === "number" ? `-w${weight}` : "";
+      const suffixParts: string[] = [];
+      const shouldAppendWeight =
+        !baseFile && (preferHeaviest || typeof normalizedTarget === "number");
+      if (resolvedWeight != null && shouldAppendWeight) {
+        suffixParts.push(`w${resolvedWeight}`);
+      } else if (preferHeaviest) {
+        suffixParts.push("bheavy");
+      }
+      if (style) suffixParts.push(style);
+      const suffix = suffixParts.length ? `-${suffixParts.join("-")}` : "";
       const fileName = safe
         ? `${safe}${suffix}.${safeExt}`
         : `${encodeURIComponent(family)}${suffix}.${safeExt}`;
       await downloadFile(fontUrl, join(paths.fonts, fileName));
+      return resolvedWeight;
     } catch (err) {
       console.warn(`Impossibile scaricare il font ${family}:`, err);
     }
+    return undefined;
   }
 
   for (const [fam, info] of fontRequests) {
+    await downloadFont(fam, { weightQuery: HEAVY_WEIGHT_PROBE, preferHeaviest: true });
     if (info.includeDefault || info.weights.size === 0) {
-      await downloadFont(fam);
+      await downloadFont(fam, { targetWeight: 400, baseFile: true });
     }
     for (const w of info.weights) {
-      await downloadFont(fam, w);
+      await downloadFont(fam, { targetWeight: w });
     }
   }
 
