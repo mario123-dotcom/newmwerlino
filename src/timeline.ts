@@ -121,13 +121,27 @@ function lenToPx(v: any, W: number, H: number): number | undefined {
   if (v == null) return undefined;
   if (typeof v === "number" && Number.isFinite(v)) return v;
   if (typeof v !== "string") return undefined;
-  const s = v.trim().toLowerCase();
+  const trimmed = v.trim().toLowerCase();
+  if (!trimmed) return undefined;
+  const s = trimmed.replace(/\s+/g, "");
   if (s.endsWith("vmin")) {
-    const n = parseFloat(s.replace("vmin", ""));
+    const n = parseFloat(s.slice(0, -4));
     return Number.isFinite(n) ? (n / 100) * Math.min(W, H) : undefined;
   }
+  if (s.endsWith("vmax")) {
+    const n = parseFloat(s.slice(0, -4));
+    return Number.isFinite(n) ? (n / 100) * Math.max(W, H) : undefined;
+  }
+  if (s.endsWith("vh")) {
+    const n = parseFloat(s.slice(0, -2));
+    return Number.isFinite(n) ? (n / 100) * H : undefined;
+  }
+  if (s.endsWith("vw")) {
+    const n = parseFloat(s.slice(0, -2));
+    return Number.isFinite(n) ? (n / 100) * W : undefined;
+  }
   if (s.endsWith("px")) {
-    const n = parseFloat(s.replace("px", ""));
+    const n = parseFloat(s.slice(0, -2));
     return Number.isFinite(n) ? n : undefined;
   }
   const n = parseFloat(s);
@@ -1289,12 +1303,24 @@ function buildCopyrightBlock(
   const box = getTextBoxFromTemplate(template, compName, elementName);
   if (!box) return undefined;
 
-  let fontGuess =
-    lenToPx((element as any)?.font_size, videoW, videoH) ??
-    lenToPx((element as any)?.font_size_maximum, videoW, videoH) ??
-    lenToPx((element as any)?.font_size_minimum, videoW, videoH) ??
-    MIN_FONT_SIZE;
+  const explicitFont = lenToPx((element as any)?.font_size, videoW, videoH);
+  const minFontPx = lenToPx((element as any)?.font_size_minimum, videoW, videoH);
+  const maxFontPx = lenToPx((element as any)?.font_size_maximum, videoW, videoH);
+  const clampFontSize = (value: number): number => {
+    let next = Number.isFinite(value) && value > 0 ? value : MIN_FONT_SIZE;
+    if (typeof maxFontPx === "number" && Number.isFinite(maxFontPx) && maxFontPx > 0) {
+      next = Math.min(next, maxFontPx);
+    }
+    if (typeof minFontPx === "number" && Number.isFinite(minFontPx) && minFontPx > 0) {
+      next = Math.max(next, minFontPx);
+    }
+    if (!(next > 0)) next = MIN_FONT_SIZE;
+    return Math.max(MIN_FONT_SIZE, Math.round(next));
+  };
+
+  let fontGuess = explicitFont ?? minFontPx ?? maxFontPx ?? MIN_FONT_SIZE;
   if (!(fontGuess > 0)) fontGuess = MIN_FONT_SIZE;
+  fontGuess = clampFontSize(fontGuess);
 
   const lineHeightFactor = parseLineHeightFactor((element as any)?.line_height) ?? 1.2;
 
@@ -1308,14 +1334,22 @@ function buildCopyrightBlock(
   lines = lines.map((ln) => ln.trim()).filter((ln) => ln);
   if (!lines.length) return undefined;
 
-  let fontSize = Math.max(1, Math.round(fontGuess));
-  let spacing = Math.max(0, Math.round(fontSize * Math.max(0, lineHeightFactor - 1)));
+  const computeSpacing = (font: number, lineCount: number): number => {
+    const safeLines = Math.max(1, lineCount);
+    const lineHeightPx = box.h > 0 ? box.h / safeLines : font * lineHeightFactor;
+    const targetSpacing = Math.round(font * Math.max(0, lineHeightFactor - 1));
+    const availableSpacing = Math.round(Math.max(0, lineHeightPx - font));
+    return Math.min(targetSpacing, availableSpacing);
+  };
+
+  let fontSize = clampFontSize(fontGuess);
+  let spacing = computeSpacing(fontSize, lines.length);
   if (!manualBreaks) {
     const layout = resolveTextLayout(text, box, fontSize, lineHeightFactor);
     if (layout) {
       lines = [...layout.lines];
-      fontSize = Math.max(1, Math.round(layout.font));
-      spacing = Math.max(0, Math.round(layout.spacing));
+      fontSize = clampFontSize(layout.font);
+      spacing = computeSpacing(fontSize, lines.length);
     }
   }
 
@@ -1353,16 +1387,32 @@ function buildCopyrightBlock(
     lineSpacing: spacing,
   };
 
-  const wantsBox = !!bg || pad > 0;
+  if (bg) {
+    const rect = clampRect(
+      box.x - padX,
+      box.y - padY,
+      box.w > 0 ? box.w + padX * 2 : 0,
+      box.h > 0 ? box.h + padY * 2 : 0,
+      videoW,
+      videoH
+    );
+    if (rect) {
+      block.background = {
+        x: rect.x,
+        y: rect.y,
+        width: rect.w,
+        height: rect.h,
+        color: bg.color,
+        alpha: bg.alpha,
+      };
+    }
+  }
+
+  const wantsBox = !block.background && (!!bg || pad > 0);
   if (wantsBox) {
     block.box = true;
-    if (bg) {
-      block.boxColor = bg.color;
-      block.boxAlpha = bg.alpha;
-    } else {
-      block.boxColor = block.boxColor ?? "#000000";
-      block.boxAlpha = block.boxAlpha ?? 0;
-    }
+    block.boxColor = bg?.color ?? block.boxColor ?? "#000000";
+    block.boxAlpha = bg?.alpha ?? block.boxAlpha ?? 0;
     if (pad > 0) {
       block.boxBorderW = pad;
     }
