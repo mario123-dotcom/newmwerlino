@@ -1496,8 +1496,14 @@ export function buildTimelineFromLayout(
     );
 
     const ttsPath = findTTSForSlide(i);
-    let ttsDur = parseSec(mods[`TTS-${i}.duration`], 0);
-    if (!ttsDur && ttsPath) ttsDur = probeDurationSec(ttsPath);
+    const hintedTtsDur = parseSec(mods[`TTS-${i}.duration`], 0);
+    let ttsDur = hintedTtsDur;
+    if (ttsPath) {
+      const measured = probeDurationSec(ttsPath);
+      if (measured > 0) {
+        ttsDur = measured;
+      }
+    }
     if (ttsDur > slideDur) slideDur = ttsDur;
 
     const txtStr = typeof mods[`Testo-${i}`] === "string" ? mods[`Testo-${i}`].trim() : "";
