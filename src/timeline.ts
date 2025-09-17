@@ -1006,8 +1006,9 @@ export function getTextBoxFromTemplate(
   const yAnchor = (pctToPx(txtEl.y_anchor, 100) || 0) / 100;
 
   const baseLeft = x - rawW * xAnchor;
+  const baseTop = y - rawH * yAnchor;
   let left = Math.max(baseLeft, x - w * xAnchor);
-  let top = y - h * yAnchor;
+  let top = Math.max(baseTop, y - h * yAnchor);
 
   if (w > 0) left = Math.max(0, Math.min(W - w, left));
   else left = Math.max(0, Math.min(W - 10, left));
