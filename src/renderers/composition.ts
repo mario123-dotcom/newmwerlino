@@ -69,7 +69,8 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
       const targetZoom = 1.12;
       const targetZoomExpr = targetZoom.toFixed(6);
       const durExpr = dur.toFixed(6);
-      const zoomExpr = `1+(${targetZoomExpr}-1)*(T/${durExpr})`;
+      const zoomProgressExpr = `(min(t\,${durExpr})/${durExpr})`;
+      const zoomExpr = `1+(${targetZoomExpr}-1)*${zoomProgressExpr}`;
       const scaledWExpr = `ceil(${W}*${zoomExpr})`;
       const scaledHExpr = `ceil(${H}*${zoomExpr})`;
       const cropYExpr = `max((ih-${H})/2,0)`;
