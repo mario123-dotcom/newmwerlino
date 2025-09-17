@@ -326,7 +326,19 @@ export async function fetchAssets() {
           : typeof face.weightMin === "number"
           ? face.weightMin
           : undefined;
-      const resolvedWeight = faceWeight ?? normalizedTarget;
+      let resolvedWeight = faceWeight ?? normalizedTarget;
+      if (resolvedWeight == null && preferHeaviest) {
+        const normalizedWeights = Array.isArray(weightQuery)
+          ? weightQuery
+              .map((w) => parseFontWeight(w))
+              .filter((w): w is number => typeof w === "number")
+          : [];
+        if (normalizedWeights.length) {
+          resolvedWeight = Math.max(...normalizedWeights);
+        } else {
+          resolvedWeight = 900;
+        }
+      }
       const style = face.style && face.style !== "normal" ? face.style : undefined;
       const normalizedFamily = family.trim().toLowerCase();
       const keyParts = [normalizedFamily];

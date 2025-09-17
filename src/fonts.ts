@@ -46,6 +46,7 @@ const NAMED_FONT_WEIGHTS: Record<string, number> = {
   "ultra bold": 800,
   black: 900,
   heavy: 900,
+  bheavy: 900,
 };
 
 function clampWeight(w: number): number | undefined {
@@ -75,8 +76,23 @@ export function parseFontWeight(weight: unknown): number | undefined {
 
 export function extractFontWeightFromFileName(fileName: string): number | undefined {
   const withoutExt = fileName.replace(/\.[^.]+$/, "");
-  const match = withoutExt.match(/-w(\d{2,4})$/i);
-  if (!match) return undefined;
-  const parsed = parseInt(match[1], 10);
-  return clampWeight(parsed);
+  const parts = withoutExt.split("-");
+  if (parts.length <= 1) return undefined;
+
+  for (let i = parts.length - 1; i >= 1; i--) {
+    const token = parts[i];
+    if (!token) continue;
+    const weightMatch = token.match(/^w(\d{2,4})$/i);
+    if (weightMatch) {
+      const parsed = parseInt(weightMatch[1], 10);
+      const clamped = clampWeight(parsed);
+      if (clamped) return clamped;
+    }
+    const normalized = token.replace(/[^a-z]/gi, "").toLowerCase();
+    if (!normalized) continue;
+    const named = NAMED_FONT_WEIGHTS[normalized];
+    if (named) return named;
+  }
+
+  return undefined;
 }
