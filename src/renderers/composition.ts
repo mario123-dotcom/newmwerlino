@@ -68,23 +68,25 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
       const animFps = fps > 0 ? fps : 30;
       const frameCount = Math.max(1, Math.ceil(animFps * dur));
       const targetZoom = 1.06;
-      const zoomScaleW = Math.max(W, Math.ceil(W * targetZoom));
-      const zoomScaleH = Math.max(H, Math.ceil(H * targetZoom));
       const steps = Math.max(0, frameCount - 1);
-      const zoomStep = steps > 0 ? (targetZoom - 1) / steps : 0;
-      const zoomStepExpr = zoomStep.toFixed(9);
       const targetZoomExpr = targetZoom.toFixed(6);
+      const progressExpr =
+        steps > 0 ? `min(1,n/${steps})` : "0";
       const zoomExpr =
         steps > 0
-          ? `if(eq(on,0),1,min(${targetZoomExpr},zoom+${zoomStepExpr}))`
+          ? `1+(${targetZoomExpr}-1)*${progressExpr}`
           : "1";
-      const panYExpr = `max(0,(ih/zoom-oh)/2)`;
+      const scaledWExpr = `ceil(${W}*${zoomExpr})`;
+      const scaledHExpr = `ceil(${H}*${zoomExpr})`;
+      const cropYExpr = `max((ih-${H})/2,0)`;
       f.push(
         `[1:v]format=rgba,` +
           `${cropFilter},` +
-          `scale=${zoomScaleW}:${zoomScaleH}:flags=lanczos,` +
-          `zoompan=z='${zoomExpr}':d=${frameCount}:s=${W}x${H}:fps=${animFps.toFixed(6)}:x='0':y='${panYExpr}',` +
+          `loop=loop=-1:size=1:start=0,` +
+          `fps=${animFps.toFixed(6)},` +
           `trim=0:${dur.toFixed(6)},setpts=PTS-STARTPTS,` +
+          `scale=w='${scaledWExpr}':h='${scaledHExpr}':flags=lanczos:eval=frame,` +
+          `crop=${W}:${H}:x=0:y='${cropYExpr}',` +
           `setsar=1[bg]`
       );
     } else {
