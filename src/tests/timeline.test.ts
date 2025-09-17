@@ -11,6 +11,7 @@ import {
   wrapText,
   buildTimelineFromLayout,
 } from "../timeline";
+import { TEXT } from "../config";
 import type { TemplateDoc } from "../template";
 import { paths } from "../paths";
 
@@ -328,7 +329,7 @@ test("buildTimelineFromLayout stabilizes font after single-line fallback", () =>
   }
 });
 
-test("buildTimelineFromLayout keeps template-sized background for intro text", () => {
+test("buildTimelineFromLayout adds extra padding to intro background", () => {
   const tpl: TemplateDoc = {
     width: 1920,
     height: 1080,
@@ -376,15 +377,18 @@ test("buildTimelineFromLayout keeps template-sized background for intro text", (
     assert(blocks.length > 0);
     const primary = blocks[0];
     assert.ok(primary.background);
-    assert.equal(primary.background?.x, box.x);
-    assert.equal(primary.background?.y, box.y);
-    assert.equal(primary.background?.width, box.w);
-    assert.equal(primary.background?.height, box.h);
+    const pad = Math.round((primary.fontSize ?? 0) * TEXT.BOX_PAD_FACTOR);
+    assert.ok(pad > 0);
+    assert.equal(primary.background?.x, box.x - pad);
+    assert.equal(primary.background?.y, box.y - pad);
+    assert.equal(primary.background?.width, box.w + pad * 2);
+    assert.equal(primary.background?.height, box.h + pad * 2);
     assert.equal(primary.background?.color, "#000000");
     assert.equal(primary.background?.alpha, 0.8);
     assert.equal(primary.box, true);
     assert.equal(primary.boxColor, "#000000");
     assert.equal(primary.boxAlpha, 0.8);
+    assert.equal(primary.boxBorderW, pad);
     for (let idx = 1; idx < blocks.length; idx++) {
       assert.equal(blocks[idx].background, undefined);
     }

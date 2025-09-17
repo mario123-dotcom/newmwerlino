@@ -4,6 +4,7 @@ import { paths } from "./paths";
 import { findComposition, findChildByName, pctToPx } from "./template";
 import type { TemplateDoc, TemplateElement } from "./template";
 import { probeDurationSec } from "./ffmpeg/probe";
+import { TEXT } from "./config";
 import {
   extractFontWeightFromFileName,
   fileNameMatchesFamily,
@@ -151,6 +152,46 @@ function clampRect(
     w: Math.round(width),
     h: Math.round(height),
   };
+}
+
+function applyExtraBackgroundPadding(
+  block: TextBlockSpec,
+  fontPx: number | undefined,
+  maxW: number,
+  maxH: number
+): number {
+  if (!(fontPx && fontPx > 0)) return 0;
+  const extra = Math.round(fontPx * TEXT.BOX_PAD_FACTOR);
+  if (!(extra > 0)) return 0;
+
+  if (block.background) {
+    const grown = clampRect(
+      block.background.x - extra,
+      block.background.y - extra,
+      block.background.width + extra * 2,
+      block.background.height + extra * 2,
+      maxW,
+      maxH
+    );
+    if (grown) {
+      block.background = {
+        ...block.background,
+        x: grown.x,
+        y: grown.y,
+        width: grown.w,
+        height: grown.h,
+      };
+    }
+  }
+
+  if (block.box) {
+    const prev = block.boxBorderW ?? 0;
+    block.boxBorderW = prev + extra;
+  } else if (typeof block.boxBorderW === "number") {
+    block.boxBorderW = block.boxBorderW + extra;
+  }
+
+  return extra;
 }
 
 function parseAlpha(val: any): number | undefined {
@@ -1120,6 +1161,13 @@ export function buildTimelineFromLayout(
         baseBlock.fontSize = layout.font;
         baseBlock.lineSpacing = layout.spacing;
       }
+
+      applyExtraBackgroundPadding(
+        baseBlock,
+        baseBlock.fontSize ?? initialFontSize,
+        videoW,
+        videoH
+      );
     }
 
     const alignY = parseAlignmentFactor((txtEl as any)?.y_alignment) ?? 0;
@@ -1354,6 +1402,13 @@ export function buildTimelineFromLayout(
           baseOut.fontSize = layout.font;
           baseOut.lineSpacing = layout.spacing;
         }
+
+        applyExtraBackgroundPadding(
+          baseOut,
+          baseOut.fontSize ?? initialOutSize,
+          videoW,
+          videoH
+        );
       }
 
       const alignY = parseAlignmentFactor(textEl?.y_alignment) ?? 0;
