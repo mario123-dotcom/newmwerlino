@@ -963,7 +963,7 @@ function findFontPath(family: string): string | undefined {
 function defaultTextBlock(x = 120, y = 160): TextBlockSpec {
   return {
     x, y,
-    fontSize: 60,
+    fontSize: 70,
     fontColor: "white",
     lineSpacing: 8,
     box: false,
