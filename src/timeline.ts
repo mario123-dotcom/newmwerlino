@@ -33,6 +33,7 @@ export type TextBlockSpec = {
   x: number;
   y: number;
 
+  fontFile?: string;
   fontSize?: number;
   fontColor?: string;
   lineSpacing?: number;
@@ -120,13 +121,27 @@ function lenToPx(v: any, W: number, H: number): number | undefined {
   if (v == null) return undefined;
   if (typeof v === "number" && Number.isFinite(v)) return v;
   if (typeof v !== "string") return undefined;
-  const s = v.trim().toLowerCase();
+  const trimmed = v.trim().toLowerCase();
+  if (!trimmed) return undefined;
+  const s = trimmed.replace(/\s+/g, "");
   if (s.endsWith("vmin")) {
-    const n = parseFloat(s.replace("vmin", ""));
+    const n = parseFloat(s.slice(0, -4));
     return Number.isFinite(n) ? (n / 100) * Math.min(W, H) : undefined;
   }
+  if (s.endsWith("vmax")) {
+    const n = parseFloat(s.slice(0, -4));
+    return Number.isFinite(n) ? (n / 100) * Math.max(W, H) : undefined;
+  }
+  if (s.endsWith("vh")) {
+    const n = parseFloat(s.slice(0, -2));
+    return Number.isFinite(n) ? (n / 100) * H : undefined;
+  }
+  if (s.endsWith("vw")) {
+    const n = parseFloat(s.slice(0, -2));
+    return Number.isFinite(n) ? (n / 100) * W : undefined;
+  }
   if (s.endsWith("px")) {
-    const n = parseFloat(s.replace("px", ""));
+    const n = parseFloat(s.slice(0, -2));
     return Number.isFinite(n) ? n : undefined;
   }
   const n = parseFloat(s);
@@ -1253,6 +1268,175 @@ function resolveTextLayout(
   return layouts[layouts.length - 1];
 }
 
+function isExplicitlyFalse(value: unknown): boolean {
+  if (value === false) return true;
+  if (value === 0) return true;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (!normalized) return false;
+    return normalized === "false" || normalized === "0" || normalized === "no" || normalized === "off";
+  }
+  return false;
+}
+
+function buildCopyrightBlock(
+  template: TemplateDoc,
+  mods: Record<string, any>,
+  compName: string,
+  elementName: string,
+  videoW: number,
+  videoH: number
+): TextBlockSpec | undefined {
+  const comp = findComposition(template, compName);
+  const element = findChildByName(comp, elementName) as TemplateElement | undefined;
+  if (!comp || !element) return undefined;
+  if ((element as any)?.visible === false) return undefined;
+  const visMod = mods?.[`${elementName}.visible`];
+  if (isExplicitlyFalse(visMod)) return undefined;
+
+  const modValue = mods?.[elementName];
+  const modText = typeof modValue === "string" ? modValue.trim() : "";
+  const tplText = typeof (element as any)?.text === "string" ? (element as any).text.trim() : "";
+  const text = modText || tplText;
+  if (!text) return undefined;
+
+  const box = getTextBoxFromTemplate(template, compName, elementName);
+  if (!box) return undefined;
+
+  const explicitFont = lenToPx((element as any)?.font_size, videoW, videoH);
+  const minFontPx = lenToPx((element as any)?.font_size_minimum, videoW, videoH);
+  const maxFontPx = lenToPx((element as any)?.font_size_maximum, videoW, videoH);
+  const clampFontSize = (value: number): number => {
+    let next = Number.isFinite(value) && value > 0 ? value : MIN_FONT_SIZE;
+    if (typeof maxFontPx === "number" && Number.isFinite(maxFontPx) && maxFontPx > 0) {
+      next = Math.min(next, maxFontPx);
+    }
+    if (typeof minFontPx === "number" && Number.isFinite(minFontPx) && minFontPx > 0) {
+      next = Math.max(next, minFontPx);
+    }
+    if (!(next > 0)) next = MIN_FONT_SIZE;
+    return Math.max(MIN_FONT_SIZE, Math.round(next));
+  };
+
+  let fontGuess = explicitFont ?? minFontPx ?? maxFontPx ?? MIN_FONT_SIZE;
+  if (!(fontGuess > 0)) fontGuess = MIN_FONT_SIZE;
+  fontGuess = clampFontSize(fontGuess);
+
+  const lineHeightFactor = parseLineHeightFactor((element as any)?.line_height) ?? 1.2;
+
+  const manualBreaks = text.includes("\n");
+  let lines = manualBreaks
+    ? text.split(/\r?\n/)
+    : wrapText(
+        text,
+        box.w > 0 ? maxCharsForWidth(box.w, Math.round(fontGuess)) : DEFAULT_CHARS_PER_LINE
+      );
+  lines = lines.map((ln) => ln.trim()).filter((ln) => ln);
+  if (!lines.length) return undefined;
+
+  const computeSpacing = (font: number, lineCount: number): number => {
+    const safeLines = Math.max(1, lineCount);
+    const lineHeightPx = box.h > 0 ? box.h / safeLines : font * lineHeightFactor;
+    const targetSpacing = Math.round(font * Math.max(0, lineHeightFactor - 1));
+    const availableSpacing = Math.round(Math.max(0, lineHeightPx - font));
+    return Math.min(targetSpacing, availableSpacing);
+  };
+
+  let fontSize = clampFontSize(fontGuess);
+  let spacing = computeSpacing(fontSize, lines.length);
+  if (!manualBreaks) {
+    const layout = resolveTextLayout(text, box, fontSize, lineHeightFactor);
+    if (layout) {
+      lines = [...layout.lines];
+      fontSize = clampFontSize(layout.font);
+      spacing = computeSpacing(fontSize, lines.length);
+    }
+  }
+
+  const alignY = parseAlignmentFactor((element as any)?.y_alignment) ?? 0;
+  let y = box.y;
+  if (lines.length && box.h > 0) {
+    const usedHeight = fontSize * lines.length + spacing * Math.max(0, lines.length - 1);
+    if (usedHeight > 0) {
+      const free = box.h - usedHeight;
+      if (free > 0 && alignY > 0) {
+        const offset = Math.round(Math.min(free, Math.max(0, free * alignY)));
+        y = box.y + offset;
+      }
+    }
+  }
+
+  const rawPadX = lenToPx((element as any)?.x_padding, videoW, videoH) ?? 0;
+  const rawPadY = lenToPx((element as any)?.y_padding, videoW, videoH) ?? 0;
+  const padX = Math.max(0, rawPadX);
+  const padY = Math.max(0, rawPadY);
+  const pad = Math.max(0, Math.round(Math.max(padX, padY)));
+
+  const fill = parseRGBA((element as any)?.fill_color);
+  const bg = parseRGBA((element as any)?.background_color);
+
+  const fontFamily = getFontFamilyFromTemplate(template, compName, elementName);
+  const fontWeight = getFontWeightFromTemplate(template, compName, elementName);
+  const fontPath = fontFamily ? findFontPath(fontFamily, fontWeight) : undefined;
+
+  const block: TextBlockSpec = {
+    x: box.x,
+    y,
+    text: lines.join("\n"),
+    fontFile: fontPath,
+    fontSize,
+    fontColor: fill?.color ?? "#ffffff",
+    lineSpacing: spacing,
+  };
+
+  if (bg) {
+    const approxCharWidth = fontSize * APPROX_CHAR_WIDTH_RATIO;
+    const longestLine = lines.reduce((max, line) => Math.max(max, line.length), 0);
+    let textWidth =
+      longestLine > 0 && approxCharWidth > 0
+        ? longestLine * approxCharWidth
+        : approxCharWidth;
+    if (!(textWidth > 0)) {
+      textWidth = fontSize;
+    }
+    const maxAllowedWidth = box.w && box.w > 0 ? box.w : textWidth;
+    textWidth = Math.min(textWidth, maxAllowedWidth);
+    const lineCount = lines.length || 1;
+    const totalSpacing = Math.max(0, lineCount - 1) * Math.max(0, spacing);
+    const textHeight = fontSize * lineCount + totalSpacing;
+    const rect = clampRect(
+      block.x - padX,
+      y - padY,
+      textWidth + padX * 2,
+      textHeight + padY * 2,
+      videoW,
+      videoH
+    );
+    if (rect) {
+      block.background = {
+        x: rect.x,
+        y: rect.y,
+        width: rect.w,
+        height: rect.h,
+        color: bg.color,
+        alpha: bg.alpha,
+      };
+    }
+  }
+
+  const wantsBox = !block.background && (!!bg || pad > 0);
+  if (wantsBox) {
+    block.box = true;
+    block.boxColor = bg?.color ?? block.boxColor ?? "#000000";
+    block.boxAlpha = bg?.alpha ?? block.boxAlpha ?? 0;
+    if (pad > 0) {
+      block.boxBorderW = pad;
+    }
+  }
+
+  return block;
+}
+
 /* ============================================================
    COSTRUTTORE SLIDE
    - Legge contenuti da 'mods'
@@ -1494,7 +1678,19 @@ export function buildTimelineFromLayout(
       animations: perLineAnims[idx].length ? perLineAnims[idx] : undefined,
     }));
 
-    const isFillerSlide = !ttsPath && !txtStr;
+    const copyrightBlock = buildCopyrightBlock(
+      template,
+      mods,
+      `Slide_${i}`,
+      `Copyright-${i}`,
+      videoW,
+      videoH
+    );
+    if (copyrightBlock) {
+      texts.push(copyrightBlock);
+    }
+
+    const isFillerSlide = !ttsPath && !txtStr && texts.length === 0;
 
     const slide: SlideSpec = {
       width: videoW,
@@ -1715,6 +1911,18 @@ export function buildTimelineFromLayout(
         textFile: tf,
         animations: perLine[idx].length ? perLine[idx] : undefined,
       }));
+    }
+    const outroCopyright = buildCopyrightBlock(
+      template,
+      mods,
+      "Outro",
+      "Copyright-outro",
+      videoW,
+      videoH
+    );
+    if (outroCopyright) {
+      if (!texts) texts = [];
+      texts.push(outroCopyright);
     }
     slides.push({
       width: videoW,
