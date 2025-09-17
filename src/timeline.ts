@@ -1366,8 +1366,10 @@ function buildCopyrightBlock(
     }
   }
 
-  const padX = lenToPx((element as any)?.x_padding, videoW, videoH) ?? 0;
-  const padY = lenToPx((element as any)?.y_padding, videoW, videoH) ?? 0;
+  const rawPadX = lenToPx((element as any)?.x_padding, videoW, videoH) ?? 0;
+  const rawPadY = lenToPx((element as any)?.y_padding, videoW, videoH) ?? 0;
+  const padX = Math.max(0, rawPadX);
+  const padY = Math.max(0, rawPadY);
   const pad = Math.max(0, Math.round(Math.max(padX, padY)));
 
   const fill = parseRGBA((element as any)?.fill_color);
@@ -1388,11 +1390,25 @@ function buildCopyrightBlock(
   };
 
   if (bg) {
+    const approxCharWidth = fontSize * APPROX_CHAR_WIDTH_RATIO;
+    const longestLine = lines.reduce((max, line) => Math.max(max, line.length), 0);
+    let textWidth =
+      longestLine > 0 && approxCharWidth > 0
+        ? longestLine * approxCharWidth
+        : approxCharWidth;
+    if (!(textWidth > 0)) {
+      textWidth = fontSize;
+    }
+    const maxAllowedWidth = box.w && box.w > 0 ? box.w : textWidth;
+    textWidth = Math.min(textWidth, maxAllowedWidth);
+    const lineCount = lines.length || 1;
+    const totalSpacing = Math.max(0, lineCount - 1) * Math.max(0, spacing);
+    const textHeight = fontSize * lineCount + totalSpacing;
     const rect = clampRect(
-      box.x - padX,
-      box.y - padY,
-      box.w > 0 ? box.w + padX * 2 : 0,
-      box.h > 0 ? box.h + padY * 2 : 0,
+      block.x - padX,
+      y - padY,
+      textWidth + padX * 2,
+      textHeight + padY * 2,
       videoW,
       videoH
     );
