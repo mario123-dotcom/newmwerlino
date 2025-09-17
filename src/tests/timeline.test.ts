@@ -782,6 +782,63 @@ test("buildTimelineFromLayout honours boolean shadow modifications", () => {
   assert.equal(slidesStringFalse[0].shadowEnabled, undefined);
 });
 
+test("buildTimelineFromLayout extracts wipe shapes from template", () => {
+  const tpl: TemplateDoc = {
+    width: 200,
+    height: 100,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 2,
+        elements: [
+          { type: "shape", width: "100%", height: "100%", fill_color: "#111" } as any,
+          {
+            type: "shape",
+            x: "40%",
+            y: "30%",
+            width: "10%",
+            height: "20%",
+            x_anchor: "50%",
+            y_anchor: "50%",
+            fill_color: "#ff0000",
+            animations: [
+              { type: "wipe", time: 0, duration: "1 s", start_angle: "90°" },
+            ],
+          } as any,
+          { type: "text", name: "Testo-0", x: "0%", y: "0%", width: "10%", height: "10%" } as any,
+        ],
+      },
+    ],
+  } as any;
+  const mods = { "Testo-0": "ciao" };
+  paths.images = "/tmp/no_img";
+  paths.tts = "/tmp/no_tts";
+  const slides = buildTimelineFromLayout(mods, tpl, {
+    videoW: 200,
+    videoH: 100,
+    fps: 30,
+    defaultDur: 2,
+  });
+  assert.equal(slides.length, 1);
+  const shape = slides[0].shapes?.[0];
+  assert.ok(shape);
+  assert.equal(shape?.color, "#ff0000");
+  assert.equal(shape?.alpha, 1);
+  assert.equal(shape?.width, 20);
+  assert.equal(shape?.height, 20);
+  assert.equal(shape?.x, 70);
+  assert.equal(shape?.y, 20);
+  assert.ok(shape?.animations && shape.animations.length === 1);
+  const anim = shape!.animations![0];
+  if (anim.type !== "wipe") {
+    throw new Error(`expected wipe animation, got ${anim.type}`);
+  }
+  assert.equal(anim.duration, 1);
+  assert.equal(anim.time, 0);
+  assert.equal(anim.direction, "wipeup");
+});
+
 test("buildTimelineFromLayout animates backgrounds after the first slide", () => {
   const tpl: TemplateDoc = {
     width: 1920,

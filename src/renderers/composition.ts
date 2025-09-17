@@ -127,6 +127,63 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
     }
   }
 
+  if (slide.shapes && slide.shapes.length) {
+    for (let i = 0; i < slide.shapes.length; i++) {
+      const sh = slide.shapes[i];
+      if (!(sh.width > 0) || !(sh.height > 0)) continue;
+      const alpha = Math.min(Math.max(sh.alpha ?? 1, 0), 1);
+      if (!(alpha > 0)) continue;
+
+      const baseLabel = `shape_${i}_src`;
+      f.push(
+        `color=c=${sh.color}@${alpha}:s=${sh.width}x${sh.height}:d=${dur},format=rgba[${baseLabel}]`
+      );
+      let cur = baseLabel;
+
+      const anims = sh.animations ?? [];
+      const wipeAnims = anims.filter((a) => a.type === "wipe");
+      let blankEnd = 0;
+      if (wipeAnims.length) {
+        blankEnd = Math.min(
+          dur,
+          Math.max(...wipeAnims.map((a) => (typeof a.time === "number" ? a.time : 0) + a.duration))
+        );
+        if (blankEnd > 0) {
+          f.push(
+            `color=c=black@0:s=${sh.width}x${sh.height}:d=${blankEnd},format=rgba[shape_${i}_blank]`
+          );
+        }
+      }
+
+      anims.forEach((an, ai) => {
+        if ((an as any).reversed) return;
+        if (an.type === "fade") {
+          const st = typeof an.time === "number" ? an.time : Math.max(0, dur - an.duration);
+          if (st + an.duration >= dur) return;
+          const lbl = `shape_${i}_anim${ai}`;
+          f.push(`[${cur}]fade=t=in:st=${st}:d=${an.duration}:alpha=1,format=rgba[${lbl}]`);
+          cur = lbl;
+        } else if (an.type === "wipe" && wipeAnims.length && blankEnd > 0) {
+          if (an.time + an.duration >= dur) return;
+          const tmp = `shape_${i}_tmp${ai}`;
+          const lbl = `shape_${i}_anim${ai}`;
+          f.push(
+            `[shape_${i}_blank][${cur}]xfade=transition=${an.direction}:duration=${an.duration}:offset=${an.time},format=rgba[${tmp}]`
+          );
+          const pad = Math.max(0, dur - blankEnd);
+          f.push(`[${tmp}]trim=0:${blankEnd},tpad=stop_mode=clone:stop_duration=${pad}[${lbl}]`);
+          cur = lbl;
+        }
+      });
+
+      const outLabel = `v_shape${i}`;
+      f.push(
+        `[${lastV}][${cur}]overlay=x=${sh.x}:y=${sh.y}:enable='between(t,0,${dur})'[${outLabel}]`
+      );
+      lastV = outLabel;
+    }
+  }
+
   // Logo (preserva AR dentro al box indicato)
   if (hasLogo) {
     const logoIndex = hasBG ? 2 : 1;
