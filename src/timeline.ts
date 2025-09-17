@@ -958,15 +958,20 @@ function findFontPath(family: string, weight?: number): string | undefined {
       .map((file) => ({ file, weight: extractFontWeightFromFileName(file) ?? 0 }));
     if (!candidates.length) return undefined;
     const sorted = [...candidates].sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0));
+    const heaviest = sorted[0];
+    const heaviestWeight = heaviest?.weight ?? 0;
     const desiredWeight =
       typeof weight === "number" && Number.isFinite(weight)
         ? Math.max(weight, MIN_BOLD_FONT_WEIGHT)
         : MIN_BOLD_FONT_WEIGHT;
-    const exact = candidates.find((c) => c.weight === desiredWeight);
+    if (heaviest && heaviestWeight >= desiredWeight) {
+      return join(paths.fonts, heaviest.file);
+    }
+    const exact = sorted.find((c) => c.weight === desiredWeight);
     if (exact) return join(paths.fonts, exact.file);
     const boldVariant = sorted.find((c) => (c.weight ?? 0) >= desiredWeight);
     if (boldVariant) return join(paths.fonts, boldVariant.file);
-    return join(paths.fonts, sorted[0].file);
+    return join(paths.fonts, heaviest.file);
   } catch {}
   return undefined;
 }

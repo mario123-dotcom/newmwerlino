@@ -329,6 +329,63 @@ test("buildTimelineFromLayout upgrades light weight to bold font", () => {
   }
 });
 
+test("buildTimelineFromLayout still picks heaviest font when multiple bold variants exist", () => {
+  const tpl: TemplateDoc = {
+    width: 100,
+    height: 100,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 1,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "0%",
+            y: "0%",
+            width: "10%",
+            height: "10%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+            font_family: "Archivo",
+            font_weight: "700",
+          },
+          { type: "image", name: "Logo", x: "0%", y: "0%", width: "10%", height: "10%" },
+        ],
+      },
+    ],
+  } as any;
+
+  const oldFonts = paths.fonts;
+  const tmpFonts = mkdtempSync(join(process.cwd(), "fonts-test-heaviest-"));
+  const boldFont = join(tmpFonts, "archivo-w700.ttf");
+  const heavierFont = join(tmpFonts, "archivo-w900.ttf");
+  writeFileSync(boldFont, "bold");
+  writeFileSync(heavierFont, "heavier");
+
+  paths.fonts = tmpFonts;
+  const prevImages = paths.images;
+  const prevTts = paths.tts;
+  paths.images = "/tmp/no_img";
+  paths.tts = "/tmp/no_tts";
+
+  try {
+    const slides = buildTimelineFromLayout({ "Testo-0": "Ciao" }, tpl, {
+      videoW: 100,
+      videoH: 100,
+      fps: 25,
+      defaultDur: 1,
+    });
+    assert.equal(slides[0]?.fontFile, heavierFont);
+  } finally {
+    paths.fonts = oldFonts;
+    paths.images = prevImages;
+    paths.tts = prevTts;
+    rmSync(tmpFonts, { recursive: true, force: true });
+  }
+});
+
 test("buildTimelineFromLayout recognises bheavy suffix as bold", () => {
   const tpl: TemplateDoc = {
     width: 100,
