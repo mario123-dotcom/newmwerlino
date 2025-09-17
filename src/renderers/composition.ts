@@ -145,6 +145,7 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
 
       if (
         tb.background &&
+        !tb.box &&
         tb.background.width > 0 &&
         tb.background.height > 0 &&
         tb.background.alpha > 0

@@ -1090,11 +1090,13 @@ export function buildTimelineFromLayout(
             color: bg.color,
             alpha: bg.alpha,
           };
-          baseBlock.box = false;
-        } else {
-          baseBlock.box = true;
-          baseBlock.boxColor = bg.color;
-          baseBlock.boxAlpha = bg.alpha;
+        }
+        baseBlock.box = true;
+        baseBlock.boxColor = bg.color;
+        baseBlock.boxAlpha = bg.alpha;
+        const pad = Math.round(Math.max(padX, padY));
+        if (pad > 0) {
+          baseBlock.boxBorderW = pad;
         }
       }
     }

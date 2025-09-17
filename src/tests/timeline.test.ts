@@ -382,7 +382,9 @@ test("buildTimelineFromLayout keeps template-sized background for intro text", (
     assert.equal(primary.background?.height, box.h);
     assert.equal(primary.background?.color, "#000000");
     assert.equal(primary.background?.alpha, 0.8);
-    assert.equal(primary.box, false);
+    assert.equal(primary.box, true);
+    assert.equal(primary.boxColor, "#000000");
+    assert.equal(primary.boxAlpha, 0.8);
     for (let idx = 1; idx < blocks.length; idx++) {
       assert.equal(blocks[idx].background, undefined);
     }
