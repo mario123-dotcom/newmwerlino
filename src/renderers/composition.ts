@@ -80,10 +80,10 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
         const framesMinusOne = totalFrames - 1;
         const framesMinusOneExpr = framesMinusOne.toFixed(6);
         const baseZoomProgressExpr = `(min(on\,${framesMinusOne})/${framesMinusOneExpr})`;
-        // Quadratic ease-out so the zoom ramps faster than linear progression.
-        const quadraticEaseOutExpr = `1-pow(1-${baseZoomProgressExpr},2)`;
-        const zoomSpeedMultiplier = 1.25;
-        const zoomProgressExpr = `min(${zoomSpeedMultiplier.toFixed(6)}*${quadraticEaseOutExpr},1)`;
+        // Cubic ease-out for an even quicker acceleration than the previous quadratic curve.
+        const cubicEaseOutExpr = `1-pow(1-${baseZoomProgressExpr},3)`;
+        const zoomSpeedMultiplier = 1.35;
+        const zoomProgressExpr = `min(${zoomSpeedMultiplier.toFixed(6)}*${cubicEaseOutExpr},1)`;
         const zoomExpr = `1+(${targetZoomExpr}-1)*${zoomProgressExpr}`;
         const yExpr = "max(min((ih/2)-(ih/zoom/2)\,ih-ih/zoom)\,0)";
         const zoompanFilter =
