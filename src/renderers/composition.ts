@@ -57,11 +57,9 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
   // Background: cover + crop (usa "increase", non 'cover' che in scale è una stringa non valida)
   let lastV = "base";
   if (hasBG) {
-    const targetAspect = Number((W / H).toFixed(10));
     const coverScale =
-      `scale=` +
-      `w='if(gt(a,${targetAspect}),${H}*a,${W})':` +
-      `h='if(gt(a,${targetAspect}),${H},${W}/a)'`;
+      `scale=${W}:${H}:` +
+      `force_original_aspect_ratio=increase`;
     if (animateBackground && dur > 0) {
       const animFps = fps > 0 ? fps : 30;
       const frameCount = Math.max(1, Math.ceil(animFps * dur));
