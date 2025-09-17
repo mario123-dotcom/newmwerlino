@@ -52,6 +52,16 @@ export type TextBlockSpec = {
   animations?: AnimationSpec[];
 };
 
+export type ShapeBlockSpec = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color: string;
+  alpha: number;
+  animations?: AnimationSpec[];
+};
+
 export type SlideSpec = {
   width?: number;
   height?: number;
@@ -73,6 +83,8 @@ export type SlideSpec = {
   logoY?: number;
 
   texts?: TextBlockSpec[];
+
+  shapes?: ShapeBlockSpec[];
 
   // overlay shadow on background
   shadowEnabled?: boolean;
@@ -677,6 +689,227 @@ function parseRGBA(c: any): { color: string; alpha: number } | undefined {
   return { color: `#${hex}`, alpha: a };
 }
 
+function parsePercent(val: any): number | undefined {
+  if (val == null) return undefined;
+  if (typeof val === "number" && Number.isFinite(val)) {
+    const n = val <= 1 && val >= 0 ? val : val / 100;
+    if (!Number.isFinite(n)) return undefined;
+    return Math.max(0, Math.min(1, n));
+  }
+  if (typeof val !== "string") return undefined;
+  const s = val.trim();
+  if (!s) return undefined;
+  if (s.endsWith("%")) {
+    const n = parseFloat(s.slice(0, -1));
+    if (!Number.isFinite(n)) return undefined;
+    return Math.max(0, Math.min(1, n / 100));
+  }
+  const n = parseFloat(s);
+  if (!Number.isFinite(n)) return undefined;
+  if (Math.abs(n) <= 1) {
+    return Math.max(0, Math.min(1, n));
+  }
+  return Math.max(0, Math.min(1, n / 100));
+}
+
+function parseAngleDeg(val: any): number | undefined {
+  if (typeof val === "number" && Number.isFinite(val)) return val;
+  if (typeof val !== "string") return undefined;
+  const s = val.trim();
+  if (!s) return undefined;
+  const cleaned = s.replace(/deg$/i, "");
+  const withoutDegree = cleaned.endsWith("°")
+    ? cleaned.slice(0, -1)
+    : cleaned;
+  const n = parseFloat(withoutDegree);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function normalizeAngle(angle: number): number {
+  let a = angle % 360;
+  if (a < 0) a += 360;
+  return a;
+}
+
+function parseShapeColor(raw: any): { color: string; alpha: number } | undefined {
+  if (typeof raw !== "string") return undefined;
+  const input = raw.trim();
+  if (!input) return undefined;
+  const rgba = parseRGBA(input);
+  if (rgba) return rgba;
+  const hex = input.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (hex) {
+    let value = hex[1];
+    if (value.length === 3) {
+      value = value
+        .split("")
+        .map((c) => c + c)
+        .join("");
+    }
+    return { color: `#${value.toLowerCase()}`, alpha: 1 };
+  }
+  return undefined;
+}
+
+function resolveShapeColor(
+  element: TemplateElement,
+  mods: Record<string, any>,
+  compName: string | undefined,
+  globalIndex: number
+): { color: string; alpha: number } | undefined {
+  const candidates: (string | undefined)[] = [];
+  const elName = typeof element.name === "string" ? element.name : undefined;
+  if (elName) {
+    candidates.push(`${elName}.fill_color`, `${elName}.fillColor`);
+    if (compName) {
+      candidates.push(
+        `${compName}.${elName}.fill_color`,
+        `${compName}.${elName}.fillColor`
+      );
+    }
+  }
+  if (compName) {
+    candidates.push(`${compName}.fill_color`, `${compName}.fillColor`);
+  }
+  if (globalIndex === 0) {
+    candidates.push("Shape.fill_color", "Shape.fillColor");
+  }
+  candidates.push(`Shape-${globalIndex}.fill_color`, `Shape-${globalIndex}.fillColor`);
+  if (globalIndex >= 1) {
+    candidates.push(
+      `Shape-${globalIndex - 1}.fill_color`,
+      `Shape-${globalIndex - 1}.fillColor`
+    );
+  }
+
+  let override: any;
+  for (const key of candidates) {
+    if (!key) continue;
+    const val = mods[key];
+    if (typeof val === "string" && val.trim()) {
+      override = val;
+      break;
+    }
+  }
+
+  const baseRaw =
+    override ?? (element as any)?.fill_color ?? (element as any)?.fillColor;
+  const parsed = parseShapeColor(baseRaw);
+  if (!parsed) return undefined;
+  const op = parseAlpha((element as any)?.opacity);
+  if (op != null && Number.isFinite(op)) {
+    const clamped = Math.max(0, Math.min(1, op));
+    parsed.alpha = Math.max(0, Math.min(1, parsed.alpha * clamped));
+  }
+  return parsed.alpha > 0 ? parsed : undefined;
+}
+
+function extractShapeAnimations(
+  element: TemplateElement,
+  rect: { width: number; height: number }
+): AnimationSpec[] {
+  const out: AnimationSpec[] = [];
+  const anims = (element as any)?.animations;
+  if (!Array.isArray(anims)) return out;
+  for (const a of anims) {
+    if (!a) continue;
+    if ((a as any).reversed) continue;
+    const rawTime = (a as any).time;
+    if (typeof rawTime === "string" && rawTime.trim().toLowerCase() === "end") {
+      continue;
+    }
+    const duration = parseSec((a as any).duration, 0);
+    if (!(duration > 0)) continue;
+    const time = parseSec(rawTime, 0);
+    if (a.type === "fade") {
+      out.push({ type: "fade", time, duration });
+    } else if (a.type === "wipe") {
+      const angle = parseAngleDeg((a as any).start_angle) ?? parseAngleDeg((a as any).end_angle);
+      let dir: "wipeup" | "wipedown" | "wipeleft" | "wiperight" = "wipeup";
+      if (typeof angle === "number" && Number.isFinite(angle)) {
+        const norm = normalizeAngle(angle);
+        if (Math.abs(norm - 90) < 1 || Math.abs(norm - 270) < 1) {
+          const anchor =
+            parsePercent((a as any).y_anchor) ?? parsePercent((element as any)?.y_anchor);
+          if (anchor != null) {
+            dir = anchor > 0.5 ? "wipedown" : "wipeup";
+          } else {
+            dir = Math.abs(norm - 270) < 1 ? "wipedown" : "wipeup";
+          }
+        } else {
+          const anchor =
+            parsePercent((a as any).x_anchor) ?? parsePercent((element as any)?.x_anchor);
+          if (anchor != null) {
+            dir = anchor > 0.5 ? "wipeleft" : "wiperight";
+          } else {
+            dir = Math.abs(norm - 180) < 1 ? "wipeleft" : "wiperight";
+          }
+        }
+      } else {
+        dir = rect.height >= rect.width ? "wipeup" : "wiperight";
+      }
+      out.push({ type: "wipe", time, duration, direction: dir });
+    }
+  }
+  return out;
+}
+
+function extractShapesFromComposition(
+  comp: TemplateElement | undefined,
+  mods: Record<string, any>,
+  W: number,
+  H: number,
+  startIndex: number
+): ShapeBlockSpec[] {
+  if (!comp || !Array.isArray(comp.elements)) return [];
+  const queue: TemplateElement[] = [...comp.elements];
+  const shapes: ShapeBlockSpec[] = [];
+  while (queue.length) {
+    const el = queue.shift();
+    if (!el) continue;
+    if ((el as any)?.visible === false) continue;
+    if (Array.isArray((el as any)?.elements)) {
+      queue.push(...(((el as any).elements as TemplateElement[]) || []));
+    }
+    const type = typeof el.type === "string" ? el.type.toLowerCase() : "";
+    if (type !== "shape") continue;
+    const fill = (el as any)?.fill_color ?? (el as any)?.fillColor;
+    if (Array.isArray(fill)) continue;
+    const widthPx = pctToPx((el as any)?.width, W);
+    const heightPx = pctToPx((el as any)?.height, H);
+    if (!(widthPx && widthPx > 0) || !(heightPx && heightPx > 0)) continue;
+    const xPx = pctToPx((el as any)?.x, W);
+    const yPx = pctToPx((el as any)?.y, H);
+    if (xPx == null || yPx == null) continue;
+    const anchorX = parsePercent((el as any)?.x_anchor) ?? 0;
+    const anchorY = parsePercent((el as any)?.y_anchor) ?? 0;
+    const rect = clampRect(
+      xPx - widthPx * anchorX,
+      yPx - heightPx * anchorY,
+      widthPx,
+      heightPx,
+      W,
+      H
+    );
+    if (!rect) continue;
+    if (rect.w >= W * 0.98 && rect.h >= H * 0.98) continue;
+    const globalIndex = startIndex + shapes.length;
+    const color = resolveShapeColor(el, mods, comp.name, globalIndex);
+    if (!color) continue;
+    const animations = extractShapeAnimations(el, { width: rect.w, height: rect.h });
+    shapes.push({
+      x: rect.x,
+      y: rect.y,
+      width: rect.w,
+      height: rect.h,
+      color: color.color,
+      alpha: color.alpha,
+      animations: animations.length ? animations : undefined,
+    });
+  }
+  return shapes;
+}
+
 function writeTextFilesForSlide(i: number, lines: string[]): string[] {
   ensureTempDir();
   return lines.map((txt, idx) => {
@@ -1052,6 +1285,7 @@ export function buildTimelineFromLayout(
 
   const slides: SlideSpec[] = [];
   let prevEnd = 0;
+  let globalShapeIndex = 0;
 
   for (let i = 0; i < n; i++) {
     const comp = findComposition(template, `Slide_${i}`);
@@ -1244,6 +1478,14 @@ export function buildTimelineFromLayout(
     const bgImagePath = findImageForSlide(i);
 
     const backgroundRect = baseBlock.background;
+    const shapes = extractShapesFromComposition(
+      comp,
+      mods,
+      videoW,
+      videoH,
+      globalShapeIndex
+    );
+    globalShapeIndex += shapes.length;
     const texts: TextBlockSpec[] = textFiles.map((tf, idx) => ({
       ...baseBlock,
       background: idx === 0 ? backgroundRect : undefined,
@@ -1273,6 +1515,8 @@ export function buildTimelineFromLayout(
       logoY: logoBox.y ?? 713,
 
       texts: texts.length ? texts : undefined,
+
+      shapes: shapes.length ? shapes : undefined,
 
       shadowEnabled: slideHasShadow ? true : undefined,
     };
