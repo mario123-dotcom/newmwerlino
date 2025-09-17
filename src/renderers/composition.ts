@@ -66,13 +66,11 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
   if (hasBG) {
     if (animateBackground && dur > 0) {
       const animFps = fps > 0 ? fps : 30;
-      const targetZoom = 1.12;
+      const targetZoom = 1.18;
       const targetZoomExpr = targetZoom.toFixed(6);
       const durExpr = dur.toFixed(6);
       const zoomProgressExpr = `(min(t\,${durExpr})/${durExpr})`;
       const zoomExpr = `1+(${targetZoomExpr}-1)*${zoomProgressExpr}`;
-      const scaledWExpr = `ceil(${W}*${zoomExpr})`;
-      const scaledHExpr = `ceil(${H}*${zoomExpr})`;
       const cropYExpr = `max((ih-${H})/2,0)`;
       f.push(
         `[1:v]format=rgba,` +
@@ -80,7 +78,7 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
           `loop=loop=-1:size=1:start=0,` +
           `fps=${animFps.toFixed(6)},` +
           `trim=0:${dur.toFixed(6)},setpts=PTS-STARTPTS,` +
-          `scale=w='${scaledWExpr}':h='${scaledHExpr}':flags=lanczos:eval=frame,` +
+          `scale=w='iw*${zoomExpr}':h='ih*${zoomExpr}':flags=lanczos:eval=frame,` +
           `crop=${W}:${H}:x=0:y='${cropYExpr}',` +
           `setsar=1[bg]`
       );
