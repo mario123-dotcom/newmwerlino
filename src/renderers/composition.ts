@@ -72,14 +72,13 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
       const zoomStep = (targetZoom - 1) / steps;
       const zoomExpr = `min(${targetZoom.toFixed(6)},1+${zoomStep.toFixed(7)}*on)`;
       const zoomScaleW = Math.max(W, Math.round(W * targetZoom));
-      const zoomScaleH = Math.max(H, Math.round(zoomScaleW / targetAR));
-      const centerXExpr = `max(0,(iw-iw/zoom)/2)`;
-      const centerYExpr = `max(0,(ih-ih/zoom)/2)`;
+      const zoomScaleH = Math.max(H, Math.round(H * targetZoom));
+      const panYExpr = `max(0,(ih/zoom-oh)/2)`;
       f.push(
         `[1:v]format=rgba,` +
           `${cropFilter},` +
           `scale=${zoomScaleW}:${zoomScaleH}:flags=lanczos,` +
-          `zoompan=z='${zoomExpr}':d=${frameCount}:s=${W}x${H}:fps=${animFps.toFixed(6)}:x='${centerXExpr}':y='${centerYExpr}',` +
+          `zoompan=z='${zoomExpr}':d=${frameCount}:s=${W}x${H}:fps=${animFps.toFixed(6)}:x='0':y='${panYExpr}',` +
           `setsar=1[bg]`
       );
     } else {
