@@ -7,6 +7,8 @@ import { probeDurationSec } from "./ffmpeg/probe";
 import { TEXT } from "./config";
 import { fileNameMatchesFamily } from "./fonts";
 
+const TEXT_BOX_SCALE = 70 / 60;
+
 /* ---------- Tipi usati da composition.ts ---------- */
 export type AnimationSpec =
   | {
@@ -996,8 +998,10 @@ export function getTextBoxFromTemplate(
   const y = pctToPx(txtEl.y, H);
   if (typeof x !== "number" || typeof y !== "number") return undefined;
 
-  const w = pctToPx(txtEl.width, W) || 0;
-  const h = pctToPx(txtEl.height, H) || 0;
+  const rawW = pctToPx(txtEl.width, W) || 0;
+  const rawH = pctToPx(txtEl.height, H) || 0;
+  const w = rawW * TEXT_BOX_SCALE;
+  const h = rawH * TEXT_BOX_SCALE;
   const xAnchor = (pctToPx(txtEl.x_anchor, 100) || 0) / 100;
   const yAnchor = (pctToPx(txtEl.y_anchor, 100) || 0) / 100;
 
