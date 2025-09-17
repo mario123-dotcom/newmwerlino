@@ -54,28 +54,50 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
   const f: string[] = [];
   f.push(`[0:v]format=rgba[base]`);
 
+  const targetAR = H > 0 ? W / H : 16 / 9;
+  const arExpr = targetAR.toFixed(10);
+  const cropWidthExpr = `min(iw,ih*${arExpr})`;
+  const cropHeightExpr = `min(ih,iw/${arExpr})`;
+  const cropFilter =
+    `crop=w='${cropWidthExpr}':h='${cropHeightExpr}':x='(iw-ow)/2':y='(ih-oh)/2'`;
+
   // Background: cover + crop (usa "increase", non 'cover' che in scale è una stringa non valida)
   let lastV = "base";
   if (hasBG) {
     if (animateBackground && dur > 0) {
       const animFps = fps > 0 ? fps : 30;
-      const frameCount = Math.max(1, Math.ceil(animFps * dur));
-      const targetZoom = 1.06;
-      const steps = Math.max(1, frameCount - 1);
-      const zoomStep = (targetZoom - 1) / steps;
-      const zoomExpr = `min(${targetZoom.toFixed(6)},1+${zoomStep.toFixed(7)}*on)`;
-      const yExpr = `max(0,(ih/zoom-oh)/2)`;
-      f.push(
-        `[1:v]format=rgba,` +
-          `scale=${W}:${H}:force_original_aspect_ratio=increase,` +
-          `zoompan=z='${zoomExpr}':d=${frameCount}:s=${W}x${H}:fps=${animFps.toFixed(6)}:x='0':y='${yExpr}',` +
-          `setsar=1[bg]`
-      );
+      const targetZoom = 1.18;
+      const targetZoomExpr = targetZoom.toFixed(6);
+      const durExpr = dur.toFixed(6);
+      const totalFrames = Math.max(Math.round(dur * animFps), 1);
+      if (totalFrames <= 1) {
+        f.push(
+          `[1:v]format=rgba,` +
+            `${cropFilter},` +
+            `scale=${W}:${H}:flags=lanczos,setsar=1[bg]`
+        );
+      } else {
+        const framesMinusOne = totalFrames - 1;
+        const framesMinusOneExpr = framesMinusOne.toFixed(6);
+        const zoomProgressExpr = `(min(on\,${framesMinusOne})/${framesMinusOneExpr})`;
+        const zoomExpr = `1+(${targetZoomExpr}-1)*${zoomProgressExpr}`;
+        const yExpr = "max(min((ih/2)-(ih/zoom/2)\,ih-ih/zoom)\,0)";
+        const zoompanFilter =
+          `zoompan=z='${zoomExpr}':x='0':y='${yExpr}':d=1:s=${W}x${H}:fps=${animFps.toFixed(6)}`;
+        f.push(
+          `[1:v]format=rgba,` +
+            `${cropFilter},` +
+            `loop=loop=-1:size=1:start=0,` +
+            `${zoompanFilter},` +
+            `trim=0:${durExpr},setpts=PTS-STARTPTS,` +
+            `format=rgba,setsar=1[bg]`
+        );
+      }
     } else {
       f.push(
         `[1:v]format=rgba,` +
-          `scale=${W}:${H}:force_original_aspect_ratio=increase,` +
-          `crop=${W}:${H},setsar=1[bg]`
+          `${cropFilter},` +
+          `scale=${W}:${H}:flags=lanczos,setsar=1[bg]`
       );
     }
     f.push(`[${lastV}][bg]overlay=x=0:y=0:enable='between(t,0,${dur})'[v0]`);
