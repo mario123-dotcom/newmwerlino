@@ -69,19 +69,30 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
       const targetZoom = 1.18;
       const targetZoomExpr = targetZoom.toFixed(6);
       const durExpr = dur.toFixed(6);
-      const zoomProgressExpr = `(min(t\,${durExpr})/${durExpr})`;
-      const zoomExpr = `1+(${targetZoomExpr}-1)*${zoomProgressExpr}`;
-      const cropYExpr = `max((ih-${H})/2,0)`;
-      f.push(
-        `[1:v]format=rgba,` +
-          `${cropFilter},` +
-          `loop=loop=-1:size=1:start=0,` +
-          `fps=${animFps.toFixed(6)},` +
-          `trim=0:${dur.toFixed(6)},setpts=PTS-STARTPTS,` +
-          `scale=w='iw*${zoomExpr}':h='ih*${zoomExpr}':flags=lanczos:eval=frame,` +
-          `crop=${W}:${H}:x=0:y='${cropYExpr}',` +
-          `setsar=1[bg]`
-      );
+      const totalFrames = Math.max(Math.round(dur * animFps), 1);
+      if (totalFrames <= 1) {
+        f.push(
+          `[1:v]format=rgba,` +
+            `${cropFilter},` +
+            `scale=${W}:${H}:flags=lanczos,setsar=1[bg]`
+        );
+      } else {
+        const framesMinusOne = totalFrames - 1;
+        const framesMinusOneExpr = framesMinusOne.toFixed(6);
+        const zoomProgressExpr = `(min(on\,${framesMinusOne})/${framesMinusOneExpr})`;
+        const zoomExpr = `1+(${targetZoomExpr}-1)*${zoomProgressExpr}`;
+        const yExpr = "max(min((ih/2)-(ih/zoom/2)\,ih-ih/zoom)\,0)";
+        const zoompanFilter =
+          `zoompan=z='${zoomExpr}':x='0':y='${yExpr}':d=1:s=${W}x${H}:fps=${animFps.toFixed(6)}`;
+        f.push(
+          `[1:v]format=rgba,` +
+            `${cropFilter},` +
+            `loop=loop=-1:size=1:start=0,` +
+            `${zoompanFilter},` +
+            `trim=0:${durExpr},setpts=PTS-STARTPTS,` +
+            `format=rgba,setsar=1[bg]`
+        );
+      }
     } else {
       f.push(
         `[1:v]format=rgba,` +
