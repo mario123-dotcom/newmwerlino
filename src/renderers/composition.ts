@@ -232,11 +232,12 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
       }
       f.push(`color=c=black@0:s=${W}x${H}:d=${dur},format=rgba[tx_${i}_in]`);
 
+      const blockFontFile = tb.fontFile ?? fontFile;
       const draw = buildDrawText({
         label: `tx_${i}`,
         textFile: tb.textFile,
         text: tb.text,
-        fontFile,
+        fontFile: blockFontFile,
         fontSize: tb.fontSize ?? 60,
         fontColor: tb.fontColor ?? "white",
         xExpr: String(tb.x),

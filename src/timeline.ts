@@ -33,6 +33,7 @@ export type TextBlockSpec = {
   x: number;
   y: number;
 
+  fontFile?: string;
   fontSize?: number;
   fontColor?: string;
   lineSpacing?: number;
@@ -1253,6 +1254,123 @@ function resolveTextLayout(
   return layouts[layouts.length - 1];
 }
 
+function isExplicitlyFalse(value: unknown): boolean {
+  if (value === false) return true;
+  if (value === 0) return true;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (!normalized) return false;
+    return normalized === "false" || normalized === "0" || normalized === "no" || normalized === "off";
+  }
+  return false;
+}
+
+function buildCopyrightBlock(
+  template: TemplateDoc,
+  mods: Record<string, any>,
+  compName: string,
+  elementName: string,
+  videoW: number,
+  videoH: number
+): TextBlockSpec | undefined {
+  const comp = findComposition(template, compName);
+  const element = findChildByName(comp, elementName) as TemplateElement | undefined;
+  if (!comp || !element) return undefined;
+  if ((element as any)?.visible === false) return undefined;
+  const visMod = mods?.[`${elementName}.visible`];
+  if (isExplicitlyFalse(visMod)) return undefined;
+
+  const modValue = mods?.[elementName];
+  const modText = typeof modValue === "string" ? modValue.trim() : "";
+  const tplText = typeof (element as any)?.text === "string" ? (element as any).text.trim() : "";
+  const text = modText || tplText;
+  if (!text) return undefined;
+
+  const box = getTextBoxFromTemplate(template, compName, elementName);
+  if (!box) return undefined;
+
+  let fontGuess =
+    lenToPx((element as any)?.font_size, videoW, videoH) ??
+    lenToPx((element as any)?.font_size_maximum, videoW, videoH) ??
+    lenToPx((element as any)?.font_size_minimum, videoW, videoH) ??
+    MIN_FONT_SIZE;
+  if (!(fontGuess > 0)) fontGuess = MIN_FONT_SIZE;
+
+  const lineHeightFactor = parseLineHeightFactor((element as any)?.line_height) ?? 1.2;
+
+  const manualBreaks = text.includes("\n");
+  let lines = manualBreaks
+    ? text.split(/\r?\n/)
+    : wrapText(
+        text,
+        box.w > 0 ? maxCharsForWidth(box.w, Math.round(fontGuess)) : DEFAULT_CHARS_PER_LINE
+      );
+  lines = lines.map((ln) => ln.trim()).filter((ln) => ln);
+  if (!lines.length) return undefined;
+
+  let fontSize = Math.max(1, Math.round(fontGuess));
+  let spacing = Math.max(0, Math.round(fontSize * Math.max(0, lineHeightFactor - 1)));
+  if (!manualBreaks) {
+    const layout = resolveTextLayout(text, box, fontSize, lineHeightFactor);
+    if (layout) {
+      lines = [...layout.lines];
+      fontSize = Math.max(1, Math.round(layout.font));
+      spacing = Math.max(0, Math.round(layout.spacing));
+    }
+  }
+
+  const alignY = parseAlignmentFactor((element as any)?.y_alignment) ?? 0;
+  let y = box.y;
+  if (lines.length && box.h > 0) {
+    const usedHeight = fontSize * lines.length + spacing * Math.max(0, lines.length - 1);
+    if (usedHeight > 0) {
+      const free = box.h - usedHeight;
+      if (free > 0 && alignY > 0) {
+        const offset = Math.round(Math.min(free, Math.max(0, free * alignY)));
+        y = box.y + offset;
+      }
+    }
+  }
+
+  const padX = lenToPx((element as any)?.x_padding, videoW, videoH) ?? 0;
+  const padY = lenToPx((element as any)?.y_padding, videoW, videoH) ?? 0;
+  const pad = Math.max(0, Math.round(Math.max(padX, padY)));
+
+  const fill = parseRGBA((element as any)?.fill_color);
+  const bg = parseRGBA((element as any)?.background_color);
+
+  const fontFamily = getFontFamilyFromTemplate(template, compName, elementName);
+  const fontWeight = getFontWeightFromTemplate(template, compName, elementName);
+  const fontPath = fontFamily ? findFontPath(fontFamily, fontWeight) : undefined;
+
+  const block: TextBlockSpec = {
+    x: box.x,
+    y,
+    text: lines.join("\n"),
+    fontFile: fontPath,
+    fontSize,
+    fontColor: fill?.color ?? "#ffffff",
+    lineSpacing: spacing,
+  };
+
+  const wantsBox = !!bg || pad > 0;
+  if (wantsBox) {
+    block.box = true;
+    if (bg) {
+      block.boxColor = bg.color;
+      block.boxAlpha = bg.alpha;
+    } else {
+      block.boxColor = block.boxColor ?? "#000000";
+      block.boxAlpha = block.boxAlpha ?? 0;
+    }
+    if (pad > 0) {
+      block.boxBorderW = pad;
+    }
+  }
+
+  return block;
+}
+
 /* ============================================================
    COSTRUTTORE SLIDE
    - Legge contenuti da 'mods'
@@ -1494,7 +1612,19 @@ export function buildTimelineFromLayout(
       animations: perLineAnims[idx].length ? perLineAnims[idx] : undefined,
     }));
 
-    const isFillerSlide = !ttsPath && !txtStr;
+    const copyrightBlock = buildCopyrightBlock(
+      template,
+      mods,
+      `Slide_${i}`,
+      `Copyright-${i}`,
+      videoW,
+      videoH
+    );
+    if (copyrightBlock) {
+      texts.push(copyrightBlock);
+    }
+
+    const isFillerSlide = !ttsPath && !txtStr && texts.length === 0;
 
     const slide: SlideSpec = {
       width: videoW,
@@ -1715,6 +1845,18 @@ export function buildTimelineFromLayout(
         textFile: tf,
         animations: perLine[idx].length ? perLine[idx] : undefined,
       }));
+    }
+    const outroCopyright = buildCopyrightBlock(
+      template,
+      mods,
+      "Outro",
+      "Copyright-outro",
+      videoW,
+      videoH
+    );
+    if (outroCopyright) {
+      if (!texts) texts = [];
+      texts.push(outroCopyright);
     }
     slides.push({
       width: videoW,
