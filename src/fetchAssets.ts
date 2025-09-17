@@ -95,12 +95,15 @@ async function downloadFile(url: string, outPath: string, options?: HttpGetOptio
 export async function fetchAssets() {
   const mods = loadModifications() || {};
 
-  // Pulisce completamente la cartella di download per evitare artefatti (es. "npm" o "img=true")
-  clearDir(paths.downloads);
+  ensureDir(paths.downloads);
 
+  // Pulisce le cartelle dinamiche ma lascia intatta la directory dei font locali
   ensureDir(paths.audio);
+  clearDir(paths.audio);
   ensureDir(paths.images);
+  clearDir(paths.images);
   ensureDir(paths.tts);
+  clearDir(paths.tts);
   ensureDir(paths.fonts);
 
   // Logo
