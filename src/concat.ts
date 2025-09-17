@@ -1,4 +1,4 @@
-import { writeFileSync } from "fs";
+import { existsSync, writeFileSync } from "fs";
 import { runFFmpeg } from "./ffmpeg/run"; // ✅ percorso corretto
 
 type ConcatArgs = {
@@ -18,6 +18,8 @@ function ffSafe(p: string): string {
 export async function concatAndFinalizeDemuxer(args: ConcatArgs) {
   const { segments, bgAudioPath, outPath, concatTxtPath, fps, bgVolume = 0.15 } = args;
 
+  const hasBgAudio = !!(bgAudioPath && existsSync(bgAudioPath));
+
   // Scrivi concat.txt (una riga per file)
   const lines = segments.map((s) => `file '${ffSafe(s)}'`);
   writeFileSync(concatTxtPath, lines.join("\n"), "utf8");
@@ -30,8 +32,8 @@ export async function concatAndFinalizeDemuxer(args: ConcatArgs) {
     "-i", concatTxtPath,
   ];
 
-  if (bgAudioPath) {
-    ffargs.push("-stream_loop", "-1", "-i", bgAudioPath);
+  if (hasBgAudio) {
+    ffargs.push("-stream_loop", "-1", "-i", bgAudioPath!);
     ffargs.push(
       "-filter_complex",
       [
