@@ -31,7 +31,7 @@ function clearDir(dir: string) {
     const raw = process.env.npm_config_local ?? process.env.NPM_CONFIG_LOCAL;
     if (typeof raw !== "string") return false;
     const normalized = raw.trim().toLowerCase();
-    return normalized !== "" && normalized !== "false" && normalized !== "0";
+    return normalized !== "false" && normalized !== "0" && normalized !== "no";
   }
 
   function fromNpmArgv(): boolean {
