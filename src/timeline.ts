@@ -251,6 +251,24 @@ function parseShadowColor(raw: any): { color: string; alpha?: number } | undefin
   if (!input) return undefined;
   const rgba = parseRGBA(input);
   if (rgba) return rgba;
+  const hexWithAlpha = input.match(/^#([0-9a-f]{8})$/i);
+  if (hexWithAlpha) {
+    const value = hexWithAlpha[1].toLowerCase();
+    const rgbHex = value.slice(0, 6);
+    const alphaHex = value.slice(6);
+    const alpha = parseInt(alphaHex, 16) / 255;
+    return { color: `#${rgbHex}`, alpha };
+  }
+  const shortHexWithAlpha = input.match(/^#([0-9a-f]{4})$/i);
+  if (shortHexWithAlpha) {
+    const value = shortHexWithAlpha[1].toLowerCase();
+    const r = value[0] + value[0];
+    const g = value[1] + value[1];
+    const b = value[2] + value[2];
+    const a = value[3] + value[3];
+    const alpha = parseInt(a, 16) / 255;
+    return { color: `#${r}${g}${b}`, alpha };
+  }
   const hex = input.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
   if (hex) {
     let value = hex[1];
@@ -370,13 +388,42 @@ function extractGradientShadow(
   if (!isGradientShadowElement(source)) return undefined;
   const fill = ((source as any)?.fill_color ?? (source as any)?.fillColor) as any[];
   const info: ShadowInfo = { declared: true };
+  let strongestAlpha = -Infinity;
+  let strongestAlphaValue: number | undefined;
+  let strongestColor: string | undefined;
 
   for (const stop of fill) {
     const color = typeof stop?.color === "string" ? stop.color : undefined;
     const parsed = parseShadowColor(color);
     if (!parsed) continue;
-    if (parsed.color) info.color = parsed.color;
-    if (parsed.alpha !== undefined) info.alpha = parsed.alpha;
+
+    const candidateColor = parsed.color;
+    const hasExplicitAlpha = parsed.alpha !== undefined;
+    const comparisonAlpha = hasExplicitAlpha
+      ? parsed.alpha ?? 0
+      : candidateColor
+        ? 1
+        : -Infinity;
+
+    if (comparisonAlpha > strongestAlpha) {
+      strongestAlpha = comparisonAlpha;
+      strongestColor = candidateColor ?? strongestColor;
+      strongestAlphaValue = hasExplicitAlpha ? parsed.alpha : comparisonAlpha;
+    } else if (Math.abs(comparisonAlpha - strongestAlpha) <= 1e-6) {
+      if (hasExplicitAlpha && strongestAlphaValue === undefined) {
+        strongestAlphaValue = parsed.alpha;
+      }
+      if (!strongestColor && candidateColor) {
+        strongestColor = candidateColor;
+      }
+    } else if (!strongestColor && candidateColor) {
+      strongestColor = candidateColor;
+    }
+  }
+
+  if (strongestColor) info.color = strongestColor;
+  if (strongestAlphaValue !== undefined && Number.isFinite(strongestAlphaValue)) {
+    info.alpha = strongestAlphaValue;
   }
 
   const widthPx = pctToPx((source as any)?.width, W);
@@ -1641,7 +1688,8 @@ export function buildTimelineFromLayout(
         (name) => () => extractShadowFromMods(mods, name, videoW, videoH)
       ),
     ];
-    const slideHasShadow = slideShadowSources.some((get) => !!get());
+    const slideShadow = mergeShadows(...slideShadowSources.map((get) => get()));
+    const slideHasShadow = !!slideShadow.declared;
 
     const bgImagePath = findImageForSlide(i);
 
@@ -1701,6 +1749,19 @@ export function buildTimelineFromLayout(
       shadowEnabled: slideHasShadow ? true : undefined,
     };
 
+    if (slideShadow.color) {
+      slide.shadowColor = slideShadow.color;
+    }
+    if (typeof slideShadow.alpha === "number" && Number.isFinite(slideShadow.alpha)) {
+      slide.shadowAlpha = slideShadow.alpha;
+    }
+    if (typeof slideShadow.w === "number" && Number.isFinite(slideShadow.w) && slideShadow.w > 0) {
+      slide.shadowW = slideShadow.w;
+    }
+    if (typeof slideShadow.h === "number" && Number.isFinite(slideShadow.h) && slideShadow.h > 0) {
+      slide.shadowH = slideShadow.h;
+    }
+
     if (isFillerSlide) {
       slide.backgroundAnimated = false;
     } else if (bgImagePath && i > 0) {
@@ -1732,29 +1793,6 @@ export function buildTimelineFromLayout(
     );
   if (outroVisible) {
     const outroStart = parseSec(mods["Outro.time"], prevEnd);
-    if (outroStart > prevEnd + 0.001) {
-      const gap = outroStart - prevEnd;
-      const fLogo = getLogoBoxFromTemplate(template, "Outro") || {
-        x: Math.round((videoW - 240) / 2),
-        y: Math.round((videoH - 140) / 2),
-        w: 240,
-        h: 140,
-      };
-      slides.push({
-        width: videoW,
-        height: videoH,
-        fps,
-        durationSec: gap,
-        outPath: "",
-        logoPath: join(paths.images, "logo.png"),
-        logoWidth: fLogo.w,
-        logoHeight: fLogo.h,
-        logoX: fLogo.x,
-        logoY: fLogo.y,
-      });
-      prevEnd = outroStart;
-    }
-
     const outDur = parseSec(
       mods["Outro.duration"],
       parseSec(outroComp.duration, defaultDur)
@@ -1773,7 +1811,46 @@ export function buildTimelineFromLayout(
         (name) => () => extractShadowFromMods(mods, name, videoW, videoH)
       ),
     ];
-    const outroHasShadow = outroShadowSources.some((get) => !!get());
+    const outroShadow = mergeShadows(...outroShadowSources.map((get) => get()));
+    const outroHasShadow = !!outroShadow.declared;
+    if (outroStart > prevEnd + 0.001) {
+      const gap = outroStart - prevEnd;
+      const fLogo = getLogoBoxFromTemplate(template, "Outro") || {
+        x: Math.round((videoW - 240) / 2),
+        y: Math.round((videoH - 140) / 2),
+        w: 240,
+        h: 140,
+      };
+      const outroGap: SlideSpec = {
+        width: videoW,
+        height: videoH,
+        fps,
+        durationSec: gap,
+        outPath: "",
+        logoPath: join(paths.images, "logo.png"),
+        logoWidth: fLogo.w,
+        logoHeight: fLogo.h,
+        logoX: fLogo.x,
+        logoY: fLogo.y,
+      };
+      if (outroHasShadow) {
+        outroGap.shadowEnabled = true;
+      }
+      if (outroShadow.color) {
+        outroGap.shadowColor = outroShadow.color;
+      }
+      if (typeof outroShadow.alpha === "number" && Number.isFinite(outroShadow.alpha)) {
+        outroGap.shadowAlpha = outroShadow.alpha;
+      }
+      if (typeof outroShadow.w === "number" && Number.isFinite(outroShadow.w) && outroShadow.w > 0) {
+        outroGap.shadowW = outroShadow.w;
+      }
+      if (typeof outroShadow.h === "number" && Number.isFinite(outroShadow.h) && outroShadow.h > 0) {
+        outroGap.shadowH = outroShadow.h;
+      }
+      slides.push(outroGap);
+      prevEnd = outroStart;
+    }
     const txt = textEl?.text as string | undefined;
     let texts: TextBlockSpec[] | undefined;
     if (txt && textBox) {
@@ -1907,7 +1984,7 @@ export function buildTimelineFromLayout(
       if (!texts) texts = [];
       texts.push(outroCopyright);
     }
-    slides.push({
+    const outroSlide: SlideSpec = {
       width: videoW,
       height: videoH,
       fps,
@@ -1921,7 +1998,20 @@ export function buildTimelineFromLayout(
       fontFile: fontPath,
       texts,
       shadowEnabled: outroHasShadow ? true : undefined,
-    });
+    };
+    if (outroShadow.color) {
+      outroSlide.shadowColor = outroShadow.color;
+    }
+    if (typeof outroShadow.alpha === "number" && Number.isFinite(outroShadow.alpha)) {
+      outroSlide.shadowAlpha = outroShadow.alpha;
+    }
+    if (typeof outroShadow.w === "number" && Number.isFinite(outroShadow.w) && outroShadow.w > 0) {
+      outroSlide.shadowW = outroShadow.w;
+    }
+    if (typeof outroShadow.h === "number" && Number.isFinite(outroShadow.h) && outroShadow.h > 0) {
+      outroSlide.shadowH = outroShadow.h;
+    }
+    slides.push(outroSlide);
   }
 
   return slides;
