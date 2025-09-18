@@ -144,3 +144,12 @@ export async function fetchAssets() {
 
   console.log("✅ Tutti gli asset sono stati scaricati.");
 }
+
+export function useLocalAssets() {
+  ensureDir(paths.downloads);
+  ensureDir(paths.audio);
+  ensureDir(paths.images);
+  ensureDir(paths.tts);
+  ensureDir(paths.fonts);
+  console.log("⚠️ Modalità locale attiva: utilizzo degli asset già presenti in download.");
+}

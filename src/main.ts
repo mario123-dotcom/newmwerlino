@@ -7,7 +7,7 @@ import { loadTemplate, loadModifications } from "./template";
 import { buildTimelineFromLayout, SlideSpec } from "./timeline";
 import { renderSlideSegment } from "./renderers/composition";
 import { concatAndFinalizeDemuxer } from "./concat";
-import { fetchAssets } from "./fetchAssets";
+import { fetchAssets, useLocalAssets } from "./fetchAssets";
 
 function ensureDir(dir: string) {
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
@@ -21,6 +21,13 @@ function clearDir(dir: string) {
 }
 
 (async () => {
+  const args = process.argv.slice(2);
+  const npmConfigLocal = process.env.npm_config_local ?? process.env.NPM_CONFIG_LOCAL;
+  const localMode =
+    args.includes("-local") ||
+    args.includes("--local") ||
+    (typeof npmConfigLocal === "string" && npmConfigLocal !== "false" && npmConfigLocal !== "0");
+
   // prepara le cartelle di lavoro
   ensureDir(paths.temp);
   ensureDir(paths.output);
@@ -28,7 +35,11 @@ function clearDir(dir: string) {
   clearDir(paths.output);
 
   // 1) scarica asset
-  await fetchAssets();
+  if (localMode) {
+    useLocalAssets();
+  } else {
+    await fetchAssets();
+  }
 
   // 2) carica template + modifications
   const tpl = loadTemplate();
