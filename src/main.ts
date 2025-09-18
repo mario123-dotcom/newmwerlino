@@ -9,6 +9,36 @@ import { renderSlideSegment } from "./renderers/composition";
 import { concatAndFinalizeDemuxer } from "./concat";
 import { fetchAssets } from "./fetchAssets";
 
+function collectCliFlags(): Set<string> {
+  const flags = new Set<string>();
+  for (const arg of process.argv.slice(2)) {
+    if (typeof arg === "string" && arg.length > 0) {
+      flags.add(arg);
+    }
+  }
+
+  const rawNpmArgs = process.env.npm_config_argv;
+  if (rawNpmArgs) {
+    try {
+      const parsed = JSON.parse(rawNpmArgs) as Record<string, unknown>;
+      const candidates = [parsed.original, parsed.cooked, parsed.remain];
+      for (const candidate of candidates) {
+        if (Array.isArray(candidate)) {
+          for (const value of candidate) {
+            if (typeof value === "string" && value.startsWith("-")) {
+              flags.add(value);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("Impossibile analizzare gli argomenti di npm:", err);
+    }
+  }
+
+  return flags;
+}
+
 function ensureDir(dir: string) {
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 }
@@ -27,8 +57,18 @@ function clearDir(dir: string) {
   clearDir(paths.temp);
   clearDir(paths.output);
 
-  // 1) scarica asset
-  await fetchAssets();
+  const cliFlags = collectCliFlags();
+  const useLocalAssets =
+    cliFlags.has("-local") || cliFlags.has("--local") || cliFlags.has("local");
+
+  if (useLocalAssets) {
+    console.log(
+      "▶️  Avvio in modalità locale: salto il download degli asset e uso quelli presenti in download/."
+    );
+  } else {
+    // 1) scarica asset
+    await fetchAssets();
+  }
 
   // 2) carica template + modifications
   const tpl = loadTemplate();
