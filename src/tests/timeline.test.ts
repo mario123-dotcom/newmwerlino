@@ -480,10 +480,10 @@ test("buildTimelineFromLayout parses slide shadow", () => {
   const slides = buildTimelineFromLayout(mods, tpl, { videoW: 100, videoH: 100, fps: 30, defaultDur: 1 });
   const s0 = slides[0];
   assert.equal(s0.shadowEnabled, true);
-  assert.equal(s0.shadowColor, undefined);
-  assert.equal(s0.shadowAlpha, undefined);
-  assert.equal(s0.shadowW, undefined);
-  assert.equal(s0.shadowH, undefined);
+  assert.equal(s0.shadowColor, "#000000");
+  assert.equal(s0.shadowAlpha, 0.5);
+  assert.equal(s0.shadowW, 10);
+  assert.equal(s0.shadowH, 20);
 });
 
 test("buildTimelineFromLayout reads nested background shadow metadata", () => {
@@ -547,10 +547,10 @@ test("buildTimelineFromLayout reads nested background shadow metadata", () => {
   assert.equal(slides.length, 1);
   const s0 = slides[0];
   assert.equal(s0.shadowEnabled, true);
-  assert.equal(s0.shadowColor, undefined);
-  assert.equal(s0.shadowAlpha, undefined);
-  assert.equal(s0.shadowW, undefined);
-  assert.equal(s0.shadowH, undefined);
+  assert.equal(s0.shadowColor, "#0a141e");
+  assert.equal(s0.shadowAlpha, 0.75);
+  assert.equal(s0.shadowW, 50);
+  assert.equal(s0.shadowH, 25);
 });
 
 test("buildTimelineFromLayout reads shadow overrides from modifications", () => {
@@ -585,10 +585,10 @@ test("buildTimelineFromLayout reads shadow overrides from modifications", () => 
   assert.equal(slides.length, 1);
   const s0 = slides[0];
   assert.equal(s0.shadowEnabled, true);
-  assert.equal(s0.shadowColor, undefined);
-  assert.equal(s0.shadowAlpha, undefined);
-  assert.equal(s0.shadowW, undefined);
-  assert.equal(s0.shadowH, undefined);
+  assert.equal(s0.shadowColor, "#0a141e");
+  assert.equal(s0.shadowAlpha, 0.6);
+  assert.equal(s0.shadowW, 50);
+  assert.equal(s0.shadowH, 25);
 });
 
 test("buildTimelineFromLayout detects gradient background shapes as shadows", () => {
@@ -633,9 +633,10 @@ test("buildTimelineFromLayout detects gradient background shapes as shadows", ()
   assert.ok(slides.length >= 2);
   const s0 = slides[0];
   assert.equal(s0.shadowEnabled, true);
-  assert.equal(s0.shadowColor, undefined);
-  assert.equal(s0.shadowW, undefined);
-  assert.equal(s0.shadowH, undefined);
+  assert.equal(s0.shadowColor, "#000000");
+  assert.equal(s0.shadowAlpha, 1);
+  assert.equal(s0.shadowW, 1920);
+  assert.equal(s0.shadowH, 1080);
   const s1 = slides[1];
   assert.equal(s1.shadowEnabled, undefined);
 });

@@ -370,13 +370,50 @@ function extractGradientShadow(
   if (!isGradientShadowElement(source)) return undefined;
   const fill = ((source as any)?.fill_color ?? (source as any)?.fillColor) as any[];
   const info: ShadowInfo = { declared: true };
+  let fallbackColor: string | undefined;
+  let strongestColor: string | undefined;
+  let strongestAlpha: number | undefined;
+  let hasPositiveAlpha = false;
 
   for (const stop of fill) {
     const color = typeof stop?.color === "string" ? stop.color : undefined;
     const parsed = parseShadowColor(color);
     if (!parsed) continue;
-    if (parsed.color) info.color = parsed.color;
-    if (parsed.alpha !== undefined) info.alpha = parsed.alpha;
+    if (parsed.color) {
+      fallbackColor = parsed.color;
+    }
+    if (parsed.alpha !== undefined) {
+      const clamped = Math.max(0, Math.min(1, parsed.alpha));
+      if (clamped > 0) {
+        hasPositiveAlpha = true;
+        if (strongestAlpha === undefined || clamped > strongestAlpha) {
+          strongestAlpha = clamped;
+          if (parsed.color) {
+            strongestColor = parsed.color;
+          }
+        }
+      } else if (strongestAlpha === undefined) {
+        strongestAlpha = 0;
+      }
+    }
+  }
+
+  if (hasPositiveAlpha) {
+    if (strongestColor) {
+      info.color = strongestColor;
+    } else if (fallbackColor) {
+      info.color = fallbackColor;
+    }
+    if (strongestAlpha !== undefined) {
+      info.alpha = strongestAlpha;
+    }
+  } else {
+    if (!info.color && fallbackColor) {
+      info.color = fallbackColor;
+    }
+    if (info.color) {
+      info.alpha = 1;
+    }
   }
 
   const widthPx = pctToPx((source as any)?.width, W);
@@ -1641,7 +1678,15 @@ export function buildTimelineFromLayout(
         (name) => () => extractShadowFromMods(mods, name, videoW, videoH)
       ),
     ];
-    const slideHasShadow = slideShadowSources.some((get) => !!get());
+    const slideShadowParts = slideShadowSources.map((get) => get());
+    let slideShadow = mergeShadows(...slideShadowParts);
+    const slideShadowOverride = readBooleanish(mods[`Slide_${i}.shadowEnabled`]);
+    if (slideShadowOverride === false) {
+      slideShadow = {};
+    } else if (slideShadowOverride === true) {
+      slideShadow.declared = true;
+    }
+    const slideHasShadow = !!slideShadow.declared;
 
     const bgImagePath = findImageForSlide(i);
 
@@ -1700,6 +1745,21 @@ export function buildTimelineFromLayout(
 
       shadowEnabled: slideHasShadow ? true : undefined,
     };
+
+    if (slideHasShadow) {
+      if (typeof slideShadow.color === "string") {
+        slide.shadowColor = slideShadow.color;
+      }
+      if (slideShadow.alpha !== undefined && Number.isFinite(slideShadow.alpha)) {
+        slide.shadowAlpha = Math.max(0, Math.min(1, slideShadow.alpha));
+      }
+      if (slideShadow.w !== undefined && Number.isFinite(slideShadow.w) && slideShadow.w > 0) {
+        slide.shadowW = slideShadow.w;
+      }
+      if (slideShadow.h !== undefined && Number.isFinite(slideShadow.h) && slideShadow.h > 0) {
+        slide.shadowH = slideShadow.h;
+      }
+    }
 
     if (isFillerSlide) {
       slide.backgroundAnimated = false;
@@ -1773,7 +1833,15 @@ export function buildTimelineFromLayout(
         (name) => () => extractShadowFromMods(mods, name, videoW, videoH)
       ),
     ];
-    const outroHasShadow = outroShadowSources.some((get) => !!get());
+    const outroShadowParts = outroShadowSources.map((get) => get());
+    let outroShadow = mergeShadows(...outroShadowParts);
+    const outroShadowOverride = readBooleanish(mods["Outro.shadowEnabled"]);
+    if (outroShadowOverride === false) {
+      outroShadow = {};
+    } else if (outroShadowOverride === true) {
+      outroShadow.declared = true;
+    }
+    const outroHasShadow = !!outroShadow.declared;
     const txt = textEl?.text as string | undefined;
     let texts: TextBlockSpec[] | undefined;
     if (txt && textBox) {
@@ -1907,7 +1975,7 @@ export function buildTimelineFromLayout(
       if (!texts) texts = [];
       texts.push(outroCopyright);
     }
-    slides.push({
+    const outroSlide: SlideSpec = {
       width: videoW,
       height: videoH,
       fps,
@@ -1921,7 +1989,24 @@ export function buildTimelineFromLayout(
       fontFile: fontPath,
       texts,
       shadowEnabled: outroHasShadow ? true : undefined,
-    });
+    };
+
+    if (outroHasShadow) {
+      if (typeof outroShadow.color === "string") {
+        outroSlide.shadowColor = outroShadow.color;
+      }
+      if (outroShadow.alpha !== undefined && Number.isFinite(outroShadow.alpha)) {
+        outroSlide.shadowAlpha = Math.max(0, Math.min(1, outroShadow.alpha));
+      }
+      if (outroShadow.w !== undefined && Number.isFinite(outroShadow.w) && outroShadow.w > 0) {
+        outroSlide.shadowW = outroShadow.w;
+      }
+      if (outroShadow.h !== undefined && Number.isFinite(outroShadow.h) && outroShadow.h > 0) {
+        outroSlide.shadowH = outroShadow.h;
+      }
+    }
+
+    slides.push(outroSlide);
   }
 
   return slides;
