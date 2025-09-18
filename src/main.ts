@@ -8,6 +8,7 @@ import { buildTimelineFromLayout, SlideSpec } from "./timeline";
 import { renderSlideSegment } from "./renderers/composition";
 import { concatAndFinalizeDemuxer } from "./concat";
 import { fetchAssets } from "./fetchAssets";
+import { resolveCliOptions } from "./cliOptions";
 
 function ensureDir(dir: string) {
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
@@ -21,6 +22,8 @@ function clearDir(dir: string) {
 }
 
 (async () => {
+  const { localOnly } = resolveCliOptions(process.argv.slice(2), process.env);
+
   // prepara le cartelle di lavoro
   ensureDir(paths.temp);
   ensureDir(paths.output);
@@ -28,7 +31,7 @@ function clearDir(dir: string) {
   clearDir(paths.output);
 
   // 1) scarica asset
-  await fetchAssets();
+  await fetchAssets({ localOnly });
 
   // 2) carica template + modifications
   const tpl = loadTemplate();
