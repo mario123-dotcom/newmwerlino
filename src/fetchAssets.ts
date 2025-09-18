@@ -92,19 +92,30 @@ async function downloadFile(url: string, outPath: string, options?: HttpGetOptio
   console.log(`Scaricato: ${outPath}`);
 }
 
-export async function fetchAssets() {
-  const mods = loadModifications() || {};
+export type FetchAssetsOptions = {
+  localOnly?: boolean;
+};
+
+export async function fetchAssets(opts: FetchAssetsOptions = {}) {
+  const { localOnly = false } = opts;
 
   ensureDir(paths.downloads);
+  ensureDir(paths.audio);
+  ensureDir(paths.images);
+  ensureDir(paths.tts);
+  ensureDir(paths.fonts);
+
+  if (localOnly) {
+    console.log("ℹ️ Modalità locale: uso asset già scaricati senza effettuare il download.");
+    return;
+  }
+
+  const mods = loadModifications() || {};
 
   // Pulisce le cartelle dinamiche ma lascia intatta la directory dei font locali
-  ensureDir(paths.audio);
   clearDir(paths.audio);
-  ensureDir(paths.images);
   clearDir(paths.images);
-  ensureDir(paths.tts);
   clearDir(paths.tts);
-  ensureDir(paths.fonts);
 
   // Logo
   const logoUrl = String(mods.Logo ?? "");

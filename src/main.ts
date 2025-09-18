@@ -21,6 +21,12 @@ function clearDir(dir: string) {
 }
 
 (async () => {
+  const rawArgs = process.argv.slice(2).map((arg) => arg.trim());
+  const wantsLocalAssets = rawArgs.some((arg) => {
+    const lower = arg.toLowerCase();
+    return lower === "--local" || lower === "-local" || lower === "local";
+  });
+
   // prepara le cartelle di lavoro
   ensureDir(paths.temp);
   ensureDir(paths.output);
@@ -28,7 +34,7 @@ function clearDir(dir: string) {
   clearDir(paths.output);
 
   // 1) scarica asset
-  await fetchAssets();
+  await fetchAssets({ localOnly: wantsLocalAssets });
 
   // 2) carica template + modifications
   const tpl = loadTemplate();
