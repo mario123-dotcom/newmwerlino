@@ -22,11 +22,33 @@ function clearDir(dir: string) {
 
 (async () => {
   const args = process.argv.slice(2);
-  const npmConfigLocal = process.env.npm_config_local ?? process.env.NPM_CONFIG_LOCAL;
-  const localMode =
-    args.includes("-local") ||
-    args.includes("--local") ||
-    (typeof npmConfigLocal === "string" && npmConfigLocal !== "false" && npmConfigLocal !== "0");
+
+  function hasFlag(flag: string) {
+    return args.includes(flag);
+  }
+
+  function fromEnvFlag(): boolean {
+    const raw = process.env.npm_config_local ?? process.env.NPM_CONFIG_LOCAL;
+    if (typeof raw !== "string") return false;
+    const normalized = raw.trim().toLowerCase();
+    return normalized !== "" && normalized !== "false" && normalized !== "0";
+  }
+
+  function fromNpmArgv(): boolean {
+    const raw = process.env.npm_config_argv;
+    if (!raw) return false;
+    try {
+      const parsed = JSON.parse(raw);
+      const original: unknown = parsed?.original ?? parsed?.cooked;
+      if (!Array.isArray(original)) return false;
+      return original.includes("-local") || original.includes("--local");
+    } catch (err) {
+      console.warn("Impossibile leggere npm_config_argv:", err);
+      return false;
+    }
+  }
+
+  const localMode = hasFlag("-local") || hasFlag("--local") || fromEnvFlag() || fromNpmArgv();
 
   // prepara le cartelle di lavoro
   ensureDir(paths.temp);
