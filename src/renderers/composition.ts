@@ -126,7 +126,7 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
       typeof slide.shadowAlpha === "number" && Number.isFinite(slide.shadowAlpha)
         ? slide.shadowAlpha
         : undefined;
-    const fallbackAlpha = 0.8;
+    const fallbackAlpha = 0.95;
     const sa = Math.min(Math.max(alphaRaw ?? fallbackAlpha, 0), 1);
     if (sa > 0) {
       const swRaw =
