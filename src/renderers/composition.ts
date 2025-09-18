@@ -66,7 +66,7 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
   if (hasBG) {
     if (animateBackground && dur > 0) {
       const animFps = fps > 0 ? fps : 30;
-      const targetZoom = 1.28;
+      const targetZoom = 1.34;
       const targetZoomExpr = targetZoom.toFixed(6);
       const durExpr = dur.toFixed(6);
       const totalFrames = Math.max(Math.round(dur * animFps), 1);
@@ -82,8 +82,9 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
         const baseZoomProgressExpr = `(min(on\,${framesMinusOne})/${framesMinusOneExpr})`;
         // Cubic ease-out for an even quicker acceleration than the previous quadratic curve.
         const cubicEaseOutExpr = `1-pow(1-${baseZoomProgressExpr},3)`;
-        const zoomSpeedMultiplier = 1.35;
-        const zoomProgressExpr = `min(${zoomSpeedMultiplier.toFixed(6)}*${cubicEaseOutExpr},1)`;
+        const lingerEaseExpr = `pow(${cubicEaseOutExpr},1.12)`;
+        const zoomSpeedMultiplier = 1.22;
+        const zoomProgressExpr = `min(${zoomSpeedMultiplier.toFixed(6)}*${lingerEaseExpr},1)`;
         const zoomExpr = `1+(${targetZoomExpr}-1)*${zoomProgressExpr}`;
         const yExpr = "max(min((ih/2)-(ih/zoom/2)\,ih-ih/zoom)\,0)";
         const zoompanFilter =
