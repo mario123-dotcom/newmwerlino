@@ -126,23 +126,26 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
       typeof slide.shadowAlpha === "number" && Number.isFinite(slide.shadowAlpha)
         ? slide.shadowAlpha
         : undefined;
-    const fallbackAlpha = 0.95;
+    const fallbackAlpha = 1;
     const sa = Math.min(Math.max(alphaRaw ?? fallbackAlpha, 0), 1);
     if (sa > 0) {
-      const swRaw =
-        typeof slide.shadowW === "number" && Number.isFinite(slide.shadowW)
-          ? slide.shadowW
-          : W;
-      const shRaw =
-        typeof slide.shadowH === "number" && Number.isFinite(slide.shadowH)
-          ? slide.shadowH
-          : H;
-      const sw = Math.max(swRaw, W * 3);
-      const sh = Math.max(shRaw, H * 3);
+      const fallbackSpanX = Math.max(W, 1) * 0.7;
+      const fallbackSpanY = Math.max(H, 1) * 0.75;
+      const hasShadowW =
+        typeof slide.shadowW === "number" && Number.isFinite(slide.shadowW);
+      const hasShadowH =
+        typeof slide.shadowH === "number" && Number.isFinite(slide.shadowH);
+      const swSource = hasShadowW ? Math.abs(slide.shadowW ?? 0) : undefined;
+      const shSource = hasShadowH ? Math.abs(slide.shadowH ?? 0) : undefined;
+      const sw = Math.max(swSource ?? fallbackSpanX, 1);
+      const sh = Math.max(shSource ?? fallbackSpanY, 1);
+      const swExpr = sw.toFixed(6);
+      const shExpr = sh.toFixed(6);
+      const hMinus1Expr = Math.max(H - 1, 0).toFixed(6);
       const alphaBase = Number((255 * sa).toFixed(6));
-      const xTerm = `max(${sw}-X,0)/${sw}`;
-      const yTerm = `max(${sh}-(${H - 1}-Y),0)/${sh}`;
-      const falloff = `pow(${xTerm},4)*pow(${yTerm},4)`;
+      const xTerm = `min(max(${swExpr}-X,0)/${swExpr},1)`;
+      const yTerm = `min(max(${shExpr}-(${hMinus1Expr}-Y),0)/${shExpr},1)`;
+      const falloff = `pow(${xTerm},2)*pow(${yTerm},2)`;
       f.push(
         `color=c=${sc}@1:s=${W}x${H}:d=${dur},format=rgba,` +
           `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${alphaBase}*${falloff}'[shdw]`
