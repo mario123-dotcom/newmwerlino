@@ -7,8 +7,6 @@ import { probeDurationSec } from "./ffmpeg/probe";
 import { TEXT } from "./config";
 import { fileNameMatchesFamily } from "./fonts";
 
-const TEXT_BOX_SCALE = 70 / 60;
-
 /* ---------- Tipi usati da composition.ts ---------- */
 export type AnimationSpec =
   | {
@@ -1000,15 +998,40 @@ export function getTextBoxFromTemplate(
 
   const rawW = pctToPx(txtEl.width, W) || 0;
   const rawH = pctToPx(txtEl.height, H) || 0;
-  const w = rawW * TEXT_BOX_SCALE;
-  const h = rawH * TEXT_BOX_SCALE;
-  const xAnchor = (pctToPx(txtEl.x_anchor, 100) || 0) / 100;
-  const yAnchor = (pctToPx(txtEl.y_anchor, 100) || 0) / 100;
+  let w = rawW;
+  let h = rawH;
+
+  const normAnchor = (value: number | undefined): number => {
+    if (typeof value !== "number" || !Number.isFinite(value)) return 0;
+    if (value <= 0) return 0;
+    if (value >= 1 && value <= 100) return value / 100;
+    if (value > 100) return 1;
+    return value;
+  };
+
+  const xAnchor = normAnchor(pctToPx(txtEl.x_anchor, 100));
+  const yAnchor = normAnchor(pctToPx(txtEl.y_anchor, 100));
 
   const baseLeft = x - rawW * xAnchor;
   const baseTop = y - rawH * yAnchor;
-  let left = Math.max(baseLeft, x - w * xAnchor);
-  let top = Math.max(baseTop, y - h * yAnchor);
+
+  if (!(w > 0)) {
+    const mirrorLeft = Math.max(0, Math.min(W, baseLeft));
+    const mirrorWidth = W - mirrorLeft * 2;
+    if (mirrorWidth > 0) {
+      w = mirrorWidth;
+    }
+  }
+  if (!(h > 0)) {
+    const mirrorTop = Math.max(0, Math.min(H, baseTop));
+    const mirrorHeight = H - mirrorTop * 2;
+    if (mirrorHeight > 0) {
+      h = mirrorHeight;
+    }
+  }
+
+  let left = x - w * xAnchor;
+  let top = y - h * yAnchor;
 
   if (w > 0) left = Math.max(0, Math.min(W - w, left));
   else left = Math.max(0, Math.min(W - 10, left));

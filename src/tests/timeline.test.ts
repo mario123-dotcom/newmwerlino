@@ -41,8 +41,38 @@ test("getTextBoxFromTemplate uses anchors and keeps box inside canvas", () => {
   const box = getTextBoxFromTemplate(tpl, 0)!;
   assert.equal(box.x, 20);
   assert.equal(box.y, 30);
-  assert.equal(box.w, 70);
-  assert.equal(box.h, 47);
+  assert.equal(box.w, 60);
+  assert.equal(box.h, 40);
+});
+
+test("getTextBoxFromTemplate mirrors point text margins", () => {
+  const tpl: TemplateDoc = {
+    width: 400,
+    height: 200,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "25%",
+            y: "10%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+            x_alignment: "50%",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const box = getTextBoxFromTemplate(tpl, 0)!;
+  assert.equal(box.x, 100);
+  assert.equal(box.w, 200);
+  assert.equal(box.y, 20);
+  assert.equal(box.h, 160);
 });
 
 test("getTextBoxFromTemplate clamps to slide bounds", () => {
@@ -69,7 +99,7 @@ test("getTextBoxFromTemplate clamps to slide bounds", () => {
     ],
   };
   const box = getTextBoxFromTemplate(tpl, 0)!;
-  assert.equal(box.x, 77);
+  assert.equal(box.x, 80);
   assert.equal(box.y, 5);
 });
 
