@@ -21,11 +21,20 @@ const DEFAULT_HEADERS = {
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
 };
 
-const NO_CACHE_HEADERS = {
-  "Cache-Control": "no-cache, no-store, must-revalidate",
+const BASE_NO_CACHE_HEADERS = {
+  "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
   Pragma: "no-cache",
   Expires: "0",
-};
+} as const;
+
+function createNoCacheHeaders(attempt: number) {
+  const uniqueSuffix = `${attempt}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return {
+    ...BASE_NO_CACHE_HEADERS,
+    "If-Modified-Since": "Thu, 01 Jan 1970 00:00:00 GMT",
+    "If-None-Match": `"force-refresh-${uniqueSuffix}"`,
+  } satisfies Record<string, string>;
+}
 
 type HttpGetOptions = {
   headers?: Record<string, string>;
@@ -61,7 +70,9 @@ function httpGet(url: string, options: HttpGetOptions = {}): Promise<HttpRespons
     const target = new URL(currentUrl);
     const lib = target.protocol === "https:" ? httpsRequest : httpRequest;
     const headers =
-      attempt > 0 ? { ...baseHeaders, ...NO_CACHE_HEADERS } : { ...baseHeaders };
+      attempt > 0
+        ? { ...baseHeaders, ...createNoCacheHeaders(attempt) }
+        : { ...baseHeaders };
 
     return new Promise((resolve, reject) => {
       const req = lib(
@@ -133,12 +144,21 @@ function decodeTextResponse(res: HttpResponse): string {
   return res.buffer.toString("utf8");
 }
 
-async function fetchWithoutCache(url: string, options: HttpGetOptions = {}): Promise<Buffer> {
-  const headers = { ...DEFAULT_HEADERS, ...options.headers, ...NO_CACHE_HEADERS };
+async function fetchWithoutCache(
+  url: string,
+  options: HttpGetOptions = {},
+  attempt = 0
+): Promise<Buffer> {
+  const headers = {
+    ...DEFAULT_HEADERS,
+    ...options.headers,
+    ...createNoCacheHeaders(attempt),
+  };
   const response = await fetch(url, {
     method: "GET",
     headers,
     redirect: "follow",
+    cache: "no-store",
   });
 
   if (response.status >= 300 && response.status < 400) {
@@ -150,11 +170,19 @@ async function fetchWithoutCache(url: string, options: HttpGetOptions = {}): Pro
   }
 
   if (response.status === 304) {
-    throw createHttpError(response.status, url, 0);
+    if (attempt < 2) {
+      const nextUrl = new URL(url);
+      nextUrl.searchParams.set(
+        "_force",
+        `${Date.now()}-${attempt}-${Math.random().toString(36).slice(2)}`
+      );
+      return fetchWithoutCache(nextUrl.toString(), options, attempt + 1);
+    }
+    throw createHttpError(response.status, url, attempt);
   }
 
   if (!response.ok) {
-    throw createHttpError(response.status, url, 0);
+    throw createHttpError(response.status, url, attempt);
   }
 
   const arrayBuffer = await response.arrayBuffer();
