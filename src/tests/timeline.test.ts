@@ -970,6 +970,81 @@ test("buildTimelineFromLayout honors outro font size and alignment", () => {
   assert.equal(block.x, expectedX);
 });
 
+test("buildTimelineFromLayout centers outro text when letter spacing expands width", () => {
+  const tpl: TemplateDoc = {
+    width: 800,
+    height: 600,
+    elements: [
+      {
+        type: "composition",
+        name: "Outro",
+        duration: 3,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-outro",
+            x: 100,
+            y: 120,
+            width: 400,
+            height: 120,
+            x_anchor: "0%",
+            y_anchor: "0%",
+            x_alignment: "50%",
+            letter_spacing: "200%",
+            line_height: "100%",
+            font_size: 40,
+            text: "Ciao mondo",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const slides = buildTimelineFromLayout({}, tpl, {
+    videoW: 800,
+    videoH: 600,
+    fps: 30,
+    defaultDur: 5,
+  });
+
+  const outro = slides[slides.length - 1];
+  assert.ok(outro.texts && outro.texts.length > 0);
+  const block = outro.texts![0];
+  assert.equal(block.fontSize, 40);
+
+  const box = getTextBoxFromTemplate(tpl, "Outro", "Testo-outro")!;
+  const content = readFileSync(block.textFile!, "utf8");
+  const lines = content.split(/\r?\n/).filter((ln) => ln.length);
+  const longest = lines.reduce((max, line) => Math.max(max, line.length), 0);
+  const spacingPerGap = block.fontSize * 0.2;
+  const spacingCount = Math.max(0, longest - 1);
+  const approxWidth =
+    longest > 0
+      ? Math.round(longest * block.fontSize * 0.56 + spacingPerGap * spacingCount)
+      : 0;
+
+  let expectedX = box.x;
+  if (approxWidth > 0) {
+    if (box.w > 0) {
+      const free = box.w - approxWidth;
+      if (Math.abs(free) >= 1) {
+        const offset = free * 0.5;
+        const clampedOffset =
+          free > 0
+            ? Math.max(0, Math.min(free, offset))
+            : Math.min(0, Math.max(free, offset));
+        expectedX = Math.round(box.x + clampedOffset);
+      }
+    } else {
+      expectedX = Math.round(box.x - approxWidth * 0.5);
+    }
+    const maxLeft = Math.max(0, Math.round(800 - approxWidth));
+    expectedX = Math.max(0, Math.min(maxLeft, expectedX));
+  }
+
+  assert.equal(block.x, expectedX);
+});
+
 test("buildTimelineFromLayout animates every non-intro, non-filler slide", () => {
   const tpl: TemplateDoc = {
     width: 1920,

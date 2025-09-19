@@ -1112,13 +1112,67 @@ function extractFontPreferences(
   return { explicit: explicitFont, min: minFontPx, max: maxFontPx, clamp };
 }
 
-function approximateTextWidth(lines: string[], fontPx: number): number {
+function resolveLetterSpacingPx(
+  raw: any,
+  fontPx: number | undefined,
+  videoW: number,
+  videoH: number
+): number {
+  const font = Number.isFinite(fontPx) && fontPx > 0 ? fontPx : 0;
+  if (!(font > 0)) return 0;
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    const normalized = raw > 10 ? raw / 1000 : raw;
+    return normalized > 0 ? normalized * font : 0;
+  }
+  if (typeof raw !== "string") return 0;
+  const trimmed = raw.trim();
+  if (!trimmed) return 0;
+  const lower = trimmed.toLowerCase();
+  if (lower.endsWith("em")) {
+    const n = parseFloat(lower.slice(0, -2));
+    return Number.isFinite(n) && n > 0 ? n * font : 0;
+  }
+  if (
+    lower.endsWith("px") ||
+    lower.endsWith("vw") ||
+    lower.endsWith("vh") ||
+    lower.endsWith("vmin") ||
+    lower.endsWith("vmax")
+  ) {
+    const px = lenToPx(trimmed, videoW, videoH);
+    if (typeof px === "number" && Number.isFinite(px) && px > 0) {
+      return px;
+    }
+    return 0;
+  }
+  if (lower.endsWith("%")) {
+    const n = parseFloat(lower.slice(0, -1));
+    if (Number.isFinite(n)) {
+      const normalized = n / 1000;
+      return normalized > 0 ? normalized * font : 0;
+    }
+    return 0;
+  }
+  const n = parseFloat(lower);
+  if (!Number.isFinite(n)) return 0;
+  const normalized = n > 10 ? n / 1000 : n;
+  return normalized > 0 ? normalized * font : 0;
+}
+
+function approximateTextWidth(
+  lines: string[],
+  fontPx: number,
+  letterSpacingPx = 0
+): number {
   const safeFont = Number.isFinite(fontPx) && fontPx > 0 ? fontPx : MIN_FONT_SIZE;
   const approxChar = safeFont * APPROX_CHAR_WIDTH_RATIO;
+  const spacing = Number.isFinite(letterSpacingPx) && letterSpacingPx > 0 ? letterSpacingPx : 0;
   if (!(approxChar > 0)) return 0;
   const longest = lines.reduce((max, line) => Math.max(max, line.length), 0);
   if (!(longest > 0)) return 0;
-  return Math.round(longest * approxChar);
+  const spacingCount = Math.max(0, longest - 1);
+  const extraSpacing = spacingCount > 0 ? spacing * spacingCount : 0;
+  return Math.round(longest * approxChar + extraSpacing);
 }
 
 function alignTextBlockHorizontally(
@@ -1127,12 +1181,17 @@ function alignTextBlockHorizontally(
   fontPx: number | undefined,
   box: { x: number; w?: number },
   alignX: number | undefined,
-  videoW: number
+  videoW: number,
+  letterSpacingPx = 0
 ): number {
   if (!(block && Array.isArray(lines) && lines.length)) return 0;
   if (!(typeof alignX === "number" && Number.isFinite(alignX) && alignX !== 0)) return 0;
 
-  const width = approximateTextWidth(lines, fontPx ?? MIN_FONT_SIZE);
+  const width = approximateTextWidth(
+    lines,
+    fontPx ?? MIN_FONT_SIZE,
+    Number.isFinite(letterSpacingPx) ? Math.max(0, letterSpacingPx) : 0
+  );
   if (!(width > 0)) return 0;
 
   let targetX: number;
@@ -1433,9 +1492,25 @@ function buildCopyrightBlock(
     lineSpacing: spacing,
   };
 
+  const finalFont = block.fontSize ?? fontSize;
+  const letterSpacingPx = resolveLetterSpacingPx(
+    (element as any)?.letter_spacing,
+    finalFont,
+    videoW,
+    videoH
+  );
+
   const alignX = parseAlignmentFactor((element as any)?.x_alignment);
   if (alignX != null) {
-    const deltaX = alignTextBlockHorizontally(block, lines, fontSize, box, alignX, videoW);
+    const deltaX = alignTextBlockHorizontally(
+      block,
+      lines,
+      finalFont,
+      box,
+      alignX,
+      videoW,
+      letterSpacingPx
+    );
     if (deltaX !== 0 && block.background) {
       const bgRect = block.background;
       const bgWidth = typeof bgRect.width === "number" ? bgRect.width : 0;
@@ -1446,20 +1521,16 @@ function buildCopyrightBlock(
   }
 
   if (bg) {
-    const approxCharWidth = fontSize * APPROX_CHAR_WIDTH_RATIO;
-    const longestLine = lines.reduce((max, line) => Math.max(max, line.length), 0);
-    let textWidth =
-      longestLine > 0 && approxCharWidth > 0
-        ? longestLine * approxCharWidth
-        : approxCharWidth;
+    let textWidth = approximateTextWidth(lines, finalFont, letterSpacingPx);
     if (!(textWidth > 0)) {
-      textWidth = fontSize;
+      const approxCharWidth = finalFont * APPROX_CHAR_WIDTH_RATIO;
+      textWidth = approxCharWidth > 0 ? approxCharWidth : finalFont;
     }
     const maxAllowedWidth = box.w && box.w > 0 ? box.w : textWidth;
     textWidth = Math.min(textWidth, maxAllowedWidth);
     const lineCount = lines.length || 1;
     const totalSpacing = Math.max(0, lineCount - 1) * Math.max(0, spacing);
-    const textHeight = fontSize * lineCount + totalSpacing;
+    const textHeight = finalFont * lineCount + totalSpacing;
     const rect = clampRect(
       block.x - padX,
       y - padY,
@@ -1666,15 +1737,24 @@ export function buildTimelineFromLayout(
       );
     }
 
+    const finalFont = baseBlock.fontSize ?? initialFontSize;
+    const letterSpacingPx = resolveLetterSpacingPx(
+      (txtEl as any)?.letter_spacing,
+      finalFont,
+      videoW,
+      videoH
+    );
+
     const alignX = parseAlignmentFactor((txtEl as any)?.x_alignment);
     if (lines.length && alignX != null) {
       const deltaX = alignTextBlockHorizontally(
         baseBlock,
         lines,
-        baseBlock.fontSize ?? initialFontSize,
+        finalFont,
         txtBox,
         alignX,
-        videoW
+        videoW,
+        letterSpacingPx
       );
       if (deltaX !== 0 && baseBlock.background) {
         const bg = baseBlock.background;
@@ -1688,7 +1768,7 @@ export function buildTimelineFromLayout(
     const alignY = parseAlignmentFactor((txtEl as any)?.y_alignment) ?? 0;
     baseBlock.y = txtBox.y;
     if (lines.length && txtBox.h > 0) {
-      const font = baseBlock.fontSize ?? initialFontSize;
+      const font = finalFont;
       const spacing = baseBlock.lineSpacing ?? 0;
       const usedHeight = font * lines.length + spacing * Math.max(0, lines.length - 1);
       if (usedHeight > 0) {
@@ -1966,15 +2046,23 @@ export function buildTimelineFromLayout(
         );
       }
 
+      const finalOutFont = baseOut.fontSize ?? initialOutSize;
+      const outroLetterSpacingPx = resolveLetterSpacingPx(
+        textEl?.letter_spacing,
+        finalOutFont,
+        videoW,
+        videoH
+      );
       const alignX = parseAlignmentFactor(textEl?.x_alignment);
       if (linesOut.length && alignX != null) {
         const deltaX = alignTextBlockHorizontally(
           baseOut,
           linesOut,
-          baseOut.fontSize ?? initialOutSize,
+          finalOutFont,
           textBox,
           alignX,
-          videoW
+          videoW,
+          outroLetterSpacingPx
         );
         if (deltaX !== 0 && baseOut.background) {
           const bgRect = baseOut.background;
@@ -1988,7 +2076,7 @@ export function buildTimelineFromLayout(
       const alignY = parseAlignmentFactor(textEl?.y_alignment) ?? 0;
       baseOut.y = textBox.y;
       if (linesOut.length && textBox.h > 0) {
-        const font = baseOut.fontSize ?? initialOutSize;
+        const font = finalOutFont;
         const spacing = baseOut.lineSpacing ?? 0;
         const usedHeight = font * linesOut.length + spacing * Math.max(0, linesOut.length - 1);
         if (usedHeight > 0) {
@@ -2001,7 +2089,7 @@ export function buildTimelineFromLayout(
       }
 
       const txtFiles = writeTextFilesForSlide(slides.length, linesOut);
-      const lineH = (baseOut.fontSize ?? 60) + (baseOut.lineSpacing ?? 8);
+      const lineH = finalOutFont + (baseOut.lineSpacing ?? 8);
       const perLine: AnimationSpec[][] = txtFiles.map(() => []);
       const anims = textEl?.animations;
       if (Array.isArray(anims)) {
