@@ -1143,7 +1143,12 @@ function parseLetterSpacing(
   if (!trimmed) return undefined;
   if (trimmed.endsWith("%")) {
     const n = parseFloat(trimmed.slice(0, -1));
-    return Number.isFinite(n) ? (n / 100) * fontPx : undefined;
+    if (!Number.isFinite(n)) return undefined;
+    // After Effects exports tracking values as percentages but they represent
+    // thousandths of an em. Convert them back to em units so "200%" -> 0.2em.
+    const normalized = n / 1000;
+    const px = normalized * fontPx;
+    return Number.isFinite(px) ? px : undefined;
   }
   const px = lenToPx(trimmed, W, H);
   if (typeof px === "number" && Number.isFinite(px)) return px;

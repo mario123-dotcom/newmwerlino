@@ -119,7 +119,8 @@ test("buildTimelineFromLayout aligns text horizontally inside box", () => {
     ...lines.map((ln) => ln.length * fontPx * APPROX_CHAR_WIDTH_RATIO)
   );
   const box = getTextBoxFromTemplate(tpl, 0)!;
-  const expected = Math.round(box.x + (box.w - textWidth));
+  const free = box.w - textWidth;
+  const expected = box.x + Math.round(Math.min(free, Math.max(0, free)));
   assert.equal(block!.x, expected);
 });
 
@@ -160,6 +161,7 @@ test("buildTimelineFromLayout centers outro point text", () => {
             x_anchor: "0%",
             y_anchor: "0%",
             x_alignment: "50%",
+            letter_spacing: "200%",
             font_size: 50,
             line_height: "100%",
             text: "HELLO",
@@ -187,10 +189,17 @@ test("buildTimelineFromLayout centers outro point text", () => {
   const rendered = readFileSync(block!.textFile!, "utf8");
   const lines = rendered.split(/\r?\n/);
   const fontPx = block!.fontSize ?? 0;
+  const letterSpacingPx = (fontPx * 200) / 1000;
   const textWidth = Math.max(
-    ...lines.map((ln) => ln.length * fontPx * APPROX_CHAR_WIDTH_RATIO)
+    ...lines.map((ln) =>
+      ln.length * fontPx * APPROX_CHAR_WIDTH_RATIO +
+      Math.max(ln.length - 1, 0) * letterSpacingPx
+    )
   );
-  const expected = Math.round((600 - textWidth) / 2);
+  const available = 600 - textWidth;
+  const offset = Math.round(Math.max(0, available) * 0.5);
+  const clamped = Math.max(0, Math.min(Math.max(0, Math.floor(available)), offset));
+  const expected = clamped;
   assert.equal(block!.x, expected);
 });
 
