@@ -1136,6 +1136,67 @@ function maxCharsForWidth(width: number, fontSize: number): number {
   return Math.max(1, maxChars || 0);
 }
 
+function computeLineSpacingForBox(
+  font: number,
+  lineCount: number,
+  boxHeight: number | undefined,
+  lineHeightFactor: number
+): number {
+  const safeFont = Number.isFinite(font) && font > 0 ? font : MIN_FONT_SIZE;
+  const safeLines = Math.max(1, lineCount);
+  const height =
+    typeof boxHeight === "number" && Number.isFinite(boxHeight) && boxHeight > 0
+      ? boxHeight
+      : 0;
+  const lineHeightPx = height > 0 ? height / safeLines : safeFont * lineHeightFactor;
+  const targetSpacing = Math.round(safeFont * Math.max(0, lineHeightFactor - 1));
+  const availableSpacing = Math.round(Math.max(0, lineHeightPx - safeFont));
+  const spacing = Math.min(targetSpacing, availableSpacing);
+  return spacing > 0 ? spacing : 0;
+}
+
+type FontSizingInfo = { initial: number; clamp(value: number): number };
+
+function deriveFontSizing(
+  element: TemplateElement | undefined,
+  fallback: number,
+  W: number,
+  H: number
+): FontSizingInfo {
+  const fallbackFont =
+    Number.isFinite(fallback) && fallback > 0 ? fallback : MIN_FONT_SIZE;
+  const explicit = lenToPx((element as any)?.font_size, W, H);
+  const min = lenToPx((element as any)?.font_size_minimum, W, H);
+  const max = lenToPx((element as any)?.font_size_maximum, W, H);
+
+  const clamp = (value: number): number => {
+    let next = Number.isFinite(value) && value > 0 ? value : fallbackFont;
+    if (typeof max === "number" && Number.isFinite(max) && max > 0) {
+      next = Math.min(next, max);
+    }
+    if (typeof min === "number" && Number.isFinite(min) && min > 0) {
+      next = Math.max(next, min);
+    }
+    if (!(next > 0)) next = fallbackFont;
+    return Math.max(MIN_FONT_SIZE, Math.round(next));
+  };
+
+  let initial = fallbackFont;
+  if (typeof explicit === "number" && Number.isFinite(explicit) && explicit > 0) {
+    initial = explicit;
+  } else {
+    if (typeof min === "number" && Number.isFinite(min) && min > 0) {
+      initial = Math.max(initial, min);
+    }
+    if (typeof max === "number" && Number.isFinite(max) && max > 0) {
+      initial = Math.min(initial, max);
+    }
+  }
+
+  initial = clamp(initial);
+  return { initial, clamp };
+}
+
 function parseLineHeightFactor(raw: any): number | undefined {
   if (typeof raw === "number" && Number.isFinite(raw)) {
     if (raw <= 0) return undefined;
@@ -1428,13 +1489,8 @@ function buildCopyrightBlock(
   lines = lines.map((ln) => ln.trim()).filter((ln) => ln);
   if (!lines.length) return undefined;
 
-  const computeSpacing = (font: number, lineCount: number): number => {
-    const safeLines = Math.max(1, lineCount);
-    const lineHeightPx = box.h > 0 ? box.h / safeLines : font * lineHeightFactor;
-    const targetSpacing = Math.round(font * Math.max(0, lineHeightFactor - 1));
-    const availableSpacing = Math.round(Math.max(0, lineHeightPx - font));
-    return Math.min(targetSpacing, availableSpacing);
-  };
+  const computeSpacing = (font: number, lineCount: number): number =>
+    computeLineSpacingForBox(font, lineCount, box.h, lineHeightFactor);
 
   let fontSize = clampFontSize(fontGuess);
   let spacing = computeSpacing(fontSize, lines.length);
@@ -1659,12 +1715,21 @@ export function buildTimelineFromLayout(
       }
     }
 
-    const initialFontSize = baseBlock.fontSize ?? 60;
+    const fontSizing = deriveFontSizing(
+      txtEl as TemplateElement | undefined,
+      baseBlock.fontSize ?? MIN_FONT_SIZE,
+      videoW,
+      videoH
+    );
+    const initialFontSize = fontSizing.initial;
+    baseBlock.fontSize = initialFontSize;
     const initialMaxChars =
       txtBox.w > 0 ? maxCharsForWidth(txtBox.w, initialFontSize) : DEFAULT_CHARS_PER_LINE;
     let lines = txtStr ? wrapText(txtStr, initialMaxChars) : [];
     const lineHeightFactor =
       parseLineHeightFactor((txtEl as any)?.line_height) ?? 1.35;
+    const computeSpacing = (font: number, lineCount: number): number =>
+      computeLineSpacingForBox(font, lineCount, txtBox.h, lineHeightFactor);
 
     if (lines.length) {
       const layout = resolveTextLayout(
@@ -1675,16 +1740,17 @@ export function buildTimelineFromLayout(
       );
       if (layout) {
         lines = [...layout.lines];
-        baseBlock.fontSize = layout.font;
-        baseBlock.lineSpacing = layout.spacing;
+        const adjustedFont = fontSizing.clamp(layout.font);
+        baseBlock.fontSize = adjustedFont;
+        baseBlock.lineSpacing = computeSpacing(adjustedFont, lines.length);
+      } else {
+        const adjustedFont = fontSizing.clamp(baseBlock.fontSize ?? initialFontSize);
+        baseBlock.fontSize = adjustedFont;
+        baseBlock.lineSpacing = computeSpacing(adjustedFont, lines.length);
       }
 
-      applyExtraBackgroundPadding(
-        baseBlock,
-        baseBlock.fontSize ?? initialFontSize,
-        videoW,
-        videoH
-      );
+      const finalFont = baseBlock.fontSize ?? initialFontSize;
+      applyExtraBackgroundPadding(baseBlock, finalFont, videoW, videoH);
     }
 
     const alignX = parseAlignmentFactor((txtEl as any)?.x_alignment);
@@ -1938,12 +2004,21 @@ export function buildTimelineFromLayout(
           baseOut.boxAlpha = bg.alpha;
         }
       }
-      const initialOutSize = baseOut.fontSize ?? 60;
+      const fontSizing = deriveFontSizing(
+        textEl as TemplateElement | undefined,
+        baseOut.fontSize ?? MIN_FONT_SIZE,
+        videoW,
+        videoH
+      );
+      const initialOutSize = fontSizing.initial;
+      baseOut.fontSize = initialOutSize;
       const initialOutMax =
         textBox.w > 0 ? maxCharsForWidth(textBox.w, initialOutSize) : DEFAULT_CHARS_PER_LINE;
       let linesOut = wrapText(txt, initialOutMax);
       const lineHeightFactorOut =
         parseLineHeightFactor(textEl?.line_height) ?? 1.35;
+      const computeSpacingOut = (font: number, lineCount: number): number =>
+        computeLineSpacingForBox(font, lineCount, textBox.h, lineHeightFactorOut);
 
       if (linesOut.length) {
         const layout = resolveTextLayout(
@@ -1954,16 +2029,17 @@ export function buildTimelineFromLayout(
         );
         if (layout) {
           linesOut = [...layout.lines];
-          baseOut.fontSize = layout.font;
-          baseOut.lineSpacing = layout.spacing;
+          const adjustedFont = fontSizing.clamp(layout.font);
+          baseOut.fontSize = adjustedFont;
+          baseOut.lineSpacing = computeSpacingOut(adjustedFont, linesOut.length);
+        } else {
+          const adjustedFont = fontSizing.clamp(baseOut.fontSize ?? initialOutSize);
+          baseOut.fontSize = adjustedFont;
+          baseOut.lineSpacing = computeSpacingOut(adjustedFont, linesOut.length);
         }
 
-        applyExtraBackgroundPadding(
-          baseOut,
-          baseOut.fontSize ?? initialOutSize,
-          videoW,
-          videoH
-        );
+        const finalFont = baseOut.fontSize ?? initialOutSize;
+        applyExtraBackgroundPadding(baseOut, finalFont, videoW, videoH);
       }
 
       const alignX = parseAlignmentFactor(textEl?.x_alignment);
