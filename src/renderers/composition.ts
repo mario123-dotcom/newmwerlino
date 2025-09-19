@@ -148,12 +148,14 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
       const xRatio = `(X/${swExpr})`;
       const yDelta = `max(${hMinusOne}-Y,0)`;
       const yRatio = `(${yDelta}/${shExpr})`;
-      // Limit the fade to a tight wedge that hugs the lower-left corner so
-      // the overlay quickly drops to full transparency across the slide.
-      const diagCutoff = 0.68;
+      // Expand the wedge so the corner goes nearly black while retaining a
+      // visible fade across the rest of the slide. Keep the diagonal cutoff
+      // high and use a shallow exponent so the opacity stays strong until the
+      // overlay reaches the far side.
+      const diagCutoff = 1.22;
       const diagMetric = `hypot(${xRatio},${yRatio})`;
       const diagNorm = `(${diagMetric}/${diagCutoff.toFixed(6)})`;
-      const diagExponent = 3.1;
+      const diagExponent = 0.58;
       const diagEase = `pow(max(1-${diagNorm},0),${diagExponent.toFixed(6)})`;
       const falloff = `min(${diagEase},1)`;
       f.push(
