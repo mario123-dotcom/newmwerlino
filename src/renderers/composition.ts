@@ -148,11 +148,13 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
       const xRatio = `(X/${swExpr})`;
       const yDelta = `max(${hMinusOne}-Y,0)`;
       const yRatio = `(${yDelta}/${shExpr})`;
-      const diag = `${xRatio}+${yRatio}`;
-      const diagExponent = 2.4;
-      const diagBoost = 1.45;
-      const diagEase = `pow(max(1-${diag},0),${diagExponent.toFixed(6)})`;
-      const falloff = `min(${diagEase}*${diagBoost.toFixed(6)},1)`;
+      const xWeight = 0.92;
+      const yWeight = 1.35;
+      const weightedDiag = `(${xWeight.toFixed(6)}*${xRatio}+${yWeight
+        .toFixed(6)}*${yRatio})`;
+      const diagExponent = 3.25;
+      const diagEase = `pow(max(1-${weightedDiag},0),${diagExponent.toFixed(6)})`;
+      const falloff = `min(${diagEase},1)`;
       f.push(
         `color=c=${sc}@1:s=${W}x${H}:d=${dur},format=rgba,` +
           `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${alphaBase}*${falloff}'[shdw]`
