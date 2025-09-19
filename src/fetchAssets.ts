@@ -21,6 +21,13 @@ const DEFAULT_HEADERS = {
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
 };
 
+const NO_CACHE_HEADERS = {
+  "Cache-Control": "no-cache, no-store, must-revalidate",
+  Pragma: "no-cache",
+  "If-Modified-Since": "Thu, 01 Jan 1970 00:00:00 GMT",
+  "If-None-Match": "\"no-match-for-this-request\"",
+};
+
 type HttpGetOptions = {
   headers?: Record<string, string>;
 };
@@ -33,38 +40,52 @@ type HttpResponse = {
 };
 
 function httpGet(url: string, options: HttpGetOptions = {}): Promise<HttpResponse> {
-  const target = new URL(url);
-  const lib = target.protocol === "https:" ? httpsRequest : httpRequest;
-  const headers = { ...DEFAULT_HEADERS, ...options.headers };
-  return new Promise((resolve, reject) => {
-    const req = lib(
-      {
-        protocol: target.protocol,
-        hostname: target.hostname,
-        port: target.port,
-        path: `${target.pathname}${target.search}`,
-        headers,
-      },
-      (res) => {
-        const status = res.statusCode ?? 0;
-        const loc = res.headers.location;
-        if (status >= 300 && status < 400 && loc) {
-          const next = new URL(loc, target).toString();
-          httpGet(next, options).then(resolve, reject);
-          return;
+  const baseHeaders = { ...DEFAULT_HEADERS, ...options.headers };
+
+  const performRequest = (currentUrl: string, attempt: number): Promise<HttpResponse> => {
+    const target = new URL(currentUrl);
+    const lib = target.protocol === "https:" ? httpsRequest : httpRequest;
+    const headers =
+      attempt > 0 ? { ...baseHeaders, ...NO_CACHE_HEADERS } : { ...baseHeaders };
+
+    return new Promise((resolve, reject) => {
+      const req = lib(
+        {
+          protocol: target.protocol,
+          hostname: target.hostname,
+          port: target.port,
+          path: `${target.pathname}${target.search}`,
+          headers,
+        },
+        (res) => {
+          const status = res.statusCode ?? 0;
+          const loc = res.headers.location;
+          if (status >= 300 && status < 400 && loc) {
+            const next = new URL(loc, target).toString();
+            performRequest(next, attempt).then(resolve, reject);
+            return;
+          }
+          if (status === 304 && attempt < 3) {
+            const cacheBusted = new URL(currentUrl);
+            cacheBusted.searchParams.set("_cb", `${Date.now()}-${attempt}`);
+            performRequest(cacheBusted.toString(), attempt + 1).then(resolve, reject);
+            return;
+          }
+          if (status !== 200) {
+            reject(new Error(`HTTP ${status}`));
+            return;
+          }
+          const chunks: Buffer[] = [];
+          res.on("data", (c) => chunks.push(c));
+          res.on("end", () => resolve({ buffer: Buffer.concat(chunks), headers: res.headers }));
         }
-        if (status !== 200) {
-          reject(new Error(`HTTP ${status}`));
-          return;
-        }
-        const chunks: Buffer[] = [];
-        res.on("data", (c) => chunks.push(c));
-        res.on("end", () => resolve({ buffer: Buffer.concat(chunks), headers: res.headers }));
-      }
-    );
-    req.on("error", reject);
-    req.end();
-  });
+      );
+      req.on("error", reject);
+      req.end();
+    });
+  };
+
+  return performRequest(url, 0);
 }
 
 function decodeTextResponse(res: HttpResponse): string {
