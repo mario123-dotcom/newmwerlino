@@ -126,23 +126,38 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
       typeof slide.shadowAlpha === "number" && Number.isFinite(slide.shadowAlpha)
         ? slide.shadowAlpha
         : undefined;
-    const fallbackAlpha = 0.6;
+    const fallbackAlpha = 1;
     const sa = Math.min(Math.max(alphaRaw ?? fallbackAlpha, 0), 1);
     if (sa > 0) {
-      const swRaw =
+      const swExplicit =
         typeof slide.shadowW === "number" && Number.isFinite(slide.shadowW)
           ? slide.shadowW
-          : W;
-      const shRaw =
+          : undefined;
+      const shExplicit =
         typeof slide.shadowH === "number" && Number.isFinite(slide.shadowH)
           ? slide.shadowH
-          : H;
-      const sw = Math.max(swRaw, W * 3);
-      const sh = Math.max(shRaw, H * 3);
+          : undefined;
+      const fallbackShadowW = W * 1.35;
+      const fallbackShadowH = H * 1.45;
+      const sw = Math.max(swExplicit ?? fallbackShadowW, 1);
+      const sh = Math.max(shExplicit ?? fallbackShadowH, 1);
       const alphaBase = Number((255 * sa).toFixed(6));
-      const xTerm = `max(${sw}-X,0)/${sw}`;
-      const yTerm = `max(${sh}-(${H - 1}-Y),0)/${sh}`;
-      const falloff = `pow(${xTerm},4)*pow(${yTerm},4)`;
+      const swExpr = sw.toFixed(6);
+      const shExpr = sh.toFixed(6);
+      const hMinusOne = Math.max(H - 1, 0);
+      const xRatio = `(X/${swExpr})`;
+      const yDelta = `max(${hMinusOne}-Y,0)`;
+      const yRatio = `(${yDelta}/${shExpr})`;
+      // Expand the wedge so the corner goes nearly black while retaining a
+      // visible fade across the rest of the slide. Bring the diagonal cutoff
+      // in slightly and steepen the exponent so the opacity stays strong in the
+      // lower-left while easing off sooner across the frame.
+      const diagCutoff = 1.14;
+      const diagMetric = `hypot(${xRatio},${yRatio})`;
+      const diagNorm = `(${diagMetric}/${diagCutoff.toFixed(6)})`;
+      const diagExponent = 0.78;
+      const diagEase = `pow(max(1-${diagNorm},0),${diagExponent.toFixed(6)})`;
+      const falloff = `min(${diagEase},1)`;
       f.push(
         `color=c=${sc}@1:s=${W}x${H}:d=${dur},format=rgba,` +
           `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${alphaBase}*${falloff}'[shdw]`
