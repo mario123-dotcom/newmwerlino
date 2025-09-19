@@ -5,9 +5,9 @@
   "type": "commonjs",
   "scripts": {
     "build": "tsc",
-    "start": "npm run build && node dist/main.js",
-    "start:reuse": "npm run build && node dist/main.js --reuse-segs",
-    "start:reuse:dir": "npm run build && node dist/main.js --reuse-segs --segsDir src/temp",
+    "start": "node scripts/start.js",
+    "start:reuse": "node scripts/start.js --reuse-segs",
+    "start:reuse:dir": "node scripts/start.js --reuse-segs --segsDir src/temp",
     "test": "npm run build && node --test dist/**/*.test.js"
   },
   "dependencies": {

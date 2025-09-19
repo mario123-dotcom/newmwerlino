@@ -48,7 +48,19 @@ function clearDir(dir: string) {
     }
   }
 
-  const localMode = hasFlag("-local") || hasFlag("--local") || fromEnvFlag() || fromNpmArgv();
+  function fromForcedEnv(): boolean {
+    const raw = process.env.FORCE_LOCAL_ASSETS;
+    if (typeof raw !== "string") return false;
+    const normalized = raw.trim().toLowerCase();
+    return normalized !== "false" && normalized !== "0" && normalized !== "no";
+  }
+
+  const localMode =
+    hasFlag("-local") ||
+    hasFlag("--local") ||
+    fromEnvFlag() ||
+    fromNpmArgv() ||
+    fromForcedEnv();
 
   // prepara le cartelle di lavoro
   ensureDir(paths.temp);
