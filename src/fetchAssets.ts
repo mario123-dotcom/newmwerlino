@@ -23,6 +23,7 @@ const DEFAULT_HEADERS = {
 
 type HttpGetOptions = {
   headers?: Record<string, string>;
+  forceNoCache?: boolean;
 };
 
 type HttpHeaders = Record<string, string | string[] | undefined>;
@@ -36,6 +37,12 @@ function httpGet(url: string, options: HttpGetOptions = {}): Promise<HttpRespons
   const target = new URL(url);
   const lib = target.protocol === "https:" ? httpsRequest : httpRequest;
   const headers = { ...DEFAULT_HEADERS, ...options.headers };
+  if (options.forceNoCache) {
+    headers["Cache-Control"] = "no-cache";
+    headers["Pragma"] = "no-cache";
+    headers["If-Modified-Since"] = "Thu, 01 Jan 1970 00:00:00 GMT";
+    headers["If-None-Match"] = "";
+  }
   return new Promise((resolve, reject) => {
     const req = lib(
       {
@@ -53,7 +60,15 @@ function httpGet(url: string, options: HttpGetOptions = {}): Promise<HttpRespons
           httpGet(next, options).then(resolve, reject);
           return;
         }
-        if (status !== 200) {
+        if (status === 304) {
+          if (options.forceNoCache) {
+            reject(new Error(`HTTP ${status}`));
+            return;
+          }
+          httpGet(url, { ...options, forceNoCache: true }).then(resolve, reject);
+          return;
+        }
+        if (status < 200 || status >= 300) {
           reject(new Error(`HTTP ${status}`));
           return;
         }
