@@ -1081,6 +1081,84 @@ const APPROX_CHAR_WIDTH_RATIO = 0.56;
 const MIN_FONT_SIZE = 24;
 const MAX_FONT_LAYOUT_ITERATIONS = 6;
 
+type FontPreferences = {
+  explicit?: number;
+  min?: number;
+  max?: number;
+  clamp: (value: number) => number;
+};
+
+function extractFontPreferences(
+  element: TemplateElement | undefined,
+  videoW: number,
+  videoH: number
+): FontPreferences {
+  const explicitFont = lenToPx((element as any)?.font_size, videoW, videoH);
+  const minFontPx = lenToPx((element as any)?.font_size_minimum, videoW, videoH);
+  const maxFontPx = lenToPx((element as any)?.font_size_maximum, videoW, videoH);
+
+  const clamp = (value: number): number => {
+    let next = Number.isFinite(value) && value > 0 ? value : MIN_FONT_SIZE;
+    if (typeof maxFontPx === "number" && Number.isFinite(maxFontPx) && maxFontPx > 0) {
+      next = Math.min(next, maxFontPx);
+    }
+    if (typeof minFontPx === "number" && Number.isFinite(minFontPx) && minFontPx > 0) {
+      next = Math.max(next, minFontPx);
+    }
+    if (!(next > 0)) next = MIN_FONT_SIZE;
+    return Math.max(1, Math.round(next));
+  };
+
+  return { explicit: explicitFont, min: minFontPx, max: maxFontPx, clamp };
+}
+
+function approximateTextWidth(lines: string[], fontPx: number): number {
+  const safeFont = Number.isFinite(fontPx) && fontPx > 0 ? fontPx : MIN_FONT_SIZE;
+  const approxChar = safeFont * APPROX_CHAR_WIDTH_RATIO;
+  if (!(approxChar > 0)) return 0;
+  const longest = lines.reduce((max, line) => Math.max(max, line.length), 0);
+  if (!(longest > 0)) return 0;
+  return Math.round(longest * approxChar);
+}
+
+function alignTextBlockHorizontally(
+  block: TextBlockSpec,
+  lines: string[],
+  fontPx: number | undefined,
+  box: { x: number; w?: number },
+  alignX: number | undefined,
+  videoW: number
+): number {
+  if (!(block && Array.isArray(lines) && lines.length)) return 0;
+  if (!(typeof alignX === "number" && Number.isFinite(alignX) && alignX !== 0)) return 0;
+
+  const width = approximateTextWidth(lines, fontPx ?? MIN_FONT_SIZE);
+  if (!(width > 0)) return 0;
+
+  let targetX: number;
+  if (box.w && box.w > 0) {
+    const free = box.w - width;
+    if (Math.abs(free) < 1) return 0;
+    const offset = free * alignX;
+    if (free > 0) {
+      const clampedOffset = Math.max(0, Math.min(free, offset));
+      targetX = box.x + clampedOffset;
+    } else {
+      const clampedOffset = Math.min(0, Math.max(free, offset));
+      targetX = box.x + clampedOffset;
+    }
+  } else {
+    targetX = box.x - width * alignX;
+  }
+
+  const maxLeft = Math.max(0, Math.round(videoW - width));
+  const clampedX = Math.max(0, Math.min(maxLeft, Math.round(targetX)));
+  const delta = clampedX - block.x;
+  if (delta === 0) return 0;
+  block.x = clampedX;
+  return delta;
+}
+
 function clamp01(value: number): number {
   if (!Number.isFinite(value)) return 0;
   if (value <= 0) return 0;
@@ -1283,24 +1361,11 @@ function buildCopyrightBlock(
   const box = getTextBoxFromTemplate(template, compName, elementName);
   if (!box) return undefined;
 
-  const explicitFont = lenToPx((element as any)?.font_size, videoW, videoH);
-  const minFontPx = lenToPx((element as any)?.font_size_minimum, videoW, videoH);
-  const maxFontPx = lenToPx((element as any)?.font_size_maximum, videoW, videoH);
-  const clampFontSize = (value: number): number => {
-    let next = Number.isFinite(value) && value > 0 ? value : MIN_FONT_SIZE;
-    if (typeof maxFontPx === "number" && Number.isFinite(maxFontPx) && maxFontPx > 0) {
-      next = Math.min(next, maxFontPx);
-    }
-    if (typeof minFontPx === "number" && Number.isFinite(minFontPx) && minFontPx > 0) {
-      next = Math.max(next, minFontPx);
-    }
-    if (!(next > 0)) next = MIN_FONT_SIZE;
-    return Math.max(MIN_FONT_SIZE, Math.round(next));
-  };
-
-  let fontGuess = explicitFont ?? minFontPx ?? maxFontPx ?? MIN_FONT_SIZE;
+  const fontPrefs = extractFontPreferences(element, videoW, videoH);
+  const hasExplicitFont = fontPrefs.explicit != null && fontPrefs.explicit > 0;
+  let fontGuess = fontPrefs.explicit ?? fontPrefs.min ?? fontPrefs.max ?? MIN_FONT_SIZE;
   if (!(fontGuess > 0)) fontGuess = MIN_FONT_SIZE;
-  fontGuess = clampFontSize(fontGuess);
+  fontGuess = fontPrefs.clamp(fontGuess);
 
   const lineHeightFactor = parseLineHeightFactor((element as any)?.line_height) ?? 1.2;
 
@@ -1322,13 +1387,13 @@ function buildCopyrightBlock(
     return Math.min(targetSpacing, availableSpacing);
   };
 
-  let fontSize = clampFontSize(fontGuess);
+  let fontSize = fontPrefs.clamp(fontGuess);
   let spacing = computeSpacing(fontSize, lines.length);
-  if (!manualBreaks) {
+  if (!manualBreaks && !hasExplicitFont) {
     const layout = resolveTextLayout(text, box, fontSize, lineHeightFactor);
     if (layout) {
       lines = [...layout.lines];
-      fontSize = clampFontSize(layout.font);
+      fontSize = fontPrefs.clamp(layout.font);
       spacing = computeSpacing(fontSize, lines.length);
     }
   }
@@ -1367,6 +1432,18 @@ function buildCopyrightBlock(
     fontColor: fill?.color ?? "#ffffff",
     lineSpacing: spacing,
   };
+
+  const alignX = parseAlignmentFactor((element as any)?.x_alignment);
+  if (alignX != null) {
+    const deltaX = alignTextBlockHorizontally(block, lines, fontSize, box, alignX, videoW);
+    if (deltaX !== 0 && block.background) {
+      const bgRect = block.background;
+      const bgWidth = typeof bgRect.width === "number" ? bgRect.width : 0;
+      const maxLeft = Math.max(0, Math.round(videoW - bgWidth));
+      const nextX = Math.max(0, Math.min(maxLeft, Math.round(bgRect.x + deltaX)));
+      block.background = { ...bgRect, x: nextX };
+    }
+  }
 
   if (bg) {
     const approxCharWidth = fontSize * APPROX_CHAR_WIDTH_RATIO;
@@ -1510,6 +1587,14 @@ export function buildTimelineFromLayout(
 
     const txtBox = getTextBoxFromTemplate(template, i) || { x: 120, y: 160, w: 0, h: 0 };
     const baseBlock = defaultTextBlock(txtBox.x, txtBox.y);
+    const fontPrefs = extractFontPreferences(txtEl as TemplateElement | undefined, videoW, videoH);
+    const hasExplicitFont = fontPrefs.explicit != null && fontPrefs.explicit > 0;
+    if (baseBlock.fontSize != null) {
+      baseBlock.fontSize = fontPrefs.clamp(baseBlock.fontSize);
+    }
+    if (fontPrefs.explicit && fontPrefs.explicit > 0) {
+      baseBlock.fontSize = fontPrefs.clamp(fontPrefs.explicit);
+    }
     if (txtEl) {
       const bg = parseRGBA((txtEl as any).background_color);
       if (bg) {
@@ -1553,16 +1638,24 @@ export function buildTimelineFromLayout(
       parseLineHeightFactor((txtEl as any)?.line_height) ?? 1.35;
 
     if (lines.length) {
-      const layout = resolveTextLayout(
-        txtStr,
-        txtBox,
-        baseBlock.fontSize ?? initialFontSize,
-        lineHeightFactor
-      );
-      if (layout) {
-        lines = [...layout.lines];
-        baseBlock.fontSize = layout.font;
-        baseBlock.lineSpacing = layout.spacing;
+      if (!hasExplicitFont) {
+        const layout = resolveTextLayout(
+          txtStr,
+          txtBox,
+          baseBlock.fontSize ?? initialFontSize,
+          lineHeightFactor
+        );
+        if (layout) {
+          lines = [...layout.lines];
+          baseBlock.fontSize = fontPrefs.clamp(layout.font);
+          baseBlock.lineSpacing = layout.spacing;
+        }
+      } else {
+        const fontForSpacing = baseBlock.fontSize ?? initialFontSize;
+        const fallbackSpacing = Math.round(fontForSpacing * Math.max(0, lineHeightFactor - 1));
+        if (Number.isFinite(fallbackSpacing)) {
+          baseBlock.lineSpacing = Math.max(0, fallbackSpacing);
+        }
       }
 
       applyExtraBackgroundPadding(
@@ -1571,6 +1664,25 @@ export function buildTimelineFromLayout(
         videoW,
         videoH
       );
+    }
+
+    const alignX = parseAlignmentFactor((txtEl as any)?.x_alignment);
+    if (lines.length && alignX != null) {
+      const deltaX = alignTextBlockHorizontally(
+        baseBlock,
+        lines,
+        baseBlock.fontSize ?? initialFontSize,
+        txtBox,
+        alignX,
+        videoW
+      );
+      if (deltaX !== 0 && baseBlock.background) {
+        const bg = baseBlock.background;
+        const bgWidth = typeof bg.width === "number" ? bg.width : 0;
+        const maxLeft = Math.max(0, Math.round(videoW - bgWidth));
+        const nextX = Math.max(0, Math.min(maxLeft, Math.round(bg.x + deltaX)));
+        baseBlock.background = { ...bg, x: nextX };
+      }
     }
 
     const alignY = parseAlignmentFactor((txtEl as any)?.y_alignment) ?? 0;
@@ -1778,6 +1890,18 @@ export function buildTimelineFromLayout(
     let texts: TextBlockSpec[] | undefined;
     if (txt && textBox) {
       const baseOut = defaultTextBlock(textBox.x, textBox.y);
+      const outroFontPrefs = extractFontPreferences(
+        textEl as TemplateElement | undefined,
+        videoW,
+        videoH
+      );
+      const outroHasExplicitFont = outroFontPrefs.explicit != null && outroFontPrefs.explicit > 0;
+      if (baseOut.fontSize != null) {
+        baseOut.fontSize = outroFontPrefs.clamp(baseOut.fontSize);
+      }
+      if (outroFontPrefs.explicit && outroFontPrefs.explicit > 0) {
+        baseOut.fontSize = outroFontPrefs.clamp(outroFontPrefs.explicit);
+      }
       const bg = parseRGBA(textEl?.background_color);
       if (bg) {
         const padX = lenToPx(textEl?.x_padding, videoW, videoH) ?? 0;
@@ -1814,16 +1938,24 @@ export function buildTimelineFromLayout(
         parseLineHeightFactor(textEl?.line_height) ?? 1.35;
 
       if (linesOut.length) {
-        const layout = resolveTextLayout(
-          txt,
-          textBox,
-          baseOut.fontSize ?? initialOutSize,
-          lineHeightFactorOut
-        );
-        if (layout) {
-          linesOut = [...layout.lines];
-          baseOut.fontSize = layout.font;
-          baseOut.lineSpacing = layout.spacing;
+        if (!outroHasExplicitFont) {
+          const layout = resolveTextLayout(
+            txt,
+            textBox,
+            baseOut.fontSize ?? initialOutSize,
+            lineHeightFactorOut
+          );
+          if (layout) {
+            linesOut = [...layout.lines];
+            baseOut.fontSize = outroFontPrefs.clamp(layout.font);
+            baseOut.lineSpacing = layout.spacing;
+          }
+        } else {
+          const fontForSpacing = baseOut.fontSize ?? initialOutSize;
+          const fallbackSpacing = Math.round(fontForSpacing * Math.max(0, lineHeightFactorOut - 1));
+          if (Number.isFinite(fallbackSpacing)) {
+            baseOut.lineSpacing = Math.max(0, fallbackSpacing);
+          }
         }
 
         applyExtraBackgroundPadding(
@@ -1832,6 +1964,25 @@ export function buildTimelineFromLayout(
           videoW,
           videoH
         );
+      }
+
+      const alignX = parseAlignmentFactor(textEl?.x_alignment);
+      if (linesOut.length && alignX != null) {
+        const deltaX = alignTextBlockHorizontally(
+          baseOut,
+          linesOut,
+          baseOut.fontSize ?? initialOutSize,
+          textBox,
+          alignX,
+          videoW
+        );
+        if (deltaX !== 0 && baseOut.background) {
+          const bgRect = baseOut.background;
+          const bgWidth = typeof bgRect.width === "number" ? bgRect.width : 0;
+          const maxLeft = Math.max(0, Math.round(videoW - bgWidth));
+          const nextX = Math.max(0, Math.min(maxLeft, Math.round(bgRect.x + deltaX)));
+          baseOut.background = { ...bgRect, x: nextX };
+        }
       }
 
       const alignY = parseAlignmentFactor(textEl?.y_alignment) ?? 0;
