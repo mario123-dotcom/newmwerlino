@@ -28,11 +28,9 @@ const BASE_NO_CACHE_HEADERS = {
 } as const;
 
 function createNoCacheHeaders(attempt: number) {
-  const uniqueSuffix = `${attempt}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   return {
     ...BASE_NO_CACHE_HEADERS,
-    "If-Modified-Since": "Thu, 01 Jan 1970 00:00:00 GMT",
-    "If-None-Match": `"force-refresh-${uniqueSuffix}"`,
+    "X-Cache-Bust": `${attempt}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
   } satisfies Record<string, string>;
 }
 
@@ -64,7 +62,7 @@ function createHttpError(status: number, url: string, attempt: number): HttpErro
 }
 
 function httpGet(url: string, options: HttpGetOptions = {}): Promise<HttpResponse> {
-  const baseHeaders = { ...DEFAULT_HEADERS, ...options.headers };
+  const baseHeaders = { ...DEFAULT_HEADERS, ...BASE_NO_CACHE_HEADERS, ...options.headers };
 
   const performRequest = (currentUrl: string, attempt: number): Promise<HttpResponse> => {
     const target = new URL(currentUrl);
@@ -152,7 +150,7 @@ async function fetchWithoutCache(
   const headers = {
     ...DEFAULT_HEADERS,
     ...options.headers,
-    ...createNoCacheHeaders(attempt),
+    ...(attempt > 0 ? createNoCacheHeaders(attempt) : BASE_NO_CACHE_HEADERS),
   };
   const response = await fetch(url, {
     method: "GET",
