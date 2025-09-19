@@ -1077,7 +1077,7 @@ export function getFontFamilyFromTemplate(
 }
 
 const DEFAULT_CHARS_PER_LINE = 40;
-const APPROX_CHAR_WIDTH_RATIO = 0.56;
+export const APPROX_CHAR_WIDTH_RATIO = 0.56;
 const MIN_FONT_SIZE = 24;
 const MAX_FONT_LAYOUT_ITERATIONS = 6;
 
@@ -1128,6 +1128,92 @@ function parseLineHeightFactor(raw: any): number | undefined {
   const n = parseFloat(trimmed);
   if (!Number.isFinite(n)) return undefined;
   return n > 10 ? n / 100 : n;
+}
+
+function parseLetterSpacing(
+  raw: any,
+  fontPx: number | undefined,
+  W: number,
+  H: number
+): number | undefined {
+  if (!(fontPx && fontPx > 0)) return undefined;
+  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+  if (typeof raw !== "string") return undefined;
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  if (trimmed.endsWith("%")) {
+    const n = parseFloat(trimmed.slice(0, -1));
+    return Number.isFinite(n) ? (n / 100) * fontPx : undefined;
+  }
+  const px = lenToPx(trimmed, W, H);
+  if (typeof px === "number" && Number.isFinite(px)) return px;
+  const n = parseFloat(trimmed);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function estimateLineWidth(
+  line: string,
+  fontPx: number,
+  letterSpacingPx: number | undefined
+): number {
+  if (!(fontPx > 0)) return 0;
+  const text = typeof line === "string" ? line : "";
+  const baseWidth = text.length * fontPx * APPROX_CHAR_WIDTH_RATIO;
+  if (!(baseWidth > 0)) return 0;
+  if (!(letterSpacingPx && Number.isFinite(letterSpacingPx))) return baseWidth;
+  const chars = Math.max(text.length - 1, 0);
+  const spacing = Math.max(0, chars * letterSpacingPx);
+  const total = baseWidth + spacing;
+  return total > 0 ? total : 0;
+}
+
+function estimateTextWidth(
+  lines: string[],
+  fontPx: number,
+  letterSpacingPx: number | undefined
+): number {
+  if (!Array.isArray(lines) || !lines.length) return 0;
+  let max = 0;
+  for (const line of lines) {
+    const width = estimateLineWidth(line ?? "", fontPx, letterSpacingPx);
+    if (width > max) max = width;
+  }
+  return max;
+}
+
+function applyHorizontalAlignment(
+  block: TextBlockSpec,
+  lines: string[],
+  fontPx: number | undefined,
+  letterSpacingPx: number | undefined,
+  alignX: number | undefined,
+  textBox: { x: number; w: number },
+  maxWidth: number
+): void {
+  if (!lines.length) return;
+  if (!(fontPx && fontPx > 0)) return;
+  if (alignX == null) return;
+  const safeAlign = clamp01(alignX);
+  const textWidth = estimateTextWidth(lines, fontPx, letterSpacingPx);
+  if (!(textWidth > 0)) return;
+
+  if (textBox.w > 0) {
+    const free = textBox.w - textWidth;
+    if (!(free > 0)) return;
+    const offset = Math.round(Math.min(free, Math.max(0, free * safeAlign)));
+    block.x = textBox.x + offset;
+    return;
+  }
+
+  const available = maxWidth - textWidth;
+  if (!(available >= 0)) {
+    block.x = 0;
+    return;
+  }
+  const offset = Math.round(Math.max(0, available) * safeAlign);
+  const upperBound = Math.max(0, Math.floor(available));
+  const clamped = Math.max(0, Math.min(upperBound, offset));
+  block.x = clamped;
 }
 
 export function wrapText(text: string, maxPerLine: number): string[] {
@@ -1573,6 +1659,24 @@ export function buildTimelineFromLayout(
       );
     }
 
+    const alignX = parseAlignmentFactor((txtEl as any)?.x_alignment);
+    const fontForAlign = baseBlock.fontSize ?? initialFontSize;
+    const letterSpacingPx = parseLetterSpacing(
+      (txtEl as any)?.letter_spacing,
+      fontForAlign,
+      videoW,
+      videoH
+    );
+    applyHorizontalAlignment(
+      baseBlock,
+      lines,
+      fontForAlign,
+      letterSpacingPx,
+      alignX,
+      txtBox,
+      videoW
+    );
+
     const alignY = parseAlignmentFactor((txtEl as any)?.y_alignment) ?? 0;
     baseBlock.y = txtBox.y;
     if (lines.length && txtBox.h > 0) {
@@ -1833,6 +1937,24 @@ export function buildTimelineFromLayout(
           videoH
         );
       }
+
+      const alignX = parseAlignmentFactor(textEl?.x_alignment);
+      const fontForAlign = baseOut.fontSize ?? initialOutSize;
+      const letterSpacingPx = parseLetterSpacing(
+        textEl?.letter_spacing,
+        fontForAlign,
+        videoW,
+        videoH
+      );
+      applyHorizontalAlignment(
+        baseOut,
+        linesOut,
+        fontForAlign,
+        letterSpacingPx,
+        alignX,
+        textBox,
+        videoW
+      );
 
       const alignY = parseAlignmentFactor(textEl?.y_alignment) ?? 0;
       baseOut.y = textBox.y;
