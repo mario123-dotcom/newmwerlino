@@ -24,8 +24,7 @@ const DEFAULT_HEADERS = {
 const NO_CACHE_HEADERS = {
   "Cache-Control": "no-cache, no-store, must-revalidate",
   Pragma: "no-cache",
-  "If-Modified-Since": "Thu, 01 Jan 1970 00:00:00 GMT",
-  "If-None-Match": "\"no-match-for-this-request\"",
+  Expires: "0",
 };
 
 type HttpGetOptions = {
@@ -38,6 +37,22 @@ type HttpResponse = {
   buffer: Buffer;
   headers: HttpHeaders;
 };
+
+type HttpError = Error & {
+  status?: number;
+  url?: string;
+  attempt?: number;
+};
+
+const MAX_304_RETRIES = 4;
+
+function createHttpError(status: number, url: string, attempt: number): HttpError {
+  const error = new Error(`HTTP ${status}`) as HttpError;
+  error.status = status;
+  error.url = url;
+  error.attempt = attempt;
+  return error;
+}
 
 function httpGet(url: string, options: HttpGetOptions = {}): Promise<HttpResponse> {
   const baseHeaders = { ...DEFAULT_HEADERS, ...options.headers };
@@ -65,14 +80,21 @@ function httpGet(url: string, options: HttpGetOptions = {}): Promise<HttpRespons
             performRequest(next, attempt).then(resolve, reject);
             return;
           }
-          if (status === 304 && attempt < 3) {
-            const cacheBusted = new URL(currentUrl);
-            cacheBusted.searchParams.set("_cb", `${Date.now()}-${attempt}`);
-            performRequest(cacheBusted.toString(), attempt + 1).then(resolve, reject);
+          if (status === 304) {
+            if (attempt < MAX_304_RETRIES) {
+              const cacheBusted = new URL(currentUrl);
+              cacheBusted.searchParams.set(
+                "_cb",
+                `${Date.now()}-${attempt}-${Math.random().toString(36).slice(2)}`
+              );
+              performRequest(cacheBusted.toString(), attempt + 1).then(resolve, reject);
+              return;
+            }
+            reject(createHttpError(status, currentUrl, attempt));
             return;
           }
           if (status !== 200) {
-            reject(new Error(`HTTP ${status}`));
+            reject(createHttpError(status, currentUrl, attempt));
             return;
           }
           const chunks: Buffer[] = [];
@@ -80,7 +102,12 @@ function httpGet(url: string, options: HttpGetOptions = {}): Promise<HttpRespons
           res.on("end", () => resolve({ buffer: Buffer.concat(chunks), headers: res.headers }));
         }
       );
-      req.on("error", reject);
+      req.on("error", (err) => {
+        const error = err as HttpError;
+        error.url = currentUrl;
+        error.attempt = attempt;
+        reject(error);
+      });
       req.end();
     });
   };
@@ -106,11 +133,56 @@ function decodeTextResponse(res: HttpResponse): string {
   return res.buffer.toString("utf8");
 }
 
-async function downloadFile(url: string, outPath: string, options?: HttpGetOptions) {
-  const { buffer } = await httpGet(url, options);
+async function fetchWithoutCache(url: string, options: HttpGetOptions = {}): Promise<Buffer> {
+  const headers = { ...DEFAULT_HEADERS, ...options.headers, ...NO_CACHE_HEADERS };
+  const response = await fetch(url, {
+    method: "GET",
+    headers,
+    redirect: "follow",
+  });
+
+  if (response.status >= 300 && response.status < 400) {
+    const location = response.headers.get("location");
+    if (location) {
+      const nextUrl = new URL(location, url).toString();
+      return fetchWithoutCache(nextUrl, options);
+    }
+  }
+
+  if (response.status === 304) {
+    throw createHttpError(response.status, url, 0);
+  }
+
+  if (!response.ok) {
+    throw createHttpError(response.status, url, 0);
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+  return Buffer.from(arrayBuffer);
+}
+
+function saveFile(outPath: string, buffer: Buffer, messagePrefix = "Scaricato") {
   ensureDir(join(outPath, ".."));
   writeFileSync(outPath, buffer);
-  console.log(`Scaricato: ${outPath}`);
+  console.log(`${messagePrefix}: ${outPath}`);
+}
+
+async function downloadFile(url: string, outPath: string, options?: HttpGetOptions) {
+  try {
+    const { buffer } = await httpGet(url, options);
+    saveFile(outPath, buffer);
+    return;
+  } catch (err) {
+    const httpError = err as HttpError;
+    if (httpError?.status === 304) {
+      const fallbackUrl = new URL(httpError.url ?? url);
+      fallbackUrl.searchParams.set("_cb", `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+      const buffer = await fetchWithoutCache(fallbackUrl.toString(), options);
+      saveFile(outPath, buffer, "Scaricato (no-cache)");
+      return;
+    }
+    throw err;
+  }
 }
 
 export async function fetchAssets() {
