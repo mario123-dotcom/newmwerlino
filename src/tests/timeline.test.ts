@@ -894,7 +894,33 @@ test("buildTimelineFromLayout adds extra padding to intro background", () => {
 
 test("wrapText splits by length", () => {
   const lines = wrapText("uno due tre quattro cinque", 7);
-  assert.deepEqual(lines, ["uno due", "tre", "quattro", "cinque"]);
+  assert.deepEqual(lines, ["uno", "due tre", "quattro", "cinque"]);
+});
+
+test("wrapText balances Campi Flegrei headline", () => {
+  const text =
+    "Una serie di scosse, a partire da domenica, ha colpito i Campi Flegrei, culminando con una di magnitudo 4.0 alle 4:55 di lunedì.";
+  const lines = wrapText(text, 28);
+  assert.deepEqual(lines, [
+    "Una serie di scosse, a partire",
+    "da domenica, ha colpito i",
+    "Campi Flegrei, culminando",
+    "con una di magnitudo 4.0 alle",
+    "4:55 di lunedì.",
+  ]);
+});
+
+test("wrapText balances Circumflegrea headline", () => {
+  const text =
+    "Il servizio ferroviario sulle linee Cumana e Circumflegrea è stato sospeso per controlli infrastrutturali, sostituito da bus.";
+  const lines = wrapText(text, 28);
+  assert.deepEqual(lines, [
+    "Il servizio ferroviario sulle",
+    "linee Cumana e Circumflegrea",
+    "è stato sospeso per controlli",
+    "infrastrutturali, sostituito da",
+    "bus.",
+  ]);
 });
 
 test("buildTimelineFromLayout includes filler slide and outro", () => {

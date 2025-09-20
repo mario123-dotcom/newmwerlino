@@ -1397,24 +1397,159 @@ function applyHorizontalAlignment(
   block.x = clamped;
 }
 
-export function wrapText(text: string, maxPerLine: number): string[] {
-  const words = text.split(/\s+/).filter(Boolean);
+function greedyWrap(words: string[], limit: number): string[] {
   const lines: string[] = [];
-  let line = "";
-  for (const w of words) {
-    const candidate = line ? `${line} ${w}` : w;
-    if (candidate.length > maxPerLine && line) {
-      lines.push(line);
-      line = w;
-    } else if (candidate.length > maxPerLine) {
-      lines.push(w);
-      line = "";
+  let current = "";
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (candidate.length > limit && current) {
+      lines.push(current);
+      current = word;
+    } else if (candidate.length > limit) {
+      lines.push(word);
+      current = "";
     } else {
-      line = candidate;
+      current = candidate;
     }
   }
-  if (line) lines.push(line);
+  if (current) lines.push(current);
   return lines;
+}
+
+function computeLinePenalty(
+  line: string,
+  len: number,
+  preferred: number,
+  limit: number,
+  isLast: boolean
+): number {
+  if (!(len > 0)) return Number.POSITIVE_INFINITY;
+  if (len > limit) return Number.POSITIVE_INFINITY;
+
+  const safePreferred = Math.max(1, preferred);
+  const slackBase = safePreferred - Math.min(len, safePreferred);
+  const slack = slackBase > 0 ? slackBase : 0;
+
+  let penalty = isLast ? slack * slack * 0.25 : slack * slack;
+
+  if (len > safePreferred) {
+    const overflow = len - safePreferred;
+    penalty += Math.pow(Math.max(overflow * 4, 1), 2);
+  }
+
+  if (!isLast) {
+    const lastChar = line[line.length - 1];
+    if (lastChar && /[,;:]/.test(lastChar)) {
+      penalty += safePreferred * safePreferred * 0.2;
+    }
+
+    if (slack >= Math.max(2, Math.floor(safePreferred * 0.35))) {
+      penalty += Math.pow(slack + 1.5, 2);
+    }
+  } else if (line.length && /[,;:]$/.test(line)) {
+    penalty += safePreferred * safePreferred * 0.1;
+  }
+
+  return penalty;
+}
+
+function balancedWrap(words: string[], preferred: number, limit: number): string[] | undefined {
+  const n = words.length;
+  if (!n) return [];
+
+  const dp = new Array<number>(n + 1).fill(Number.POSITIVE_INFINITY);
+  const prevBreak = new Array<number>(n + 1).fill(-1);
+  dp[0] = 0;
+
+  for (let i = 0; i < n; i++) {
+    if (!Number.isFinite(dp[i])) continue;
+    let line = "";
+    for (let j = i; j < n; j++) {
+      line = line ? `${line} ${words[j]}` : words[j];
+      const len = line.length;
+      if (len > limit) break;
+      const isLast = j === n - 1;
+      const penalty = computeLinePenalty(line, len, preferred, limit, isLast);
+      if (!Number.isFinite(penalty)) continue;
+      const cost = dp[i] + penalty;
+      if (cost < dp[j + 1]) {
+        dp[j + 1] = cost;
+        prevBreak[j + 1] = i;
+      }
+    }
+  }
+
+  if (!Number.isFinite(dp[n])) return undefined;
+
+  const lines: string[] = [];
+  let idx = n;
+  while (idx > 0) {
+    const start = prevBreak[idx];
+    if (start < 0 || start >= idx) return undefined;
+    const segment = words.slice(start, idx).join(" ");
+    lines.push(segment);
+    idx = start;
+  }
+
+  lines.reverse();
+  return lines.length ? lines : undefined;
+}
+
+function rebalanceTrailingShortWord(lines: string[], limit: number): string[] {
+  let result = [...lines];
+  let changed = false;
+
+  while (result.length >= 2) {
+    const lastIdx = result.length - 1;
+    const lastLine = result[lastIdx];
+    const prevLine = result[lastIdx - 1];
+    if (!lastLine || !prevLine) break;
+
+    const words = lastLine.split(/\s+/).filter(Boolean);
+    if (!words.length) break;
+    const first = words[0];
+    if (!first) break;
+    const remainderWords = words.slice(1);
+    const isShortPreposition = first.length <= 3 && remainderWords.length <= 1;
+    const isMoveCandidate =
+      (first.length >= 4 && first.length <= 8 && !/^[0-9.,:;!?-]+$/.test(first)) || isShortPreposition;
+    if (!isMoveCandidate) break;
+
+    const candidatePrev = `${prevLine} ${first}`;
+    if (candidatePrev.length > limit) break;
+
+    const remainder = remainderWords.join(" ");
+    result[lastIdx - 1] = candidatePrev;
+    if (remainder) {
+      result[lastIdx] = remainder;
+    } else {
+      result.pop();
+    }
+    changed = true;
+  }
+
+  return changed ? result : lines;
+}
+
+export function wrapText(text: string, maxPerLine: number): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+
+  const preferred = Math.max(1, Math.floor(maxPerLine));
+  const rawOvershoot = TEXT.WRAP_OVERSHOOT_RATIO;
+  const overshootRatio =
+    typeof rawOvershoot === "number" && Number.isFinite(rawOvershoot)
+      ? Math.max(0.05, Math.min(0.2, rawOvershoot))
+      : 0.12;
+  const extra = Math.max(2, Math.round(preferred * overshootRatio));
+  const limit = Math.max(preferred + extra, words.reduce((m, w) => Math.max(m, w.length), 0));
+
+  const balanced = balancedWrap(words, preferred, limit);
+  if (balanced && balanced.length) {
+    return rebalanceTrailingShortWord(balanced, limit);
+  }
+
+  return greedyWrap(words, limit);
 }
 
 function linesEqual(a: string[], b: string[]): boolean {

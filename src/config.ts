@@ -37,6 +37,8 @@ export const TEXT = {
   TEMPLATE_FONT_SCALE: 2,
   /** numero massimo di caratteri desiderato per riga prima di forzare un nuovo wrap */
   MAX_CHARS_PER_LINE: 28,
+  /** tolleranza percentuale oltre il limite preferito per consentire una distribuzione più equilibrata delle righe */
+  WRAP_OVERSHOOT_RATIO: 0.12,
 };
 
 /** Scale di base (fontsize ≈ scale * videoH) */
