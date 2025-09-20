@@ -1181,6 +1181,27 @@ function estimateTextWidth(
   return max;
 }
 
+function shiftBackgroundHorizontally(
+  block: TextBlockSpec,
+  delta: number,
+  maxWidth: number
+): void {
+  if (!delta) return;
+  const bg = block.background;
+  if (!bg) return;
+  const current = typeof bg.x === "number" ? bg.x : 0;
+  const width = typeof bg.width === "number" ? bg.width : 0;
+  const maxLeft = width > 0 ? maxWidth - width : maxWidth;
+  const upperBound = Number.isFinite(maxLeft) ? Math.max(0, Math.floor(maxLeft)) : maxWidth;
+  let next = current + delta;
+  if (Number.isFinite(next)) {
+    next = Math.max(0, Math.min(upperBound, next));
+  } else {
+    next = Math.max(0, Math.min(upperBound, current));
+  }
+  bg.x = Math.round(next);
+}
+
 function applyHorizontalAlignment(
   block: TextBlockSpec,
   lines: string[],
@@ -1197,23 +1218,35 @@ function applyHorizontalAlignment(
   const textWidth = estimateTextWidth(lines, fontPx, letterSpacingPx);
   if (!(textWidth > 0)) return;
 
+  const previousX = typeof block.x === "number" ? block.x : 0;
+
   if (textBox.w > 0) {
-    const free = textBox.w - textWidth;
-    if (!(free > 0)) return;
-    const offset = Math.round(Math.min(free, Math.max(0, free * safeAlign)));
-    block.x = textBox.x + offset;
+    const anchorPoint = textBox.x + textBox.w * safeAlign;
+    const desired = anchorPoint - textWidth * safeAlign;
+    const maxLeft = maxWidth - textWidth;
+    const bounded = Math.round(Math.max(0, Math.min(maxLeft, desired)));
+    const delta = bounded - previousX;
+    block.x = bounded;
+    if (delta) {
+      shiftBackgroundHorizontally(block, delta, maxWidth);
+    }
     return;
   }
 
   const available = maxWidth - textWidth;
+  let nextX: number;
   if (!(available >= 0)) {
-    block.x = 0;
-    return;
+    nextX = 0;
+  } else {
+    const offset = Math.round(Math.max(0, available) * safeAlign);
+    const upperBound = Math.max(0, Math.floor(available));
+    nextX = Math.max(0, Math.min(upperBound, offset));
   }
-  const offset = Math.round(Math.max(0, available) * safeAlign);
-  const upperBound = Math.max(0, Math.floor(available));
-  const clamped = Math.max(0, Math.min(upperBound, offset));
-  block.x = clamped;
+  const delta = nextX - previousX;
+  block.x = nextX;
+  if (delta) {
+    shiftBackgroundHorizontally(block, delta, maxWidth);
+  }
 }
 
 export function wrapText(text: string, maxPerLine: number): string[] {

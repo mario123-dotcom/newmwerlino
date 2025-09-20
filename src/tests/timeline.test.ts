@@ -194,6 +194,80 @@ test("buildTimelineFromLayout centers outro point text", () => {
   assert.equal(block!.x, expected);
 });
 
+test("buildTimelineFromLayout centers outro text within template box", () => {
+  const tpl: TemplateDoc = {
+    width: 600,
+    height: 400,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 2,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "0%",
+            y: "0%",
+            width: "10%",
+            height: "10%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+            font_size: 30,
+            line_height: "100%",
+          },
+        ],
+      },
+      {
+        type: "composition",
+        name: "Outro",
+        duration: 2,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-outro",
+            x: "50%",
+            y: "10%",
+            width: "5%",
+            x_anchor: "50%",
+            y_anchor: "0%",
+            x_alignment: "50%",
+            font_size: 70,
+            line_height: "100%",
+            text: "OUTRO",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const slides = buildTimelineFromLayout(
+    { "Testo-0": "ciao", "Testo-outro": "OUTRO" },
+    tpl,
+    {
+      videoW: 600,
+      videoH: 400,
+      fps: 25,
+      defaultDur: 2,
+    }
+  );
+
+  const outro = slides[slides.length - 1];
+  const block = outro.texts?.[0];
+  assert.ok(block);
+  assert.ok(block?.textFile);
+  const rendered = readFileSync(block!.textFile!, "utf8");
+  const lines = rendered.split(/\r?\n/);
+  const fontPx = block!.fontSize ?? 0;
+  const textWidth = Math.max(
+    ...lines.map((ln) => ln.length * fontPx * APPROX_CHAR_WIDTH_RATIO)
+  );
+  const box = getTextBoxFromTemplate(tpl, "Outro", "Testo-outro")!;
+  const center = box.x + box.w * 0.5;
+  const expected = Math.round(center - textWidth * 0.5);
+  assert.equal(block!.x, expected);
+});
+
 test("getLogoBoxFromTemplate uses anchors and clamps", () => {
   const tpl: TemplateDoc = {
     width: 200,
