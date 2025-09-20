@@ -7,7 +7,7 @@ import { loadTemplate, loadModifications } from "./template";
 import { buildTimelineFromLayout, SlideSpec } from "./timeline";
 import { renderSlideSegment } from "./renderers/composition";
 import { concatAndFinalizeDemuxer } from "./concat";
-import { fetchAssets } from "./fetchAssets";
+import { fetchAssets, useLocalAssets } from "./fetchAssets";
 
 function ensureDir(dir: string) {
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
@@ -21,6 +21,47 @@ function clearDir(dir: string) {
 }
 
 (async () => {
+  const args = process.argv.slice(2);
+
+  function hasFlag(flag: string) {
+    return args.includes(flag);
+  }
+
+  function fromEnvFlag(): boolean {
+    const raw = process.env.npm_config_local ?? process.env.NPM_CONFIG_LOCAL;
+    if (typeof raw !== "string") return false;
+    const normalized = raw.trim().toLowerCase();
+    return normalized !== "false" && normalized !== "0" && normalized !== "no";
+  }
+
+  function fromNpmArgv(): boolean {
+    const raw = process.env.npm_config_argv;
+    if (!raw) return false;
+    try {
+      const parsed = JSON.parse(raw);
+      const original: unknown = parsed?.original ?? parsed?.cooked;
+      if (!Array.isArray(original)) return false;
+      return original.includes("-local") || original.includes("--local");
+    } catch (err) {
+      console.warn("Impossibile leggere npm_config_argv:", err);
+      return false;
+    }
+  }
+
+  function fromForcedEnv(): boolean {
+    const raw = process.env.FORCE_LOCAL_ASSETS;
+    if (typeof raw !== "string") return false;
+    const normalized = raw.trim().toLowerCase();
+    return normalized !== "false" && normalized !== "0" && normalized !== "no";
+  }
+
+  const localMode =
+    hasFlag("-local") ||
+    hasFlag("--local") ||
+    fromEnvFlag() ||
+    fromNpmArgv() ||
+    fromForcedEnv();
+
   // prepara le cartelle di lavoro
   ensureDir(paths.temp);
   ensureDir(paths.output);
@@ -28,7 +69,11 @@ function clearDir(dir: string) {
   clearDir(paths.output);
 
   // 1) scarica asset
-  await fetchAssets();
+  if (localMode) {
+    useLocalAssets();
+  } else {
+    await fetchAssets();
+  }
 
   // 2) carica template + modifications
   const tpl = loadTemplate();
