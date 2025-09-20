@@ -1006,7 +1006,8 @@ function defaultTextBlock(x = 120, y = 160): TextBlockSpec {
 export function getTextBoxFromTemplate(
   tpl: TemplateDoc,
   slideIndexOrName: number | string,
-  textName?: string
+  textName?: string,
+  minWidthPx?: number
 ): { x: number; y: number; w: number; h: number } | undefined {
   const compName =
     typeof slideIndexOrName === "number"
@@ -1061,19 +1062,26 @@ export function getTextBoxFromTemplate(
     }
   }
 
-  const minTemplateWidthRatio = TEXT.BOX_MIN_WIDTH_RATIO;
+  const ratioMin = TEXT.BOX_MIN_WIDTH_RATIO > 0 ? Math.round(Math.min(W, W * TEXT.BOX_MIN_WIDTH_RATIO)) : 0;
+  const minWidthRaw = typeof minWidthPx === "number" ? minWidthPx : 0;
+  const explicitMin = Number.isFinite(minWidthRaw) && minWidthRaw > 0 ? Math.min(W, Math.round(minWidthRaw)) : 0;
+
   if (!(w > 0)) {
-    if (minTemplateWidthRatio > 0) {
-      const minTemplateWidth = Math.round(Math.min(W, W * minTemplateWidthRatio));
-      if (minTemplateWidth > 0) {
-        w = minTemplateWidth;
-      }
+    if (explicitMin > 0) {
+      w = explicitMin;
+    } else if (ratioMin > 0) {
+      w = ratioMin;
     }
-  } else if (w > W) {
+  } else if (explicitMin > 0 && w < explicitMin) {
+    w = explicitMin;
+  }
+
+  if (w > W) {
     w = W;
   }
 
-  let left = x - w * xAnchor;
+  const desiredLeft = Number.isFinite(baseLeft) ? baseLeft : x - w * xAnchor;
+  let left = desiredLeft;
   let top = y - h * yAnchor;
 
   if (w > 0) left = Math.max(0, Math.min(W - w, left));
@@ -1738,7 +1746,12 @@ export function buildTimelineFromLayout(
 
     const txtStr = typeof mods[`Testo-${i}`] === "string" ? mods[`Testo-${i}`].trim() : "";
 
-    const txtBox = getTextBoxFromTemplate(template, i) || { x: 120, y: 160, w: 0, h: 0 };
+    const minTextWidthPx =
+      TEXT.BOX_MIN_WIDTH_RATIO > 0
+        ? Math.round(Math.min(videoW, videoW * TEXT.BOX_MIN_WIDTH_RATIO))
+        : undefined;
+    const txtBox =
+      getTextBoxFromTemplate(template, i, undefined, minTextWidthPx) || { x: 120, y: 160, w: 0, h: 0 };
     const baseBlock = defaultTextBlock(txtBox.x, txtBox.y);
     if (txtEl) {
       const bg = parseRGBA((txtEl as any).background_color);

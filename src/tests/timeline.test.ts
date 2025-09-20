@@ -45,6 +45,37 @@ test("getTextBoxFromTemplate uses anchors and keeps box inside canvas", () => {
   assert.equal(box.h, 40);
 });
 
+test("getTextBoxFromTemplate expands to explicit minimum width", () => {
+  const tpl: TemplateDoc = {
+    width: 100,
+    height: 100,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "50%",
+            y: "50%",
+            width: "60%",
+            height: "40%",
+            x_anchor: "50%",
+            y_anchor: "50%",
+          },
+        ],
+      },
+    ],
+  };
+
+  const box = getTextBoxFromTemplate(tpl, 0, undefined, 80)!;
+  assert.equal(box.x, 20);
+  assert.equal(box.y, 30);
+  assert.equal(box.w, 80);
+  assert.equal(box.h, 40);
+});
+
 test("getTextBoxFromTemplate mirrors point text margins", () => {
   const tpl: TemplateDoc = {
     width: 400,
