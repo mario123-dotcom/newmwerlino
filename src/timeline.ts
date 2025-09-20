@@ -1155,6 +1155,18 @@ export const APPROX_CHAR_WIDTH_RATIO = 0.56;
 const MIN_FONT_SIZE = 24;
 const MAX_FONT_LAYOUT_ITERATIONS = 6;
 
+function scaleTemplateFontPx(value: number | undefined): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value) || !(value > 0)) {
+    return value;
+  }
+  const scale = TEXT.TEMPLATE_FONT_SCALE;
+  if (typeof scale !== "number" || !Number.isFinite(scale) || !(scale > 0)) {
+    return value;
+  }
+  if (Math.abs(scale - 1) < 1e-6) return value;
+  return value * scale;
+}
+
 function clamp01(value: number): number {
   if (!Number.isFinite(value)) return 0;
   if (value <= 0) return 0;
@@ -1216,9 +1228,9 @@ function deriveFontSizing(
 ): FontSizingInfo {
   const fallbackFont =
     Number.isFinite(fallback) && fallback > 0 ? fallback : MIN_FONT_SIZE;
-  const explicit = lenToPx((element as any)?.font_size, W, H);
-  const min = lenToPx((element as any)?.font_size_minimum, W, H);
-  const max = lenToPx((element as any)?.font_size_maximum, W, H);
+  const explicit = scaleTemplateFontPx(lenToPx((element as any)?.font_size, W, H));
+  const min = scaleTemplateFontPx(lenToPx((element as any)?.font_size_minimum, W, H));
+  const max = scaleTemplateFontPx(lenToPx((element as any)?.font_size_maximum, W, H));
 
   const clamp = (value: number): number => {
     let next = Number.isFinite(value) && value > 0 ? value : fallbackFont;
@@ -1509,9 +1521,15 @@ function buildCopyrightBlock(
   const box = getTextBoxFromTemplate(template, compName, elementName);
   if (!box) return undefined;
 
-  const explicitFont = lenToPx((element as any)?.font_size, videoW, videoH);
-  const minFontPx = lenToPx((element as any)?.font_size_minimum, videoW, videoH);
-  const maxFontPx = lenToPx((element as any)?.font_size_maximum, videoW, videoH);
+  const explicitFont = scaleTemplateFontPx(
+    lenToPx((element as any)?.font_size, videoW, videoH)
+  );
+  const minFontPx = scaleTemplateFontPx(
+    lenToPx((element as any)?.font_size_minimum, videoW, videoH)
+  );
+  const maxFontPx = scaleTemplateFontPx(
+    lenToPx((element as any)?.font_size_maximum, videoW, videoH)
+  );
   const clampFontSize = (value: number): number => {
     let next = Number.isFinite(value) && value > 0 ? value : MIN_FONT_SIZE;
     if (typeof maxFontPx === "number" && Number.isFinite(maxFontPx) && maxFontPx > 0) {

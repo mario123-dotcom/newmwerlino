@@ -33,6 +33,8 @@ export const TEXT = {
   BOX_PAD_FACTOR: 0.30,
   /** larghezza minima dello sfondo del testo rispetto alla larghezza del video */
   BOX_MIN_WIDTH_RATIO: 0.75,
+  /** fattore di scala applicato ai font letti dal template per avvicinarsi al layout originale */
+  TEMPLATE_FONT_SCALE: 1.2,
 };
 
 /** Scale di base (fontsize ≈ scale * videoH) */

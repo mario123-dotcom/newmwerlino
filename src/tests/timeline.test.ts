@@ -217,6 +217,60 @@ test("buildTimelineFromLayout aligns text horizontally inside box", () => {
   assert.equal(block!.x, expected);
 });
 
+test("buildTimelineFromLayout scales template font size", () => {
+  const tpl: TemplateDoc = {
+    width: 800,
+    height: 600,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 2,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "10%",
+            y: "10%",
+            width: "80%",
+            height: "50%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+            font_size: 40,
+            font_size_minimum: 40,
+            font_size_maximum: 40,
+            line_height: "120%",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const prevImages = paths.images;
+  const prevTts = paths.tts;
+  paths.images = "/tmp/no_img";
+  paths.tts = "/tmp/no_tts";
+
+  try {
+    const slides = buildTimelineFromLayout({ "Testo-0": "ciao" }, tpl, {
+      videoW: 800,
+      videoH: 600,
+      fps: 25,
+      defaultDur: 2,
+    });
+
+    const slide = slides[0];
+    assert.ok(slide);
+    const block = slide.texts?.[0];
+    assert.ok(block);
+    const expected = Math.round(40 * TEXT.TEMPLATE_FONT_SCALE);
+    assert.equal(block!.fontSize, expected);
+  } finally {
+    paths.images = prevImages;
+    paths.tts = prevTts;
+  }
+});
+
 test("buildTimelineFromLayout centers outro point text", () => {
   const tpl: TemplateDoc = {
     width: 600,
