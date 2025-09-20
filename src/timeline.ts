@@ -1540,28 +1540,43 @@ function buildCopyrightBlock(
   };
 
   if (bg) {
-    const approxCharWidth = fontSize * APPROX_CHAR_WIDTH_RATIO;
-    const longestLine = lines.reduce((max, line) => Math.max(max, line.length), 0);
-    let textWidth =
-      longestLine > 0 && approxCharWidth > 0
-        ? longestLine * approxCharWidth
-        : approxCharWidth;
-    if (!(textWidth > 0)) {
-      textWidth = fontSize;
+    const prefersTemplateBox = box.w > 0 && box.h > 0;
+    let rect = prefersTemplateBox
+      ? clampRect(
+          box.x - padX,
+          box.y - padY,
+          box.w + padX * 2,
+          box.h + padY * 2,
+          videoW,
+          videoH
+        )
+      : undefined;
+
+    if (!rect) {
+      const approxCharWidth = fontSize * APPROX_CHAR_WIDTH_RATIO;
+      const longestLine = lines.reduce((max, line) => Math.max(max, line.length), 0);
+      let textWidth =
+        longestLine > 0 && approxCharWidth > 0
+          ? longestLine * approxCharWidth
+          : approxCharWidth;
+      if (!(textWidth > 0)) {
+        textWidth = fontSize;
+      }
+      const maxAllowedWidth = box.w && box.w > 0 ? box.w : textWidth;
+      textWidth = Math.min(textWidth, maxAllowedWidth);
+      const lineCount = lines.length || 1;
+      const totalSpacing = Math.max(0, lineCount - 1) * Math.max(0, spacing);
+      const textHeight = fontSize * lineCount + totalSpacing;
+      rect = clampRect(
+        block.x - padX,
+        y - padY,
+        textWidth + padX * 2,
+        textHeight + padY * 2,
+        videoW,
+        videoH
+      );
     }
-    const maxAllowedWidth = box.w && box.w > 0 ? box.w : textWidth;
-    textWidth = Math.min(textWidth, maxAllowedWidth);
-    const lineCount = lines.length || 1;
-    const totalSpacing = Math.max(0, lineCount - 1) * Math.max(0, spacing);
-    const textHeight = fontSize * lineCount + totalSpacing;
-    const rect = clampRect(
-      block.x - padX,
-      y - padY,
-      textWidth + padX * 2,
-      textHeight + padY * 2,
-      videoW,
-      videoH
-    );
+
     if (rect) {
       block.background = {
         x: rect.x,
