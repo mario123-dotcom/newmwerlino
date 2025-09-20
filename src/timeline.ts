@@ -1000,28 +1000,80 @@ export function getTextBoxFromTemplate(
 
   const rawW = pctToPx(txtEl.width, W) || 0;
   const rawH = pctToPx(txtEl.height, H) || 0;
-  const w = rawW * TEXT_BOX_SCALE;
-  const h = rawH * TEXT_BOX_SCALE;
-  const xAnchor = (pctToPx(txtEl.x_anchor, 100) || 0) / 100;
-  const yAnchor = (pctToPx(txtEl.y_anchor, 100) || 0) / 100;
 
-  let left = x - w * xAnchor;
-  let top = y - h * yAnchor;
+  const normalizeAnchor = (value: number | undefined): number => {
+    if (typeof value !== "number" || !Number.isFinite(value)) return 0;
+    if (value <= 0) return 0;
+    if (value >= 1 && value <= 100) return value / 100;
+    if (value > 100) return 1;
+    return value;
+  };
 
-  if (w > 0) {
-    const maxLeft = Math.max(0, Math.floor(W - w));
-    left = Math.max(0, Math.min(maxLeft, left));
-  } else {
+  const xAnchor = normalizeAnchor(pctToPx(txtEl.x_anchor, 100));
+  const yAnchor = normalizeAnchor(pctToPx(txtEl.y_anchor, 100));
+
+  const baseLeft = x - rawW * xAnchor;
+  const baseTop = y - rawH * yAnchor;
+
+  let w = rawW * TEXT_BOX_SCALE;
+  let h = rawH * TEXT_BOX_SCALE;
+
+  if (!(w > 0)) {
+    const mirroredLeft = Math.max(0, Math.min(W, baseLeft));
+    const mirroredWidth = W - mirroredLeft * 2;
+    if (mirroredWidth > 0) {
+      w = mirroredWidth;
+    }
+  }
+  if (!(h > 0)) {
+    const mirroredTop = Math.max(0, Math.min(H, baseTop));
+    const mirroredHeight = H - mirroredTop * 2;
+    if (mirroredHeight > 0) {
+      h = mirroredHeight;
+    }
+  }
+
+  let left = baseLeft;
+  let top = baseTop;
+
+  if (!(w > 0)) {
     left = Math.max(0, Math.min(W - 10, left));
-  }
-  if (h > 0) {
-    const maxTop = Math.max(0, Math.floor(H - h));
-    top = Math.max(0, Math.min(maxTop, top));
   } else {
-    top = Math.max(0, Math.min(H - 10, top));
+    if (w >= W) {
+      left = 0;
+      w = W;
+    } else {
+      if (left < 0) {
+        left = 0;
+      }
+      if (left + w > W) {
+        left = Math.max(0, Math.min(W - w, left));
+      }
+    }
   }
 
-  return { x: Math.round(left), y: Math.round(top), w: Math.round(w), h: Math.round(h) };
+  if (!(h > 0)) {
+    top = Math.max(0, Math.min(H - 10, top));
+  } else {
+    if (h >= H) {
+      top = 0;
+      h = H;
+    } else {
+      if (top < 0) {
+        top = 0;
+      }
+      if (top + h > H) {
+        top = Math.max(0, Math.min(H - h, top));
+      }
+    }
+  }
+
+  return {
+    x: Math.round(left),
+    y: Math.round(top),
+    w: Math.round(w),
+    h: Math.round(h),
+  };
 }
 
 /** Ricava posizione e dimensione del logo dalla composition "Slide_i" */
