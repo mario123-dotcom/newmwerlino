@@ -137,6 +137,37 @@ test("getTextBoxFromTemplate treats fractional widths as percentages", () => {
   assert.equal(box.h, 270);
 });
 
+test("getTextBoxFromTemplate treats numeric string widths as percentages", () => {
+  const tpl: TemplateDoc = {
+    width: 1920,
+    height: 1080,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: 120,
+            y: 200,
+            width: "50",
+            height: 0.25,
+            x_anchor: "0%",
+            y_anchor: "0%",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const box = getTextBoxFromTemplate(tpl, 0)!;
+  assert.equal(box.x, 120);
+  assert.equal(box.w, 960);
+  assert.equal(box.y, 200);
+  assert.equal(box.h, 270);
+});
+
 test("getTextBoxFromTemplate clamps to slide bounds", () => {
   const tpl: TemplateDoc = {
     width: 100,

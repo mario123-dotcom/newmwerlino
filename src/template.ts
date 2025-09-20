@@ -135,8 +135,14 @@ export function pctToPx(val: number | string | undefined, base: number): number 
   }
   const n = parseFloat(s);
   if (!Number.isFinite(n)) return undefined;
-  if (base > 0 && Math.abs(n) > 0 && Math.abs(n) <= 1) {
-    return n * base;
+  if (base > 0) {
+    const abs = Math.abs(n);
+    if (abs > 0 && abs <= 1) {
+      return n * base;
+    }
+    if (abs > 1 && abs <= 100 && /^[+-]?\d+(?:\.\d+)?$/.test(s)) {
+      return (n / 100) * base;
+    }
   }
   return n;
 }
