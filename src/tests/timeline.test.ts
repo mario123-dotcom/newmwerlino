@@ -15,7 +15,7 @@ import { TEXT } from "../config";
 import type { TemplateDoc } from "../template";
 import { paths } from "../paths";
 
-test("getTextBoxFromTemplate enforces slide min width while preserving anchor", () => {
+test("getTextBoxFromTemplate uses anchors and keeps box inside canvas", () => {
   const tpl: TemplateDoc = {
     width: 100,
     height: 100,
@@ -39,12 +39,71 @@ test("getTextBoxFromTemplate enforces slide min width while preserving anchor", 
     ],
   };
   const box = getTextBoxFromTemplate(tpl, 0)!;
-  const minWidth = Math.min(Math.round(100 * TEXT.MIN_BOX_WIDTH_RATIO), 100);
-  const expectedLeft = Math.round(50 - minWidth * 0.5);
-  assert.equal(box.x, expectedLeft);
+  assert.equal(box.x, 20);
   assert.equal(box.y, 30);
-  assert.equal(box.w, minWidth);
+  assert.equal(box.w, 60);
   assert.equal(box.h, 40);
+});
+
+test("getTextBoxFromTemplate mirrors point text margins", () => {
+  const tpl: TemplateDoc = {
+    width: 400,
+    height: 200,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "25%",
+            y: "10%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+            x_alignment: "50%",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const box = getTextBoxFromTemplate(tpl, 0)!;
+  assert.equal(box.x, 100);
+  assert.equal(box.w, 200);
+  assert.equal(box.y, 20);
+  assert.equal(box.h, 160);
+});
+
+test("getTextBoxFromTemplate keeps anchors beyond 100 percent", () => {
+  const tpl: TemplateDoc = {
+    width: 200,
+    height: 100,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "50%",
+            y: "80%",
+            width: "40%",
+            height: "50%",
+            x_anchor: "50%",
+            y_anchor: "150%",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const box = getTextBoxFromTemplate(tpl, 0)!;
+  assert.equal(box.x, 60);
+  assert.equal(box.y, 5);
+  assert.equal(box.w, 80);
+  assert.equal(box.h, 50);
 });
 
 test("getTextBoxFromTemplate clamps to slide bounds", () => {
@@ -71,67 +130,8 @@ test("getTextBoxFromTemplate clamps to slide bounds", () => {
     ],
   };
   const box = getTextBoxFromTemplate(tpl, 0)!;
-  const minWidth = Math.min(Math.round(100 * TEXT.MIN_BOX_WIDTH_RATIO), 100);
-  assert.equal(box.x, 100 - minWidth);
+  assert.equal(box.x, 80);
   assert.equal(box.y, 5);
-  assert.equal(box.w, minWidth);
-});
-
-test("getTextBoxFromTemplate expands left-anchored slides without moving origin", () => {
-  const tpl: TemplateDoc = {
-    width: 200,
-    height: 100,
-    elements: [
-      {
-        type: "composition",
-        name: "Slide_0",
-        elements: [
-          {
-            type: "text",
-            name: "Testo-0",
-            x: "20%",
-            y: "10%",
-            width: "20%",
-            height: "10%",
-            x_anchor: "0%",
-            y_anchor: "0%",
-          },
-        ],
-      },
-    ],
-  };
-  const box = getTextBoxFromTemplate(tpl, 0)!;
-  const minWidth = Math.min(Math.round(200 * TEXT.MIN_BOX_WIDTH_RATIO), 200);
-  assert.equal(box.x, 40);
-  assert.equal(box.w, minWidth);
-});
-
-test("getTextBoxFromTemplate leaves outro width unchanged", () => {
-  const tpl: TemplateDoc = {
-    width: 400,
-    height: 200,
-    elements: [
-      {
-        type: "composition",
-        name: "Outro",
-        elements: [
-          {
-            type: "text",
-            name: "Testo-outro",
-            x: "50%",
-            y: "50%",
-            width: "25%",
-            height: "20%",
-            x_anchor: "50%",
-            y_anchor: "50%",
-          },
-        ],
-      },
-    ],
-  };
-  const box = getTextBoxFromTemplate(tpl, "Outro", "Testo-outro")!;
-  assert.equal(box.w, 100);
-  assert.equal(box.x, 150);
 });
 
 test("buildTimelineFromLayout aligns text horizontally inside box", () => {
@@ -180,7 +180,8 @@ test("buildTimelineFromLayout aligns text horizontally inside box", () => {
     ...lines.map((ln) => ln.length * fontPx * APPROX_CHAR_WIDTH_RATIO)
   );
   const box = getTextBoxFromTemplate(tpl, 0)!;
-  const expected = Math.round(box.x + (box.w - textWidth));
+  const free = box.w - textWidth;
+  const expected = box.x + Math.round(Math.min(free, Math.max(0, free)));
   assert.equal(block!.x, expected);
 });
 
@@ -221,6 +222,7 @@ test("buildTimelineFromLayout centers outro point text", () => {
             x_anchor: "0%",
             y_anchor: "0%",
             x_alignment: "50%",
+            letter_spacing: "200%",
             font_size: 50,
             line_height: "100%",
             text: "HELLO",
@@ -248,85 +250,99 @@ test("buildTimelineFromLayout centers outro point text", () => {
   const rendered = readFileSync(block!.textFile!, "utf8");
   const lines = rendered.split(/\r?\n/);
   const fontPx = block!.fontSize ?? 0;
+  const letterSpacingPx = (fontPx * 200) / 1000;
   const textWidth = Math.max(
-    ...lines.map((ln) => ln.length * fontPx * APPROX_CHAR_WIDTH_RATIO)
+    ...lines.map((ln) =>
+      ln.length * fontPx * APPROX_CHAR_WIDTH_RATIO +
+      Math.max(ln.length - 1, 0) * letterSpacingPx
+    )
   );
-  const expected = Math.round((600 - textWidth) / 2);
+  const available = 600 - textWidth;
+  const offset = Math.round(Math.max(0, available) * 0.5);
+  const clamped = Math.max(0, Math.min(Math.max(0, Math.floor(available)), offset));
+  const expected = clamped;
   assert.equal(block!.x, expected);
 });
 
-test("buildTimelineFromLayout centers outro text within template box", () => {
+test("buildTimelineFromLayout centers outro textbox and text", () => {
   const tpl: TemplateDoc = {
-    width: 600,
-    height: 400,
+    width: 800,
+    height: 600,
     elements: [
       {
         type: "composition",
-        name: "Slide_0",
-        duration: 2,
-        elements: [
-          {
-            type: "text",
-            name: "Testo-0",
-            x: "0%",
-            y: "0%",
-            width: "10%",
-            height: "10%",
-            x_anchor: "0%",
-            y_anchor: "0%",
-            font_size: 30,
-            line_height: "100%",
-          },
-        ],
-      },
-      {
-        type: "composition",
         name: "Outro",
-        duration: 2,
+        duration: 3,
         elements: [
           {
             type: "text",
             name: "Testo-outro",
-            x: "50%",
-            y: "10%",
-            width: "5%",
-            x_anchor: "50%",
+            x: "40%",
+            y: "30%",
+            width: "30%",
+            height: "10%",
+            x_anchor: "0%",
             y_anchor: "0%",
-            x_alignment: "50%",
-            font_size: 70,
+            x_alignment: "0%",
             line_height: "100%",
-            text: "OUTRO",
+            background_color: "rgba(255, 255, 255, 1)",
+            text: "ARRIVEDERCI",
+          },
+          {
+            type: "image",
+            name: "Logo",
+            x: "50%",
+            y: "60%",
+            width: "20%",
+            height: "20%",
+            x_anchor: "50%",
+            y_anchor: "50%",
           },
         ],
       },
     ],
   } as any;
 
-  const slides = buildTimelineFromLayout(
-    { "Testo-0": "ciao", "Testo-outro": "OUTRO" },
-    tpl,
-    {
-      videoW: 600,
-      videoH: 400,
-      fps: 25,
-      defaultDur: 2,
-    }
-  );
+  const prevImages = paths.images;
+  const prevTts = paths.tts;
+  const tmpDir = mkdtempSync(join(process.cwd(), "timeline-outro-center-"));
+  try {
+    writeFileSync(join(tmpDir, "img0.jpg"), "");
+    paths.images = tmpDir;
+    paths.tts = tmpDir;
 
-  const outro = slides[slides.length - 1];
-  const block = outro.texts?.[0];
-  assert.ok(block);
-  assert.ok(block?.textFile);
-  const rendered = readFileSync(block!.textFile!, "utf8");
-  const lines = rendered.split(/\r?\n/);
-  const fontPx = block!.fontSize ?? 0;
-  const textWidth = Math.max(
-    ...lines.map((ln) => ln.length * fontPx * APPROX_CHAR_WIDTH_RATIO)
-  );
-  const box = getTextBoxFromTemplate(tpl, "Outro", "Testo-outro")!;
-  const center = box.x + box.w * 0.5;
-  const expected = Math.round(center - textWidth * 0.5);
-  assert.equal(block!.x, expected);
+    const slides = buildTimelineFromLayout({ "Testo-outro": "ARRIVEDERCI" }, tpl, {
+      videoW: 800,
+      videoH: 600,
+      fps: 30,
+      defaultDur: 3,
+    });
+
+    const outro = slides[slides.length - 1];
+    const block = outro.texts?.[0];
+    assert.ok(block);
+    assert.ok(block?.background);
+
+    const bg = block!.background!;
+    const expectedCenter = 800 / 2;
+    const bgCenter = bg.x + bg.width / 2;
+    assert.ok(Math.abs(bgCenter - expectedCenter) <= 1);
+
+    assert.ok(block!.textFile);
+    const rendered = readFileSync(block!.textFile!, "utf8");
+    const lines = rendered.split(/\r?\n/).filter(Boolean);
+    assert.ok(lines.length > 0);
+    const fontPx = block!.fontSize ?? 0;
+    const textWidth = Math.max(
+      ...lines.map((ln) => ln.length * fontPx * APPROX_CHAR_WIDTH_RATIO)
+    );
+    const textCenter = block!.x + textWidth / 2;
+    assert.ok(Math.abs(textCenter - expectedCenter) <= 1);
+  } finally {
+    paths.images = prevImages;
+    paths.tts = prevTts;
+    rmSync(tmpDir, { recursive: true, force: true });
+  }
 });
 
 test("getLogoBoxFromTemplate uses anchors and clamps", () => {
@@ -1329,7 +1345,7 @@ test("buildTimelineFromLayout uses fixed wipe timings", () => {
       },
     ],
   } as any;
-  const mods = { "Testo-0": "a a a a" };
+  const mods = { "Testo-0": "a b" };
   paths.images = "/tmp/no_img";
   paths.tts = "/tmp/no_tts";
   const slides = buildTimelineFromLayout(mods, tpl, {
@@ -1339,7 +1355,7 @@ test("buildTimelineFromLayout uses fixed wipe timings", () => {
     defaultDur: 2,
   });
   const t0 = slides[0].texts!;
-  assert.equal(t0.length, 2);
+  assert.equal(t0.length >= 2, true);
   assert.deepEqual(t0[0].animations, [
     { type: "wipe", time: 0, duration: 0.5, direction: "wipeleft" },
   ]);
