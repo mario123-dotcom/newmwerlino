@@ -221,9 +221,7 @@ function applyExtraBackgroundPadding(
     if (minWidth > 0) {
       const targetWidth = Math.min(maxW, Math.max(minWidth, block.background.width));
       if (targetWidth > block.background.width) {
-        const deficit = targetWidth - block.background.width;
-        const shiftLeft = Math.round(deficit / 2);
-        const desiredLeft = block.background.x - shiftLeft;
+        const desiredLeft = block.background.x;
         const boundedLeft = Math.max(0, Math.min(desiredLeft, maxW - targetWidth));
         const widened = clampRect(
           boundedLeft,
@@ -1064,15 +1062,15 @@ export function getTextBoxFromTemplate(
   }
 
   const minTemplateWidthRatio = TEXT.BOX_MIN_WIDTH_RATIO;
-  if (minTemplateWidthRatio > 0) {
-    const minTemplateWidth = Math.round(Math.min(W, W * minTemplateWidthRatio));
-    if (minTemplateWidth > 0) {
-      if (!(w > 0) || w < minTemplateWidth) {
+  if (!(w > 0)) {
+    if (minTemplateWidthRatio > 0) {
+      const minTemplateWidth = Math.round(Math.min(W, W * minTemplateWidthRatio));
+      if (minTemplateWidth > 0) {
         w = minTemplateWidth;
-      } else if (w > W) {
-        w = W;
       }
     }
+  } else if (w > W) {
+    w = W;
   }
 
   let left = x - w * xAnchor;

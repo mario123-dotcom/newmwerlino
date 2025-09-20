@@ -39,9 +39,9 @@ test("getTextBoxFromTemplate uses anchors and keeps box inside canvas", () => {
     ],
   };
   const box = getTextBoxFromTemplate(tpl, 0)!;
-  assert.equal(box.x, 13);
+  assert.equal(box.x, 20);
   assert.equal(box.y, 30);
-  assert.equal(box.w, Math.round(TEXT.BOX_MIN_WIDTH_RATIO * tpl.width));
+  assert.equal(box.w, 60);
   assert.equal(box.h, 40);
 });
 
@@ -70,7 +70,7 @@ test("getTextBoxFromTemplate mirrors point text margins", () => {
 
   const box = getTextBoxFromTemplate(tpl, 0)!;
   assert.equal(box.x, 100);
-  assert.equal(box.w, Math.round(TEXT.BOX_MIN_WIDTH_RATIO * tpl.width));
+  assert.equal(box.w, 200);
   assert.equal(box.y, 20);
   assert.equal(box.h, 160);
 });
@@ -100,9 +100,9 @@ test("getTextBoxFromTemplate keeps anchors beyond 100 percent", () => {
   } as any;
 
   const box = getTextBoxFromTemplate(tpl, 0)!;
-  assert.equal(box.x, 25);
+  assert.equal(box.x, 60);
   assert.equal(box.y, 5);
-  assert.equal(box.w, Math.round(TEXT.BOX_MIN_WIDTH_RATIO * tpl.width));
+  assert.equal(box.w, 80);
   assert.equal(box.h, 50);
 });
 
@@ -130,9 +130,9 @@ test("getTextBoxFromTemplate clamps to slide bounds", () => {
     ],
   };
   const box = getTextBoxFromTemplate(tpl, 0)!;
-  assert.equal(box.x, 25);
+  assert.equal(box.x, 80);
   assert.equal(box.y, 5);
-  assert.equal(box.w, Math.round(TEXT.BOX_MIN_WIDTH_RATIO * tpl.width));
+  assert.equal(box.w, 20);
 });
 
 test("buildTimelineFromLayout aligns text horizontally inside box", () => {
