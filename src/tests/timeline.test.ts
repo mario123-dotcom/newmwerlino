@@ -495,9 +495,13 @@ test("buildTimelineFromLayout adds extra padding to intro background", () => {
     assert.ok(primary.background);
     const pad = Math.round((primary.fontSize ?? 0) * TEXT.BOX_PAD_FACTOR);
     assert.ok(pad > 0);
-    assert.equal(primary.background?.x, box.x - pad);
+    assert.ok(primary.background?.x <= box.x - pad);
     assert.equal(primary.background?.y, box.y - pad);
-    assert.equal(primary.background?.width, box.w + pad * 2);
+    const minWidth = Math.round(1920 * TEXT.BOX_MIN_WIDTH_RATIO);
+    assert.ok((primary.background?.width ?? 0) >= minWidth);
+    const rightEdge = (primary.background?.x ?? 0) + (primary.background?.width ?? 0);
+    assert.ok(rightEdge >= box.x + box.w + pad);
+    assert.ok(rightEdge <= 1920);
     assert.equal(primary.background?.height, box.h + pad * 2);
     assert.equal(primary.background?.color, "#000000");
     assert.equal(primary.background?.alpha, 0.8);

@@ -183,35 +183,67 @@ function applyExtraBackgroundPadding(
   maxW: number,
   maxH: number
 ): number {
-  if (!(fontPx && fontPx > 0)) return 0;
-  const extra = Math.round(fontPx * TEXT.BOX_PAD_FACTOR);
-  if (!(extra > 0)) return 0;
+  let extra = 0;
+  if (fontPx && fontPx > 0) {
+    extra = Math.round(fontPx * TEXT.BOX_PAD_FACTOR);
+    if (extra > 0) {
+      if (block.background) {
+        const grown = clampRect(
+          block.background.x - extra,
+          block.background.y - extra,
+          block.background.width + extra * 2,
+          block.background.height + extra * 2,
+          maxW,
+          maxH
+        );
+        if (grown) {
+          block.background = {
+            ...block.background,
+            x: grown.x,
+            y: grown.y,
+            width: grown.w,
+            height: grown.h,
+          };
+        }
+      }
 
-  if (block.background) {
-    const grown = clampRect(
-      block.background.x - extra,
-      block.background.y - extra,
-      block.background.width + extra * 2,
-      block.background.height + extra * 2,
-      maxW,
-      maxH
-    );
-    if (grown) {
-      block.background = {
-        ...block.background,
-        x: grown.x,
-        y: grown.y,
-        width: grown.w,
-        height: grown.h,
-      };
+      if (block.box) {
+        const prev = block.boxBorderW ?? 0;
+        block.boxBorderW = prev + extra;
+      } else if (typeof block.boxBorderW === "number") {
+        block.boxBorderW = block.boxBorderW + extra;
+      }
     }
   }
 
-  if (block.box) {
-    const prev = block.boxBorderW ?? 0;
-    block.boxBorderW = prev + extra;
-  } else if (typeof block.boxBorderW === "number") {
-    block.boxBorderW = block.boxBorderW + extra;
+  if (block.background) {
+    const minWidth = Math.round(maxW * TEXT.BOX_MIN_WIDTH_RATIO);
+    if (minWidth > 0) {
+      const targetWidth = Math.min(maxW, Math.max(minWidth, block.background.width));
+      if (targetWidth > block.background.width) {
+        const deficit = targetWidth - block.background.width;
+        const shiftLeft = Math.round(deficit / 2);
+        const desiredLeft = block.background.x - shiftLeft;
+        const boundedLeft = Math.max(0, Math.min(desiredLeft, maxW - targetWidth));
+        const widened = clampRect(
+          boundedLeft,
+          block.background.y,
+          targetWidth,
+          block.background.height,
+          maxW,
+          maxH
+        );
+        if (widened) {
+          block.background = {
+            ...block.background,
+            x: widened.x,
+            y: widened.y,
+            width: widened.w,
+            height: widened.h,
+          };
+        }
+      }
+    }
   }
 
   return extra;
@@ -1598,6 +1630,8 @@ function buildCopyrightBlock(
       block.boxBorderW = pad;
     }
   }
+
+  applyExtraBackgroundPadding(block, fontSize, videoW, videoH);
 
   return block;
 }
