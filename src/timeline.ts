@@ -1048,11 +1048,13 @@ export function getTextBoxFromTemplate(
   const baseLeft = x - rawW * xAnchor;
   const baseTop = y - rawH * yAnchor;
 
+  let usedMirrorFallback = false;
   if (!(w > 0)) {
     const mirrorLeft = Math.max(0, Math.min(W, baseLeft));
     const mirrorWidth = W - mirrorLeft * 2;
     if (mirrorWidth > 0) {
       w = mirrorWidth;
+      usedMirrorFallback = true;
     }
   }
   if (!(h > 0)) {
@@ -1062,6 +1064,14 @@ export function getTextBoxFromTemplate(
       h = mirrorHeight;
     }
   }
+
+  const widthBeforeEnforcement = w > 0 ? w : undefined;
+  const leftBeforeEnforcement =
+    widthBeforeEnforcement &&
+    typeof x === "number" &&
+    Number.isFinite(x)
+      ? x - widthBeforeEnforcement * xAnchor
+      : undefined;
 
   const ratioMin =
     TEXT.BOX_MIN_WIDTH_RATIO > 0
@@ -1096,6 +1106,19 @@ export function getTextBoxFromTemplate(
     ? x - w * xAnchor
     : 0;
   let left = desiredLeft;
+  if (
+    usedMirrorFallback &&
+    widthBeforeEnforcement &&
+    widthBeforeEnforcement > 0 &&
+    typeof leftBeforeEnforcement === "number" &&
+    Number.isFinite(leftBeforeEnforcement) &&
+    w > widthBeforeEnforcement
+  ) {
+    const center = leftBeforeEnforcement + widthBeforeEnforcement / 2;
+    if (Number.isFinite(center)) {
+      left = center - w / 2;
+    }
+  }
   let top = y - h * yAnchor;
 
   if (w > 0) left = Math.max(0, Math.min(W - w, left));

@@ -107,8 +107,10 @@ test("getTextBoxFromTemplate mirrors point text margins", () => {
 
   const box = getTextBoxFromTemplate(tpl, 0)!;
   const ratioMin = Math.round(Math.min(tpl.width, tpl.width * TEXT.BOX_MIN_WIDTH_RATIO));
-  assert.equal(box.x, 100);
-  assert.equal(box.w, Math.max(200, ratioMin));
+  const expectedWidth = Math.max(200, ratioMin);
+  const expectedLeft = Math.round((tpl.width - expectedWidth) / 2);
+  assert.equal(box.x, expectedLeft);
+  assert.equal(box.w, expectedWidth);
   assert.equal(box.y, 20);
   assert.equal(box.h, 160);
 });
