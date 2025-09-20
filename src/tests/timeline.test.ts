@@ -9,6 +9,7 @@ import {
   getFontFamilyFromTemplate,
   wrapText,
   buildTimelineFromLayout,
+  APPROX_CHAR_WIDTH_RATIO,
 } from "../timeline";
 import { TEXT } from "../config";
 import type { TemplateDoc } from "../template";
@@ -40,8 +41,108 @@ test("getTextBoxFromTemplate uses anchors and keeps box inside canvas", () => {
   const box = getTextBoxFromTemplate(tpl, 0)!;
   assert.equal(box.x, 20);
   assert.equal(box.y, 30);
-  assert.equal(box.w, 70);
-  assert.equal(box.h, 47);
+  assert.equal(box.w, 60);
+  assert.equal(box.h, 40);
+});
+
+test("getTextBoxFromTemplate mirrors point text margins", () => {
+  const tpl: TemplateDoc = {
+    width: 400,
+    height: 200,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "25%",
+            y: "10%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+            x_alignment: "50%",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const box = getTextBoxFromTemplate(tpl, 0)!;
+  assert.equal(box.x, 100);
+  assert.equal(box.w, 200);
+  assert.equal(box.y, 20);
+  assert.equal(box.h, 160);
+});
+
+test("getTextBoxFromTemplate expands zero-width boxes using override text", () => {
+  const tpl: TemplateDoc = {
+    width: 2000,
+    height: 600,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "25%",
+            y: "10%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+            x_alignment: "50%",
+            font_size: 50,
+            letter_spacing: "200%",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const override = "UN TITOLO DAVVERO MOLTO LUNGO PER L'OUTRO";
+  const box = getTextBoxFromTemplate(tpl, 0, undefined, { textOverride: override })!;
+  const fontPx = 50;
+  const letterSpacingPx = (fontPx * 200) / 1000;
+  const baseWidth = override.length * fontPx * APPROX_CHAR_WIDTH_RATIO;
+  const spacing = Math.max(override.length - 1, 0) * letterSpacingPx;
+  const pad = Math.round(letterSpacingPx);
+  const expectedWidth = Math.min(2000, Math.round(baseWidth + spacing + pad));
+  assert.equal(box.w, expectedWidth);
+  const anchorX = (25 / 100) * 2000;
+  const expectedX = Math.max(0, Math.min(2000 - expectedWidth, anchorX));
+  assert.equal(box.x, expectedX);
+});
+
+test("getTextBoxFromTemplate keeps anchors beyond 100 percent", () => {
+  const tpl: TemplateDoc = {
+    width: 200,
+    height: 100,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "50%",
+            y: "80%",
+            width: "40%",
+            height: "50%",
+            x_anchor: "50%",
+            y_anchor: "150%",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const box = getTextBoxFromTemplate(tpl, 0)!;
+  assert.equal(box.x, 60);
+  assert.equal(box.y, 5);
+  assert.equal(box.w, 80);
+  assert.equal(box.h, 50);
 });
 
 test("getTextBoxFromTemplate clamps to slide bounds", () => {
@@ -68,8 +169,157 @@ test("getTextBoxFromTemplate clamps to slide bounds", () => {
     ],
   };
   const box = getTextBoxFromTemplate(tpl, 0)!;
-  assert.equal(box.x, 77);
+  assert.equal(box.x, 80);
   assert.equal(box.y, 5);
+});
+
+test("buildTimelineFromLayout aligns text horizontally inside box", () => {
+  const tpl: TemplateDoc = {
+    width: 400,
+    height: 200,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 2,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "50%",
+            y: "25%",
+            width: "50%",
+            height: "20%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+            x_alignment: "100%",
+            font_size: 40,
+            line_height: "100%",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const slides = buildTimelineFromLayout({ "Testo-0": "CIAO" }, tpl, {
+    videoW: 400,
+    videoH: 200,
+    fps: 25,
+    defaultDur: 2,
+  });
+
+  const slide = slides[0];
+  const block = slide.texts?.[0];
+  assert.ok(block);
+  assert.ok(block?.textFile);
+  const rendered = readFileSync(block!.textFile!, "utf8");
+  const lines = rendered.split(/\r?\n/);
+  const fontPx = block!.fontSize ?? 0;
+  const textWidth = Math.max(
+    ...lines.map((ln) => ln.length * fontPx * APPROX_CHAR_WIDTH_RATIO)
+  );
+  const box = getTextBoxFromTemplate(tpl, 0)!;
+  const safeAlign = 1;
+  const anchorPoint = box.x + box.w * safeAlign;
+  const rawX = anchorPoint - textWidth * safeAlign;
+  const roundedWidth = Math.max(0, Math.round(textWidth));
+  const maxLeft = 400 - roundedWidth;
+  let expected = Math.round(rawX);
+  if (!(maxLeft >= 0)) {
+    expected = Math.max(0, expected);
+  } else {
+    if (expected < 0) expected = 0;
+    if (expected > maxLeft) expected = maxLeft;
+  }
+  assert.equal(block!.x, expected);
+});
+
+test("buildTimelineFromLayout centers outro point text", () => {
+  const tpl: TemplateDoc = {
+    width: 600,
+    height: 400,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 2,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "0%",
+            y: "0%",
+            width: "10%",
+            height: "10%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+            font_size: 30,
+            line_height: "100%",
+          },
+        ],
+      },
+      {
+        type: "composition",
+        name: "Outro",
+        duration: 2,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-outro",
+            x: "0%",
+            y: "0%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+            x_alignment: "50%",
+            letter_spacing: "200%",
+            font_size: 50,
+            line_height: "100%",
+            text: "HELLO",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const slides = buildTimelineFromLayout(
+    { "Testo-0": "ciao", "Testo-outro": "HELLO" },
+    tpl,
+    {
+      videoW: 600,
+      videoH: 400,
+      fps: 25,
+      defaultDur: 2,
+    }
+  );
+
+  const outro = slides[slides.length - 1];
+  const block = outro.texts?.[0];
+  assert.ok(block);
+  assert.ok(block?.textFile);
+  const rendered = readFileSync(block!.textFile!, "utf8");
+  const lines = rendered.split(/\r?\n/);
+  const fontPx = block!.fontSize ?? 0;
+  const letterSpacingPx = (fontPx * 200) / 1000;
+  const textWidth = Math.max(
+    ...lines.map((ln) =>
+      ln.length * fontPx * APPROX_CHAR_WIDTH_RATIO +
+      Math.max(ln.length - 1, 0) * letterSpacingPx
+    )
+  );
+  const box = getTextBoxFromTemplate(tpl, "Outro", "Testo-outro", { textOverride: "HELLO" })!;
+  const safeAlign = 0.5;
+  const anchorPoint = box.x + box.w * safeAlign;
+  const rawX = anchorPoint - textWidth * safeAlign;
+  const roundedWidth = Math.max(0, Math.round(textWidth));
+  const maxLeft = 600 - roundedWidth;
+  let expected = Math.round(rawX);
+  if (!(maxLeft >= 0)) {
+    expected = Math.max(0, expected);
+  } else {
+    if (expected < 0) expected = 0;
+    if (expected > maxLeft) expected = maxLeft;
+  }
+  assert.equal(block!.x, expected);
 });
 
 test("getLogoBoxFromTemplate uses anchors and clamps", () => {
