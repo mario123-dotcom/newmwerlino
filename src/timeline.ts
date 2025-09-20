@@ -1001,6 +1001,19 @@ export function getTextBoxFromTemplate(
   let w = rawW;
   let h = rawH;
 
+  const enforceMinWidth = (() => {
+    if (!(TEXT?.MIN_BOX_WIDTH_RATIO > 0)) return 0;
+    const ratio = Number(TEXT.MIN_BOX_WIDTH_RATIO);
+    if (!Number.isFinite(ratio) || ratio <= 0) return 0;
+    const isSlideComposition =
+      typeof slideIndexOrName === "number" ||
+      (typeof compName === "string" && /^slide_/i.test(compName));
+    if (!isSlideComposition) return 0;
+    const minWidth = Math.round(W * ratio);
+    if (!(minWidth > 0)) return 0;
+    return Math.min(minWidth, W);
+  })();
+
   const normAnchor = (value: number | undefined): number => {
     if (typeof value !== "number" || !Number.isFinite(value)) return 0;
     if (value <= 0) return 0;
@@ -1029,6 +1042,12 @@ export function getTextBoxFromTemplate(
     if (mirrorHeight > 0) {
       h = mirrorHeight;
     }
+  }
+
+  if (enforceMinWidth > 0) {
+    const current = w > 0 ? w : 0;
+    const widened = Math.max(current, enforceMinWidth);
+    w = Math.min(widened, W);
   }
 
   let left = x - w * xAnchor;

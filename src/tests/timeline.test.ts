@@ -15,7 +15,7 @@ import { TEXT } from "../config";
 import type { TemplateDoc } from "../template";
 import { paths } from "../paths";
 
-test("getTextBoxFromTemplate uses anchors and keeps box inside canvas", () => {
+test("getTextBoxFromTemplate enforces slide min width while preserving anchor", () => {
   const tpl: TemplateDoc = {
     width: 100,
     height: 100,
@@ -39,9 +39,11 @@ test("getTextBoxFromTemplate uses anchors and keeps box inside canvas", () => {
     ],
   };
   const box = getTextBoxFromTemplate(tpl, 0)!;
-  assert.equal(box.x, 20);
+  const minWidth = Math.min(Math.round(100 * TEXT.MIN_BOX_WIDTH_RATIO), 100);
+  const expectedLeft = Math.round(50 - minWidth * 0.5);
+  assert.equal(box.x, expectedLeft);
   assert.equal(box.y, 30);
-  assert.equal(box.w, 60);
+  assert.equal(box.w, minWidth);
   assert.equal(box.h, 40);
 });
 
@@ -69,8 +71,67 @@ test("getTextBoxFromTemplate clamps to slide bounds", () => {
     ],
   };
   const box = getTextBoxFromTemplate(tpl, 0)!;
-  assert.equal(box.x, 80);
+  const minWidth = Math.min(Math.round(100 * TEXT.MIN_BOX_WIDTH_RATIO), 100);
+  assert.equal(box.x, 100 - minWidth);
   assert.equal(box.y, 5);
+  assert.equal(box.w, minWidth);
+});
+
+test("getTextBoxFromTemplate expands left-anchored slides without moving origin", () => {
+  const tpl: TemplateDoc = {
+    width: 200,
+    height: 100,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "20%",
+            y: "10%",
+            width: "20%",
+            height: "10%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+          },
+        ],
+      },
+    ],
+  };
+  const box = getTextBoxFromTemplate(tpl, 0)!;
+  const minWidth = Math.min(Math.round(200 * TEXT.MIN_BOX_WIDTH_RATIO), 200);
+  assert.equal(box.x, 40);
+  assert.equal(box.w, minWidth);
+});
+
+test("getTextBoxFromTemplate leaves outro width unchanged", () => {
+  const tpl: TemplateDoc = {
+    width: 400,
+    height: 200,
+    elements: [
+      {
+        type: "composition",
+        name: "Outro",
+        elements: [
+          {
+            type: "text",
+            name: "Testo-outro",
+            x: "50%",
+            y: "50%",
+            width: "25%",
+            height: "20%",
+            x_anchor: "50%",
+            y_anchor: "50%",
+          },
+        ],
+      },
+    ],
+  };
+  const box = getTextBoxFromTemplate(tpl, "Outro", "Testo-outro")!;
+  assert.equal(box.w, 100);
+  assert.equal(box.x, 150);
 });
 
 test("buildTimelineFromLayout aligns text horizontally inside box", () => {
@@ -1268,7 +1329,7 @@ test("buildTimelineFromLayout uses fixed wipe timings", () => {
       },
     ],
   } as any;
-  const mods = { "Testo-0": "a b" };
+  const mods = { "Testo-0": "a a a a" };
   paths.images = "/tmp/no_img";
   paths.tts = "/tmp/no_tts";
   const slides = buildTimelineFromLayout(mods, tpl, {
@@ -1278,7 +1339,7 @@ test("buildTimelineFromLayout uses fixed wipe timings", () => {
     defaultDur: 2,
   });
   const t0 = slides[0].texts!;
-  assert.equal(t0.length >= 2, true);
+  assert.equal(t0.length, 2);
   assert.deepEqual(t0[0].animations, [
     { type: "wipe", time: 0, duration: 0.5, direction: "wipeleft" },
   ]);

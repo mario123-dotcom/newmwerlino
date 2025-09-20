@@ -31,6 +31,8 @@ export const TEXT = {
   CHAR_WIDTH_K: 0.55, // 0.52–0.58 a seconda del font
   /** padding extra per gli sfondi del testo (in multipli del font size) */
   BOX_PAD_FACTOR: 0.30,
+  /** larghezza minima del box testo (percentuale della larghezza video) */
+  MIN_BOX_WIDTH_RATIO: 0.75,
 };
 
 /** Scale di base (fontsize ≈ scale * videoH) */
