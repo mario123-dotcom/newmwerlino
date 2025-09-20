@@ -1015,8 +1015,8 @@ export function getTextBoxFromTemplate(
   const baseLeft = x - rawW * xAnchor;
   const baseTop = y - rawH * yAnchor;
 
-  let w = rawW * TEXT_BOX_SCALE;
-  let h = rawH * TEXT_BOX_SCALE;
+  let w = rawW > 0 ? rawW * TEXT_BOX_SCALE : 0;
+  let h = rawH > 0 ? rawH : 0;
 
   if (!(w > 0)) {
     const mirroredLeft = Math.max(0, Math.min(W, baseLeft));
@@ -1033,8 +1033,8 @@ export function getTextBoxFromTemplate(
     }
   }
 
-  let left = baseLeft;
-  let top = baseTop;
+  let left = w > 0 ? x - w * xAnchor : baseLeft;
+  let top = h > 0 ? y - h * yAnchor : baseTop;
 
   if (!(w > 0)) {
     left = Math.max(0, Math.min(W - 10, left));
@@ -1342,11 +1342,13 @@ function resolveTextLayout(
   text: string,
   box: { w?: number; h?: number },
   initialFont: number,
-  lineHeightFactor: number
+  lineHeightFactor: number,
+  options?: { preferSingleLine?: boolean }
 ): TextLayoutResult | undefined {
   if (!text) return undefined;
   const width = typeof box.w === "number" ? box.w : 0;
   const height = typeof box.h === "number" ? box.h : 0;
+  const preferSingleLine = options?.preferSingleLine === true;
   const safeInitial =
     Number.isFinite(initialFont) && initialFont > 0
       ? Math.round(initialFont)
@@ -1357,7 +1359,9 @@ function resolveTextLayout(
   const layouts: TextLayoutResult[] = [];
 
   for (let iter = 0; iter < MAX_FONT_LAYOUT_ITERATIONS; iter++) {
-    const maxChars = width > 0 ? maxCharsForWidth(width, fontGuess) : DEFAULT_CHARS_PER_LINE;
+    const baseMaxChars =
+      width > 0 ? maxCharsForWidth(width, fontGuess) : DEFAULT_CHARS_PER_LINE;
+    const maxChars = preferSingleLine ? Math.max(baseMaxChars, text.length) : baseMaxChars;
     const lines = wrapText(text, maxChars);
     if (!lines.length) break;
 
@@ -1415,7 +1419,11 @@ function resolveTextLayout(
 
   for (let idx = layouts.length - 1; idx >= 0; idx--) {
     const candidate = layouts[idx];
-    const maxChars = width > 0 ? maxCharsForWidth(width, candidate.font) : DEFAULT_CHARS_PER_LINE;
+    const baseMaxChars =
+      width > 0 ? maxCharsForWidth(width, candidate.font) : DEFAULT_CHARS_PER_LINE;
+    const maxChars = preferSingleLine
+      ? Math.max(baseMaxChars, text.length)
+      : baseMaxChars;
     const recomputed = wrapText(text, maxChars);
     if (linesEqual(recomputed, candidate.lines)) {
       return candidate;
@@ -2004,21 +2012,32 @@ export function buildTimelineFromLayout(
       const initialOutSize = baseOut.fontSize ?? 60;
       const initialOutMax =
         textBox.w > 0 ? maxCharsForWidth(textBox.w, initialOutSize) : DEFAULT_CHARS_PER_LINE;
-      let linesOut = wrapText(txt, initialOutMax);
+      const manualOutroLines = txt.includes("\n")
+        ? txt
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter((line) => line)
+        : undefined;
+      let linesOut = manualOutroLines
+        ? [...manualOutroLines]
+        : wrapText(txt, initialOutMax);
       const lineHeightFactorOut =
         parseLineHeightFactor(textEl?.line_height) ?? 1.35;
 
       if (linesOut.length) {
-        const layout = resolveTextLayout(
-          txt,
-          textBox,
-          baseOut.fontSize ?? initialOutSize,
-          lineHeightFactorOut
-        );
-        if (layout) {
-          linesOut = [...layout.lines];
-          baseOut.fontSize = layout.font;
-          baseOut.lineSpacing = layout.spacing;
+        if (!manualOutroLines) {
+          const layout = resolveTextLayout(
+            txt,
+            textBox,
+            baseOut.fontSize ?? initialOutSize,
+            lineHeightFactorOut,
+            { preferSingleLine: true }
+          );
+          if (layout) {
+            linesOut = [...layout.lines];
+            baseOut.fontSize = layout.font;
+            baseOut.lineSpacing = layout.spacing;
+          }
         }
 
         applyExtraBackgroundPadding(
