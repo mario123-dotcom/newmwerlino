@@ -1005,15 +1005,21 @@ export function getTextBoxFromTemplate(
   const xAnchor = (pctToPx(txtEl.x_anchor, 100) || 0) / 100;
   const yAnchor = (pctToPx(txtEl.y_anchor, 100) || 0) / 100;
 
-  const baseLeft = x - rawW * xAnchor;
-  const baseTop = y - rawH * yAnchor;
-  let left = Math.max(baseLeft, x - w * xAnchor);
-  let top = Math.max(baseTop, y - h * yAnchor);
+  let left = x - w * xAnchor;
+  let top = y - h * yAnchor;
 
-  if (w > 0) left = Math.max(0, Math.min(W - w, left));
-  else left = Math.max(0, Math.min(W - 10, left));
-  if (h > 0) top = Math.max(0, Math.min(H - h, top));
-  else top = Math.max(0, Math.min(H - 10, top));
+  if (w > 0) {
+    const maxLeft = Math.max(0, Math.floor(W - w));
+    left = Math.max(0, Math.min(maxLeft, left));
+  } else {
+    left = Math.max(0, Math.min(W - 10, left));
+  }
+  if (h > 0) {
+    const maxTop = Math.max(0, Math.floor(H - h));
+    top = Math.max(0, Math.min(maxTop, top));
+  } else {
+    top = Math.max(0, Math.min(H - 10, top));
+  }
 
   return { x: Math.round(left), y: Math.round(top), w: Math.round(w), h: Math.round(h) };
 }
