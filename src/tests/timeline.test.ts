@@ -407,6 +407,81 @@ test("buildTimelineFromLayout keeps outro font size from template", () => {
   }
 });
 
+test("buildTimelineFromLayout wraps slide text using the configured max chars", () => {
+  const tpl: TemplateDoc = {
+    width: 1920,
+    height: 1080,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 2,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "50%",
+            y: "60%",
+            width: "55%",
+            height: "40%",
+            x_anchor: "50%",
+            y_anchor: "50%",
+            line_height: "200%",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const prevMaxChars = TEXT.MAX_CHARS_PER_LINE;
+  const prevImages = paths.images;
+  const prevTts = paths.tts;
+  paths.images = "/tmp/no_img";
+  paths.tts = "/tmp/no_tts";
+
+  try {
+    (TEXT as any).MAX_CHARS_PER_LINE = 28;
+    const slides = buildTimelineFromLayout(
+      { "Testo-0": "terremoto oggi ai campi flegrei, nuova forte scossa di magnitudo 4" },
+      tpl,
+      {
+        videoW: 1920,
+        videoH: 1080,
+        fps: 25,
+        defaultDur: 2,
+      }
+    );
+
+    const slide = slides[0];
+    assert.ok(slide);
+    const textBlocks = slide.texts ?? [];
+    assert.ok(textBlocks.length >= 3, `expected multiple wrapped lines, got ${textBlocks.length}`);
+
+    const renderedLines = textBlocks
+      .map((block) => (block.textFile ? readFileSync(block.textFile, "utf8") : block.text ?? ""))
+      .filter((line) => !!line && line.trim().length > 0);
+
+    assert.deepEqual(renderedLines, [
+      "terremoto oggi ai campi",
+      "flegrei, nuova forte scossa",
+      "di magnitudo 4",
+    ]);
+
+    const longestLine = renderedLines.reduce((max, line) => Math.max(max, line.length), 0);
+    assert.ok(
+      longestLine <= (TEXT.MAX_CHARS_PER_LINE ?? 0),
+      `expected longest line ${longestLine} to respect limit ${(TEXT.MAX_CHARS_PER_LINE ?? 0)}`
+    );
+
+    const font = textBlocks[0]?.fontSize ?? 0;
+    assert.ok(font >= 70, `expected enlarged font >= 70px, got ${font}`);
+  } finally {
+    (TEXT as any).MAX_CHARS_PER_LINE = prevMaxChars;
+    paths.images = prevImages;
+    paths.tts = prevTts;
+  }
+});
+
 test("buildTimelineFromLayout keeps copyright font size from template", () => {
   const tpl: TemplateDoc = {
     width: 800,

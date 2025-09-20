@@ -35,6 +35,8 @@ export const TEXT = {
   BOX_MIN_WIDTH_RATIO: 0.75,
   /** fattore di scala applicato ai font letti dal template per avvicinarsi al layout originale */
   TEMPLATE_FONT_SCALE: 2,
+  /** numero massimo di caratteri desiderato per riga prima di forzare un nuovo wrap */
+  MAX_CHARS_PER_LINE: 28,
 };
 
 /** Scale di base (fontsize ≈ scale * videoH) */

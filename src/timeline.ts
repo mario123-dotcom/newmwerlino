@@ -1206,7 +1206,11 @@ function maxCharsForWidth(width: number, fontSize: number): number {
   if (!(width > 0) || !(fontSize > 0)) return DEFAULT_CHARS_PER_LINE;
   const approxChar = fontSize * APPROX_CHAR_WIDTH_RATIO;
   if (!(approxChar > 0)) return DEFAULT_CHARS_PER_LINE;
-  const maxChars = Math.floor(width / approxChar);
+  let maxChars = Math.floor(width / approxChar);
+  const targetWrap = Math.floor(TEXT.MAX_CHARS_PER_LINE ?? 0);
+  if (targetWrap > 0) {
+    maxChars = Math.min(maxChars, targetWrap);
+  }
   return Math.max(1, maxChars || 0);
 }
 
