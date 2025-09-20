@@ -559,6 +559,95 @@ test("buildTimelineFromLayout keeps copyright font size from template", () => {
   }
 });
 
+test("buildTimelineFromLayout wraps copyright background around text", () => {
+  const tpl: TemplateDoc = {
+    width: 1920,
+    height: 1080,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 2,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "10%",
+            y: "20%",
+            width: "60%",
+            height: "40%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+          },
+          {
+            type: "text",
+            name: "Copyright-0",
+            x: "5%",
+            y: "88%",
+            width: "80%",
+            height: "8%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+            font_size: 24,
+            line_height: "110%",
+            text: "© TEST SRL",
+            background_color: "rgba(0, 0, 0, 0.6)",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const prevImages = paths.images;
+  const prevTts = paths.tts;
+  paths.images = "/tmp/no_img";
+  paths.tts = "/tmp/no_tts";
+
+  try {
+    const templateBox = getTextBoxFromTemplate(tpl, 0, "Copyright-0")!;
+    assert.ok(templateBox.w && templateBox.w > 1200);
+
+    const slides = buildTimelineFromLayout({ "Testo-0": "ciao" }, tpl, {
+      videoW: 1920,
+      videoH: 1080,
+      fps: 25,
+      defaultDur: 2,
+    });
+
+    const slide = slides[0];
+    assert.ok(slide);
+    const block = slide.texts?.find((txt) => txt.text === "© TEST SRL");
+    assert.ok(block);
+    assert.ok(block!.background, "expected copyright block to expose background");
+
+    const background = block!.background!;
+    assert.ok(
+      background.width < (templateBox.w ?? 0),
+      `expected wrapped width less than template width ${templateBox.w}, got ${background.width}`
+    );
+
+    const fontPx = block!.fontSize ?? 0;
+    assert.ok(fontPx > 0);
+    const lines = block!.text?.split(/\n/) ?? [];
+    const longest = lines.reduce((max, line) => Math.max(max, line.length), 0);
+    const approxWidth = longest * fontPx * APPROX_CHAR_WIDTH_RATIO;
+    const extra = Math.round(fontPx * TEXT.BOX_PAD_FACTOR) * 2;
+    const tolerance = Math.max(16, Math.round(fontPx * 0.25));
+
+    assert.ok(
+      background.width <= Math.round(approxWidth) + extra + tolerance,
+      `expected background width to stay close to text width, got ${background.width}`
+    );
+    assert.ok(
+      background.width >= Math.max(1, Math.round(approxWidth)),
+      `expected background width to cover text, got ${background.width}`
+    );
+  } finally {
+    paths.images = prevImages;
+    paths.tts = prevTts;
+  }
+});
+
 test("buildTimelineFromLayout centers outro point text", () => {
   const tpl: TemplateDoc = {
     width: 600,

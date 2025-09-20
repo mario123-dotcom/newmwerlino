@@ -181,7 +181,8 @@ function applyExtraBackgroundPadding(
   block: TextBlockSpec,
   fontPx: number | undefined,
   maxW: number,
-  maxH: number
+  maxH: number,
+  opts: { skipMinWidth?: boolean } = {}
 ): number {
   let extra = 0;
   if (fontPx && fontPx > 0) {
@@ -216,7 +217,7 @@ function applyExtraBackgroundPadding(
     }
   }
 
-  if (block.background) {
+  if (block.background && !opts.skipMinWidth) {
     const minWidth = Math.round(maxW * TEXT.BOX_MIN_WIDTH_RATIO);
     if (minWidth > 0) {
       const targetWidth = Math.min(maxW, Math.max(minWidth, block.background.width));
@@ -1775,7 +1776,9 @@ function buildCopyrightBlock(
   };
 
   if (bg) {
-    const prefersTemplateBox = box.w > 0 && box.h > 0;
+    // Wrap the copyright background tightly around the rendered text instead of
+    // stretching across the full template width.
+    const prefersTemplateBox = false;
     let rect = prefersTemplateBox
       ? clampRect(
           box.x - padX,
@@ -1834,7 +1837,7 @@ function buildCopyrightBlock(
     }
   }
 
-  applyExtraBackgroundPadding(block, fontSize, videoW, videoH);
+  applyExtraBackgroundPadding(block, fontSize, videoW, videoH, { skipMinWidth: true });
 
   return block;
 }
