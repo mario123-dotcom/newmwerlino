@@ -39,9 +39,10 @@ test("getTextBoxFromTemplate uses anchors and keeps box inside canvas", () => {
     ],
   };
   const box = getTextBoxFromTemplate(tpl, 0)!;
+  const ratioMin = Math.round(Math.min(tpl.width, tpl.width * TEXT.BOX_MIN_WIDTH_RATIO));
   assert.equal(box.x, 20);
   assert.equal(box.y, 30);
-  assert.equal(box.w, 60);
+  assert.equal(box.w, Math.max(60, ratioMin));
   assert.equal(box.h, 40);
 });
 
@@ -70,9 +71,10 @@ test("getTextBoxFromTemplate expands to explicit minimum width", () => {
   };
 
   const box = getTextBoxFromTemplate(tpl, 0, undefined, 80)!;
+  const ratioMin = Math.round(Math.min(tpl.width, tpl.width * TEXT.BOX_MIN_WIDTH_RATIO));
   assert.equal(box.x, 20);
   assert.equal(box.y, 30);
-  assert.equal(box.w, 80);
+  assert.equal(box.w, Math.max(80, ratioMin));
   assert.equal(box.h, 40);
 });
 
@@ -100,8 +102,9 @@ test("getTextBoxFromTemplate mirrors point text margins", () => {
   } as any;
 
   const box = getTextBoxFromTemplate(tpl, 0)!;
+  const ratioMin = Math.round(Math.min(tpl.width, tpl.width * TEXT.BOX_MIN_WIDTH_RATIO));
   assert.equal(box.x, 100);
-  assert.equal(box.w, 200);
+  assert.equal(box.w, Math.max(200, ratioMin));
   assert.equal(box.y, 20);
   assert.equal(box.h, 160);
 });
@@ -131,9 +134,10 @@ test("getTextBoxFromTemplate keeps anchors beyond 100 percent", () => {
   } as any;
 
   const box = getTextBoxFromTemplate(tpl, 0)!;
-  assert.equal(box.x, 60);
+  const ratioMin = Math.round(Math.min(tpl.width, tpl.width * TEXT.BOX_MIN_WIDTH_RATIO));
+  assert.equal(box.x, Math.max(0, Math.min(200 - Math.max(80, ratioMin), 60)));
   assert.equal(box.y, 5);
-  assert.equal(box.w, 80);
+  assert.equal(box.w, Math.max(80, ratioMin));
   assert.equal(box.h, 50);
 });
 
@@ -161,9 +165,10 @@ test("getTextBoxFromTemplate clamps to slide bounds", () => {
     ],
   };
   const box = getTextBoxFromTemplate(tpl, 0)!;
-  assert.equal(box.x, 80);
+  const ratioMin = Math.round(Math.min(tpl.width, tpl.width * TEXT.BOX_MIN_WIDTH_RATIO));
+  assert.equal(box.x, Math.max(0, Math.min(100 - Math.max(20, ratioMin), 95)));
   assert.equal(box.y, 5);
-  assert.equal(box.w, 20);
+  assert.equal(box.w, Math.max(20, ratioMin));
 });
 
 test("buildTimelineFromLayout aligns text horizontally inside box", () => {

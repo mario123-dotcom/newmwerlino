@@ -1062,18 +1062,23 @@ export function getTextBoxFromTemplate(
     }
   }
 
-  const ratioMin = TEXT.BOX_MIN_WIDTH_RATIO > 0 ? Math.round(Math.min(W, W * TEXT.BOX_MIN_WIDTH_RATIO)) : 0;
+  const ratioMin =
+    TEXT.BOX_MIN_WIDTH_RATIO > 0
+      ? Math.round(Math.min(W, W * TEXT.BOX_MIN_WIDTH_RATIO))
+      : 0;
   const minWidthRaw = typeof minWidthPx === "number" ? minWidthPx : 0;
-  const explicitMin = Number.isFinite(minWidthRaw) && minWidthRaw > 0 ? Math.min(W, Math.round(minWidthRaw)) : 0;
+  const explicitMin =
+    Number.isFinite(minWidthRaw) && minWidthRaw > 0
+      ? Math.min(W, Math.round(minWidthRaw))
+      : 0;
+  const enforcedMin = Math.max(explicitMin, ratioMin, 0);
 
   if (!(w > 0)) {
-    if (explicitMin > 0) {
-      w = explicitMin;
-    } else if (ratioMin > 0) {
-      w = ratioMin;
+    if (enforcedMin > 0) {
+      w = enforcedMin;
     }
-  } else if (explicitMin > 0 && w < explicitMin) {
-    w = explicitMin;
+  } else if (enforcedMin > 0 && w < enforcedMin) {
+    w = enforcedMin;
   }
 
   if (w > W) {
