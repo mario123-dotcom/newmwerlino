@@ -1123,8 +1123,23 @@ export function getTextBoxFromTemplate(
   }
   let top = y - h * yAnchor;
 
-  if (w > 0) left = Math.max(0, Math.min(W - w, left));
-  else left = Math.max(0, Math.min(W - 10, left));
+  const wantsLeftMargin =
+    !opts?.preserveMirrorCenter &&
+    TEXT.LEFT_MARGIN_P > 0 &&
+    W > 0 &&
+    (Number.isFinite(xAnchor) ? xAnchor <= 0.01 : true);
+  const rawMargin = wantsLeftMargin ? Math.round(W * TEXT.LEFT_MARGIN_P) : 0;
+  const leftMarginPx = rawMargin > 0 ? Math.min(rawMargin, W) : 0;
+
+  if (w > 0) {
+    const maxLeft = Math.max(0, W - w);
+    const minLeft = leftMarginPx > 0 ? Math.min(leftMarginPx, maxLeft) : 0;
+    left = Math.max(minLeft, Math.min(maxLeft, left));
+  } else {
+    const maxLeft = Math.max(0, W - 10);
+    const minLeft = leftMarginPx > 0 ? Math.min(leftMarginPx, maxLeft) : 0;
+    left = Math.max(minLeft, Math.min(maxLeft, left));
+  }
   if (h > 0) top = Math.max(0, Math.min(H - h, top));
   else top = Math.max(0, Math.min(H - 10, top));
 

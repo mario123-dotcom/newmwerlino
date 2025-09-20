@@ -82,6 +82,43 @@ test("getTextBoxFromTemplate expands to explicit minimum width", () => {
   assert.equal(box.h, 40);
 });
 
+test("getTextBoxFromTemplate enforces left margin for left anchored boxes", () => {
+  const tpl: TemplateDoc = {
+    width: 100,
+    height: 100,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "5%",
+            y: "50%",
+            width: "30%",
+            height: "40%",
+            x_anchor: "0%",
+            y_anchor: "50%",
+          },
+        ],
+      },
+    ],
+  };
+
+  const box = getTextBoxFromTemplate(tpl, 0)!;
+  const ratioMin = Math.round(Math.min(tpl.width, tpl.width * TEXT.BOX_MIN_WIDTH_RATIO));
+  const expectedWidth = Math.max(Math.round((tpl.width * 30) / 100), ratioMin);
+  const maxLeft = Math.max(0, tpl.width - expectedWidth);
+  const expectedLeft = Math.min(Math.round(tpl.width * TEXT.LEFT_MARGIN_P), maxLeft);
+  const expectedHeight = Math.round((tpl.height * 40) / 100);
+  const expectedTop = Math.round(tpl.height * 0.5 - expectedHeight * 0.5);
+  assert.equal(box.w, expectedWidth);
+  assert.equal(box.x, expectedLeft);
+  assert.equal(box.h, expectedHeight);
+  assert.equal(box.y, expectedTop);
+});
+
 test("getTextBoxFromTemplate mirrors point text margins", () => {
   const tpl: TemplateDoc = {
     width: 400,
