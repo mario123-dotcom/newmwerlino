@@ -1086,7 +1086,15 @@ export function getTextBoxFromTemplate(
     w = W;
   }
 
-  const desiredLeft = Number.isFinite(baseLeft) ? baseLeft : x - w * xAnchor;
+  const anchorLeft =
+    typeof x === "number" && Number.isFinite(x) ? x - w * xAnchor : undefined;
+  const desiredLeft = Number.isFinite(anchorLeft)
+    ? (anchorLeft as number)
+    : Number.isFinite(baseLeft)
+    ? (baseLeft as number)
+    : typeof x === "number" && Number.isFinite(x)
+    ? x - w * xAnchor
+    : 0;
   let left = desiredLeft;
   let top = y - h * yAnchor;
 

@@ -40,9 +40,11 @@ test("getTextBoxFromTemplate uses anchors and keeps box inside canvas", () => {
   };
   const box = getTextBoxFromTemplate(tpl, 0)!;
   const ratioMin = Math.round(Math.min(tpl.width, tpl.width * TEXT.BOX_MIN_WIDTH_RATIO));
-  assert.equal(box.x, 20);
+  const expectedWidth = Math.max(Math.round((tpl.width * 60) / 100), ratioMin);
+  const expectedLeft = Math.round(0.5 * tpl.width - expectedWidth * 0.5);
+  assert.equal(box.x, expectedLeft);
   assert.equal(box.y, 30);
-  assert.equal(box.w, Math.max(60, ratioMin));
+  assert.equal(box.w, expectedWidth);
   assert.equal(box.h, 40);
 });
 
@@ -72,9 +74,11 @@ test("getTextBoxFromTemplate expands to explicit minimum width", () => {
 
   const box = getTextBoxFromTemplate(tpl, 0, undefined, 80)!;
   const ratioMin = Math.round(Math.min(tpl.width, tpl.width * TEXT.BOX_MIN_WIDTH_RATIO));
-  assert.equal(box.x, 20);
+  const expectedWidth = Math.max(80, ratioMin);
+  const expectedLeft = Math.round(0.5 * tpl.width - expectedWidth * 0.5);
+  assert.equal(box.x, expectedLeft);
   assert.equal(box.y, 30);
-  assert.equal(box.w, Math.max(80, ratioMin));
+  assert.equal(box.w, expectedWidth);
   assert.equal(box.h, 40);
 });
 
@@ -135,9 +139,13 @@ test("getTextBoxFromTemplate keeps anchors beyond 100 percent", () => {
 
   const box = getTextBoxFromTemplate(tpl, 0)!;
   const ratioMin = Math.round(Math.min(tpl.width, tpl.width * TEXT.BOX_MIN_WIDTH_RATIO));
-  assert.equal(box.x, Math.max(0, Math.min(200 - Math.max(80, ratioMin), 60)));
+  const expectedWidth = Math.max(Math.round((tpl.width * 40) / 100), ratioMin);
+  const unclampedLeft = Math.round(0.5 * tpl.width - expectedWidth * 0.5);
+  const maxLeft = Math.max(0, tpl.width - expectedWidth);
+  const expectedLeft = Math.max(0, Math.min(maxLeft, unclampedLeft));
+  assert.equal(box.x, expectedLeft);
   assert.equal(box.y, 5);
-  assert.equal(box.w, Math.max(80, ratioMin));
+  assert.equal(box.w, expectedWidth);
   assert.equal(box.h, 50);
 });
 
@@ -169,6 +177,38 @@ test("getTextBoxFromTemplate clamps to slide bounds", () => {
   assert.equal(box.x, Math.max(0, Math.min(100 - Math.max(20, ratioMin), 95)));
   assert.equal(box.y, 5);
   assert.equal(box.w, Math.max(20, ratioMin));
+});
+
+test("getTextBoxFromTemplate recenters anchor after widening box", () => {
+  const tpl: TemplateDoc = {
+    width: 800,
+    height: 400,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "50%",
+            y: "20%",
+            width: "40%",
+            height: "30%",
+            x_anchor: "50%",
+            y_anchor: "0%",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const box = getTextBoxFromTemplate(tpl, 0)!;
+  const ratioMin = Math.round(Math.min(tpl.width, tpl.width * TEXT.BOX_MIN_WIDTH_RATIO));
+  const expectedWidth = Math.max(Math.round((tpl.width * 40) / 100), ratioMin);
+  const expectedLeft = Math.round(0.5 * tpl.width - expectedWidth * 0.5);
+  assert.equal(box.w, expectedWidth);
+  assert.equal(box.x, expectedLeft);
 });
 
 test("buildTimelineFromLayout aligns text horizontally inside box", () => {
