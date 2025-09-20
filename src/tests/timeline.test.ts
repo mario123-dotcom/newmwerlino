@@ -39,9 +39,9 @@ test("getTextBoxFromTemplate uses anchors and keeps box inside canvas", () => {
     ],
   };
   const box = getTextBoxFromTemplate(tpl, 0)!;
-  assert.equal(box.x, 15);
+  assert.equal(box.x, 20);
   assert.equal(box.y, 30);
-  assert.equal(box.w, 70);
+  assert.equal(box.w, 60);
   assert.equal(box.h, 40);
 });
 
@@ -69,7 +69,7 @@ test("getTextBoxFromTemplate clamps to slide bounds", () => {
     ],
   };
   const box = getTextBoxFromTemplate(tpl, 0)!;
-  assert.equal(box.x, 77);
+  assert.equal(box.x, 80);
   assert.equal(box.y, 5);
 });
 

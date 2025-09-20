@@ -7,8 +7,6 @@ import { probeDurationSec } from "./ffmpeg/probe";
 import { TEXT } from "./config";
 import { fileNameMatchesFamily } from "./fonts";
 
-const TEXT_BOX_SCALE = 70 / 60;
-
 /* ---------- Tipi usati da composition.ts ---------- */
 export type AnimationSpec =
   | {
@@ -1000,80 +998,48 @@ export function getTextBoxFromTemplate(
 
   const rawW = pctToPx(txtEl.width, W) || 0;
   const rawH = pctToPx(txtEl.height, H) || 0;
+  let w = rawW;
+  let h = rawH;
 
-  const normalizeAnchor = (value: number | undefined): number => {
+  const normAnchor = (value: number | undefined): number => {
     if (typeof value !== "number" || !Number.isFinite(value)) return 0;
     if (value <= 0) return 0;
-    if (value >= 1 && value <= 100) return value / 100;
-    if (value > 100) return 1;
-    return value;
+    if (value <= 1) return value;
+    const ratio = value / 100;
+    if (!Number.isFinite(ratio) || ratio <= 0) return 0;
+    return ratio;
   };
 
-  const xAnchor = normalizeAnchor(pctToPx(txtEl.x_anchor, 100));
-  const yAnchor = normalizeAnchor(pctToPx(txtEl.y_anchor, 100));
+  const xAnchor = normAnchor(pctToPx(txtEl.x_anchor, 100));
+  const yAnchor = normAnchor(pctToPx(txtEl.y_anchor, 100));
 
   const baseLeft = x - rawW * xAnchor;
   const baseTop = y - rawH * yAnchor;
 
-  let w = rawW > 0 ? rawW * TEXT_BOX_SCALE : 0;
-  let h = rawH > 0 ? rawH : 0;
-
   if (!(w > 0)) {
-    const mirroredLeft = Math.max(0, Math.min(W, baseLeft));
-    const mirroredWidth = W - mirroredLeft * 2;
-    if (mirroredWidth > 0) {
-      w = mirroredWidth;
+    const mirrorLeft = Math.max(0, Math.min(W, baseLeft));
+    const mirrorWidth = W - mirrorLeft * 2;
+    if (mirrorWidth > 0) {
+      w = mirrorWidth;
     }
   }
   if (!(h > 0)) {
-    const mirroredTop = Math.max(0, Math.min(H, baseTop));
-    const mirroredHeight = H - mirroredTop * 2;
-    if (mirroredHeight > 0) {
-      h = mirroredHeight;
+    const mirrorTop = Math.max(0, Math.min(H, baseTop));
+    const mirrorHeight = H - mirrorTop * 2;
+    if (mirrorHeight > 0) {
+      h = mirrorHeight;
     }
   }
 
-  let left = w > 0 ? x - w * xAnchor : baseLeft;
-  let top = h > 0 ? y - h * yAnchor : baseTop;
+  let left = x - w * xAnchor;
+  let top = y - h * yAnchor;
 
-  if (!(w > 0)) {
-    left = Math.max(0, Math.min(W - 10, left));
-  } else {
-    if (w >= W) {
-      left = 0;
-      w = W;
-    } else {
-      if (left < 0) {
-        left = 0;
-      }
-      if (left + w > W) {
-        left = Math.max(0, Math.min(W - w, left));
-      }
-    }
-  }
+  if (w > 0) left = Math.max(0, Math.min(W - w, left));
+  else left = Math.max(0, Math.min(W - 10, left));
+  if (h > 0) top = Math.max(0, Math.min(H - h, top));
+  else top = Math.max(0, Math.min(H - 10, top));
 
-  if (!(h > 0)) {
-    top = Math.max(0, Math.min(H - 10, top));
-  } else {
-    if (h >= H) {
-      top = 0;
-      h = H;
-    } else {
-      if (top < 0) {
-        top = 0;
-      }
-      if (top + h > H) {
-        top = Math.max(0, Math.min(H - h, top));
-      }
-    }
-  }
-
-  return {
-    x: Math.round(left),
-    y: Math.round(top),
-    w: Math.round(w),
-    h: Math.round(h),
-  };
+  return { x: Math.round(left), y: Math.round(top), w: Math.round(w), h: Math.round(h) };
 }
 
 /** Ricava posizione e dimensione del logo dalla composition "Slide_i" */
@@ -2048,7 +2014,7 @@ export function buildTimelineFromLayout(
         );
       }
 
-      const alignX = parseAlignmentFactor(textEl?.x_alignment);
+      let alignX = parseAlignmentFactor(textEl?.x_alignment);
       const fontForAlign = baseOut.fontSize ?? initialOutSize;
       const letterSpacingPx = parseLetterSpacing(
         textEl?.letter_spacing,
@@ -2056,13 +2022,32 @@ export function buildTimelineFromLayout(
         videoW,
         videoH
       );
+      let alignBox: { x: number; w: number } | undefined =
+        textBox?.w != null ? { x: textBox.x, w: textBox.w } : undefined;
+      if (
+        textBox &&
+        textBox.w > 0 &&
+        logoBox?.x != null &&
+        logoBox?.w != null &&
+        logoBox.w > 0
+      ) {
+        alignX = 0.5;
+        const logoCenter = logoBox.x + logoBox.w / 2;
+        const desiredLeft = Math.round(logoCenter - textBox.w / 2);
+        const maxLeft = videoW - textBox.w;
+        const clampedLeft = Math.max(0, Math.min(maxLeft, desiredLeft));
+        alignBox = {
+          x: clampedLeft,
+          w: textBox.w,
+        };
+      }
       applyHorizontalAlignment(
         baseOut,
         linesOut,
         fontForAlign,
         letterSpacingPx,
         alignX,
-        textBox,
+        alignBox ?? textBox,
         videoW
       );
 
