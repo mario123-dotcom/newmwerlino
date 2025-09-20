@@ -1008,7 +1008,8 @@ export function getTextBoxFromTemplate(
   tpl: TemplateDoc,
   slideIndexOrName: number | string,
   textName?: string,
-  minWidthPx?: number
+  minWidthPx?: number,
+  opts?: { preserveMirrorCenter?: boolean }
 ): { x: number; y: number; w: number; h: number } | undefined {
   const compName =
     typeof slideIndexOrName === "number"
@@ -1107,6 +1108,7 @@ export function getTextBoxFromTemplate(
     : 0;
   let left = desiredLeft;
   if (
+    opts?.preserveMirrorCenter &&
     usedMirrorFallback &&
     widthBeforeEnforcement &&
     widthBeforeEnforcement > 0 &&
@@ -2252,7 +2254,13 @@ export function buildTimelineFromLayout(
     );
     const logoBox = getLogoBoxFromTemplate(template, "Outro");
     const textEl = findChildByName(outroComp, "Testo-outro") as any;
-    const textBox = getTextBoxFromTemplate(template, "Outro", "Testo-outro");
+    const textBox = getTextBoxFromTemplate(
+      template,
+      "Outro",
+      "Testo-outro",
+      undefined,
+      { preserveMirrorCenter: true }
+    );
     const fontFam = getFontFamilyFromTemplate(template, "Outro", "Testo-outro");
     const fontPath = fontFam ? findFontPath(fontFam) : undefined;
     const outroBgNames = outroBackgroundNameCandidates();

@@ -108,6 +108,42 @@ test("getTextBoxFromTemplate mirrors point text margins", () => {
   const box = getTextBoxFromTemplate(tpl, 0)!;
   const ratioMin = Math.round(Math.min(tpl.width, tpl.width * TEXT.BOX_MIN_WIDTH_RATIO));
   const expectedWidth = Math.max(200, ratioMin);
+  const anchorX = Math.round((tpl.width * 25) / 100);
+  const expectedLeft = Math.max(0, Math.min(tpl.width - expectedWidth, anchorX));
+  assert.equal(box.x, expectedLeft);
+  assert.equal(box.w, expectedWidth);
+  assert.equal(box.y, 20);
+  assert.equal(box.h, 160);
+});
+
+test("getTextBoxFromTemplate preserves mirror center when requested", () => {
+  const tpl: TemplateDoc = {
+    width: 400,
+    height: 200,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "25%",
+            y: "10%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+            x_alignment: "50%",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const box = getTextBoxFromTemplate(tpl, 0, undefined, undefined, {
+    preserveMirrorCenter: true,
+  })!;
+  const ratioMin = Math.round(Math.min(tpl.width, tpl.width * TEXT.BOX_MIN_WIDTH_RATIO));
+  const expectedWidth = Math.max(200, ratioMin);
   const expectedLeft = Math.round((tpl.width - expectedWidth) / 2);
   assert.equal(box.x, expectedLeft);
   assert.equal(box.w, expectedWidth);
