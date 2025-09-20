@@ -1004,9 +1004,10 @@ export function getTextBoxFromTemplate(
   const normAnchor = (value: number | undefined): number => {
     if (typeof value !== "number" || !Number.isFinite(value)) return 0;
     if (value <= 0) return 0;
-    if (value >= 1 && value <= 100) return value / 100;
-    if (value > 100) return 1;
-    return value;
+    if (value <= 1) return value;
+    const ratio = value / 100;
+    if (!Number.isFinite(ratio) || ratio <= 0) return 0;
+    return ratio;
   };
 
   const xAnchor = normAnchor(pctToPx(txtEl.x_anchor, 100));

@@ -75,6 +75,37 @@ test("getTextBoxFromTemplate mirrors point text margins", () => {
   assert.equal(box.h, 160);
 });
 
+test("getTextBoxFromTemplate keeps anchors beyond 100 percent", () => {
+  const tpl: TemplateDoc = {
+    width: 200,
+    height: 100,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "50%",
+            y: "80%",
+            width: "40%",
+            height: "50%",
+            x_anchor: "50%",
+            y_anchor: "150%",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const box = getTextBoxFromTemplate(tpl, 0)!;
+  assert.equal(box.x, 60);
+  assert.equal(box.y, 5);
+  assert.equal(box.w, 80);
+  assert.equal(box.h, 50);
+});
+
 test("getTextBoxFromTemplate clamps to slide bounds", () => {
   const tpl: TemplateDoc = {
     width: 100,
