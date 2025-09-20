@@ -992,14 +992,52 @@ export function getTextBoxFromTemplate(
   const W = tpl.width,
     H = tpl.height;
 
+  const usesPercent = (value: number | string | undefined): boolean => {
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (!trimmed) return false;
+      return trimmed.endsWith("%");
+    }
+    if (typeof value === "number") {
+      const abs = Math.abs(value);
+      return abs > 0 && abs <= 1;
+    }
+    return false;
+  };
+
   const x = pctToPx(txtEl.x, W);
   const y = pctToPx(txtEl.y, H);
   if (typeof x !== "number" || typeof y !== "number") return undefined;
 
-  const rawW = pctToPx(txtEl.width, W) || 0;
-  const rawH = pctToPx(txtEl.height, H) || 0;
-  let w = rawW;
-  let h = rawH;
+  const xUsesPercent = usesPercent(txtEl.x);
+  const yUsesPercent = usesPercent(txtEl.y);
+
+  let rawW = pctToPx(txtEl.width, W);
+  if (
+    typeof txtEl.width === "number" &&
+    Number.isFinite(txtEl.width) &&
+    Math.abs(txtEl.width) > 1 &&
+    Math.abs(txtEl.width) <= 100 &&
+    xUsesPercent
+  ) {
+    rawW = (txtEl.width / 100) * W;
+  }
+
+  let rawH = pctToPx(txtEl.height, H);
+  if (
+    typeof txtEl.height === "number" &&
+    Number.isFinite(txtEl.height) &&
+    Math.abs(txtEl.height) > 1 &&
+    Math.abs(txtEl.height) <= 100 &&
+    yUsesPercent
+  ) {
+    rawH = (txtEl.height / 100) * H;
+  }
+
+  const safeRawW = typeof rawW === "number" && Number.isFinite(rawW) ? rawW : 0;
+  const safeRawH = typeof rawH === "number" && Number.isFinite(rawH) ? rawH : 0;
+  let w = safeRawW;
+  let h = safeRawH;
 
   const normAnchor = (value: number | undefined): number => {
     if (typeof value !== "number" || !Number.isFinite(value)) return 0;
@@ -1013,8 +1051,8 @@ export function getTextBoxFromTemplate(
   const xAnchor = normAnchor(pctToPx(txtEl.x_anchor, 100));
   const yAnchor = normAnchor(pctToPx(txtEl.y_anchor, 100));
 
-  const baseLeft = x - rawW * xAnchor;
-  const baseTop = y - rawH * yAnchor;
+  const baseLeft = x - w * xAnchor;
+  const baseTop = y - h * yAnchor;
 
   if (!(w > 0)) {
     const mirrorLeft = Math.max(0, Math.min(W, baseLeft));

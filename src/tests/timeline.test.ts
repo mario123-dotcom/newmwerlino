@@ -168,6 +168,68 @@ test("getTextBoxFromTemplate treats numeric string widths as percentages", () =>
   assert.equal(box.h, 270);
 });
 
+test("getTextBoxFromTemplate treats integer numeric widths as percentages when coords use percents", () => {
+  const tpl: TemplateDoc = {
+    width: 1920,
+    height: 1080,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "10%",
+            y: "10%",
+            width: 50,
+            height: 25,
+            x_anchor: "0%",
+            y_anchor: "0%",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const box = getTextBoxFromTemplate(tpl, 0)!;
+  assert.equal(box.x, 192); // 10% of 1920
+  assert.equal(box.w, 960); // 50% of 1920
+  assert.equal(box.y, 108); // 10% of 1080
+  assert.equal(box.h, 270); // 25% of 1080
+});
+
+test("getTextBoxFromTemplate keeps numeric pixel widths when coords are absolute", () => {
+  const tpl: TemplateDoc = {
+    width: 1920,
+    height: 1080,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: 200,
+            y: 100,
+            width: 80,
+            height: 40,
+            x_anchor: "0%",
+            y_anchor: "0%",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const box = getTextBoxFromTemplate(tpl, 0)!;
+  assert.equal(box.x, 200);
+  assert.equal(box.w, 80);
+  assert.equal(box.y, 100);
+  assert.equal(box.h, 40);
+});
+
 test("getTextBoxFromTemplate clamps to slide bounds", () => {
   const tpl: TemplateDoc = {
     width: 100,
