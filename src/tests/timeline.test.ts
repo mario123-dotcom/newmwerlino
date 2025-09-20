@@ -39,7 +39,7 @@ test("getTextBoxFromTemplate uses anchors and keeps box inside canvas", () => {
     ],
   };
   const box = getTextBoxFromTemplate(tpl, 0)!;
-  assert.equal(box.x, 20);
+  assert.equal(box.x, 40);
   assert.equal(box.y, 30);
   assert.equal(box.w, 60);
   assert.equal(box.h, 40);
@@ -100,7 +100,7 @@ test("getTextBoxFromTemplate keeps anchors beyond 100 percent", () => {
   } as any;
 
   const box = getTextBoxFromTemplate(tpl, 0)!;
-  assert.equal(box.x, 60);
+  assert.equal(box.x, 100);
   assert.equal(box.y, 5);
   assert.equal(box.w, 80);
   assert.equal(box.h, 50);

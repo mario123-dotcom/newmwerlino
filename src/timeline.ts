@@ -1069,7 +1069,12 @@ export function getTextBoxFromTemplate(
     }
   }
 
-  let left = x - w * xAnchor;
+  let left: number;
+  if (w > 0) {
+    left = x;
+  } else {
+    left = baseLeft;
+  }
   let top = y - h * yAnchor;
 
   if (w > 0) left = Math.max(0, Math.min(W - w, left));
