@@ -1160,16 +1160,22 @@ export const APPROX_CHAR_WIDTH_RATIO = 0.56;
 const MIN_FONT_SIZE = 24;
 const MAX_FONT_LAYOUT_ITERATIONS = 6;
 
-function scaleTemplateFontPx(value: number | undefined): number | undefined {
+function scaleTemplateFontPx(
+  value: number | undefined,
+  multiplier = TEXT.TEMPLATE_FONT_SCALE
+): number | undefined {
   if (typeof value !== "number" || !Number.isFinite(value) || !(value > 0)) {
     return value;
   }
-  const scale = TEXT.TEMPLATE_FONT_SCALE;
-  if (typeof scale !== "number" || !Number.isFinite(scale) || !(scale > 0)) {
+  if (
+    typeof multiplier !== "number" ||
+    !Number.isFinite(multiplier) ||
+    !(multiplier > 0)
+  ) {
     return value;
   }
-  if (Math.abs(scale - 1) < 1e-6) return value;
-  return value * scale;
+  if (Math.abs(multiplier - 1) < 1e-6) return value;
+  return value * multiplier;
 }
 
 function clamp01(value: number): number {
@@ -1229,13 +1235,27 @@ function deriveFontSizing(
   element: TemplateElement | undefined,
   fallback: number,
   W: number,
-  H: number
+  H: number,
+  opts?: { scaleMultiplier?: number }
 ): FontSizingInfo {
-  const fallbackFont =
+  const multiplier = opts?.scaleMultiplier ?? 1;
+  const applyScale = (value: number | undefined): number | undefined =>
+    scaleTemplateFontPx(value, multiplier);
+
+  const fallbackBase =
     Number.isFinite(fallback) && fallback > 0 ? fallback : MIN_FONT_SIZE;
-  const explicit = scaleTemplateFontPx(lenToPx((element as any)?.font_size, W, H));
-  const min = scaleTemplateFontPx(lenToPx((element as any)?.font_size_minimum, W, H));
-  const max = scaleTemplateFontPx(lenToPx((element as any)?.font_size_maximum, W, H));
+  let fallbackFont = applyScale(fallbackBase);
+  if (
+    typeof fallbackFont !== "number" ||
+    !Number.isFinite(fallbackFont) ||
+    !(fallbackFont > 0)
+  ) {
+    fallbackFont = fallbackBase;
+  }
+
+  const explicit = applyScale(lenToPx((element as any)?.font_size, W, H));
+  const min = applyScale(lenToPx((element as any)?.font_size_minimum, W, H));
+  const max = applyScale(lenToPx((element as any)?.font_size_maximum, W, H));
 
   const clamp = (value: number): number => {
     let next = Number.isFinite(value) && value > 0 ? value : fallbackFont;
@@ -1527,13 +1547,16 @@ function buildCopyrightBlock(
   if (!box) return undefined;
 
   const explicitFont = scaleTemplateFontPx(
-    lenToPx((element as any)?.font_size, videoW, videoH)
+    lenToPx((element as any)?.font_size, videoW, videoH),
+    1
   );
   const minFontPx = scaleTemplateFontPx(
-    lenToPx((element as any)?.font_size_minimum, videoW, videoH)
+    lenToPx((element as any)?.font_size_minimum, videoW, videoH),
+    1
   );
   const maxFontPx = scaleTemplateFontPx(
-    lenToPx((element as any)?.font_size_maximum, videoW, videoH)
+    lenToPx((element as any)?.font_size_maximum, videoW, videoH),
+    1
   );
   const clampFontSize = (value: number): number => {
     let next = Number.isFinite(value) && value > 0 ? value : MIN_FONT_SIZE;
@@ -1815,7 +1838,8 @@ export function buildTimelineFromLayout(
       txtEl as TemplateElement | undefined,
       baseBlock.fontSize ?? MIN_FONT_SIZE,
       videoW,
-      videoH
+      videoH,
+      { scaleMultiplier: TEXT.TEMPLATE_FONT_SCALE }
     );
     const initialFontSize = fontSizing.initial;
     baseBlock.fontSize = initialFontSize;
@@ -2104,7 +2128,8 @@ export function buildTimelineFromLayout(
         textEl as TemplateElement | undefined,
         baseOut.fontSize ?? MIN_FONT_SIZE,
         videoW,
-        videoH
+        videoH,
+        { scaleMultiplier: 1 }
       );
       const initialOutSize = fontSizing.initial;
       baseOut.fontSize = initialOutSize;

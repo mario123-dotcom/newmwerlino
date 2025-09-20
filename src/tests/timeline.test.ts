@@ -276,6 +276,214 @@ test("buildTimelineFromLayout scales template font size", () => {
   }
 });
 
+test("buildTimelineFromLayout scales fallback font size for slides", () => {
+  const tpl: TemplateDoc = {
+    width: 800,
+    height: 600,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 2,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "50%",
+            y: "50%",
+            x_anchor: "50%",
+            y_anchor: "50%",
+            line_height: "100%",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const prevScale = TEXT.TEMPLATE_FONT_SCALE;
+  const prevMinRatio = TEXT.BOX_MIN_WIDTH_RATIO;
+  const prevImages = paths.images;
+  const prevTts = paths.tts;
+  paths.images = "/tmp/no_img";
+  paths.tts = "/tmp/no_tts";
+
+  try {
+    (TEXT as any).BOX_MIN_WIDTH_RATIO = 0;
+    (TEXT as any).TEMPLATE_FONT_SCALE = 1;
+    const baseSlides = buildTimelineFromLayout({ "Testo-0": "ciao" }, tpl, {
+      videoW: 800,
+      videoH: 600,
+      fps: 25,
+      defaultDur: 2,
+    });
+    const baseSlide = baseSlides[0];
+    assert.ok(baseSlide);
+    const baseFont = baseSlide.texts?.[0]?.fontSize ?? 0;
+
+    (TEXT as any).TEMPLATE_FONT_SCALE = prevScale;
+    const scaledSlides = buildTimelineFromLayout({ "Testo-0": "ciao" }, tpl, {
+      videoW: 800,
+      videoH: 600,
+      fps: 25,
+      defaultDur: 2,
+    });
+    const scaledSlide = scaledSlides[0];
+    assert.ok(scaledSlide);
+    const scaledFont = scaledSlide.texts?.[0]?.fontSize ?? 0;
+
+    assert.ok(baseFont > 0);
+    assert.ok(
+      scaledFont > baseFont,
+      `expected scaled font ${scaledFont} to exceed baseline ${baseFont}`
+    );
+  } finally {
+    (TEXT as any).BOX_MIN_WIDTH_RATIO = prevMinRatio;
+    (TEXT as any).TEMPLATE_FONT_SCALE = prevScale;
+    paths.images = prevImages;
+    paths.tts = prevTts;
+  }
+});
+
+test("buildTimelineFromLayout keeps outro font size from template", () => {
+  const tpl: TemplateDoc = {
+    width: 600,
+    height: 400,
+    elements: [
+      {
+        type: "composition",
+        name: "Outro",
+        duration: 2,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-outro",
+            x: "10%",
+            y: "20%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+            font_size: 36,
+            line_height: "100%",
+            text: "CIAO",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const prevScale = TEXT.TEMPLATE_FONT_SCALE;
+  const prevImages = paths.images;
+  const prevTts = paths.tts;
+  paths.images = "/tmp/no_img";
+  paths.tts = "/tmp/no_tts";
+
+  try {
+    (TEXT as any).TEMPLATE_FONT_SCALE = 1;
+    const baseSlides = buildTimelineFromLayout({}, tpl, {
+      videoW: 600,
+      videoH: 400,
+      fps: 25,
+      defaultDur: 2,
+    });
+    const baseSlide = baseSlides[baseSlides.length - 1];
+    assert.ok(baseSlide);
+    const baseFont = baseSlide.texts?.[0]?.fontSize ?? 0;
+
+    (TEXT as any).TEMPLATE_FONT_SCALE = prevScale;
+    const scaledSlides = buildTimelineFromLayout({}, tpl, {
+      videoW: 600,
+      videoH: 400,
+      fps: 25,
+      defaultDur: 2,
+    });
+    const scaledSlide = scaledSlides[scaledSlides.length - 1];
+    assert.ok(scaledSlide);
+    const scaledFont = scaledSlide.texts?.[0]?.fontSize ?? 0;
+
+    assert.equal(scaledFont, baseFont);
+  } finally {
+    (TEXT as any).TEMPLATE_FONT_SCALE = prevScale;
+    paths.images = prevImages;
+    paths.tts = prevTts;
+  }
+});
+
+test("buildTimelineFromLayout keeps copyright font size from template", () => {
+  const tpl: TemplateDoc = {
+    width: 800,
+    height: 600,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 2,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "10%",
+            y: "20%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+          },
+          {
+            type: "text",
+            name: "Copyright-0",
+            x: "5%",
+            y: "90%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+            font_size: 18,
+            line_height: "100%",
+            text: "© TEST",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const prevScale = TEXT.TEMPLATE_FONT_SCALE;
+  const prevImages = paths.images;
+  const prevTts = paths.tts;
+  paths.images = "/tmp/no_img";
+  paths.tts = "/tmp/no_tts";
+
+  try {
+    (TEXT as any).TEMPLATE_FONT_SCALE = 1;
+    const baseSlides = buildTimelineFromLayout({ "Testo-0": "ciao" }, tpl, {
+      videoW: 800,
+      videoH: 600,
+      fps: 25,
+      defaultDur: 2,
+    });
+    const baseSlide = baseSlides[0];
+    assert.ok(baseSlide);
+    const baseCopyright = baseSlide.texts?.find((block) => block.text === "© TEST");
+    assert.ok(baseCopyright);
+    const baseFont = baseCopyright!.fontSize ?? 0;
+
+    (TEXT as any).TEMPLATE_FONT_SCALE = prevScale;
+    const scaledSlides = buildTimelineFromLayout({ "Testo-0": "ciao" }, tpl, {
+      videoW: 800,
+      videoH: 600,
+      fps: 25,
+      defaultDur: 2,
+    });
+    const scaledSlide = scaledSlides[0];
+    assert.ok(scaledSlide);
+    const scaledCopyright = scaledSlide.texts?.find(
+      (block) => block.text === "© TEST"
+    );
+    assert.ok(scaledCopyright);
+    const scaledFont = scaledCopyright!.fontSize ?? 0;
+
+    assert.equal(scaledFont, baseFont);
+  } finally {
+    (TEXT as any).TEMPLATE_FONT_SCALE = prevScale;
+    paths.images = prevImages;
+    paths.tts = prevTts;
+  }
+});
+
 test("buildTimelineFromLayout centers outro point text", () => {
   const tpl: TemplateDoc = {
     width: 600,
