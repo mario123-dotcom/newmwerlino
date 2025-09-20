@@ -1550,6 +1550,7 @@ function buildCopyrightBlock(
       textWidth = fontSize;
     }
     const maxAllowedWidth = box.w && box.w > 0 ? box.w : textWidth;
+    const backgroundWidth = maxAllowedWidth;
     textWidth = Math.min(textWidth, maxAllowedWidth);
     const lineCount = lines.length || 1;
     const totalSpacing = Math.max(0, lineCount - 1) * Math.max(0, spacing);
@@ -1557,7 +1558,7 @@ function buildCopyrightBlock(
     const rect = clampRect(
       block.x - padX,
       y - padY,
-      textWidth + padX * 2,
+      backgroundWidth + padX * 2,
       textHeight + padY * 2,
       videoW,
       videoH

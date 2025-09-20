@@ -514,6 +514,62 @@ test("buildTimelineFromLayout adds extra padding to intro background", () => {
   }
 });
 
+test("buildTimelineFromLayout keeps template background width for short text", () => {
+  const tpl: TemplateDoc = {
+    width: 1920,
+    height: 1080,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 2,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "40%",
+            y: "90%",
+            width: "50%",
+            height: "40%",
+            x_anchor: "50%",
+            y_anchor: "100%",
+            line_height: "200%",
+            background_color: "rgba(0,0,0,0.8)",
+            font_family: "Archivo",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const box = getTextBoxFromTemplate(tpl, 0)!;
+  const prevImages = paths.images;
+  const prevTts = paths.tts;
+  paths.images = "/tmp/no_img";
+  paths.tts = "/tmp/no_tts";
+
+  try {
+    const slides = buildTimelineFromLayout({ "Testo-0": "ciao" }, tpl, {
+      videoW: 1920,
+      videoH: 1080,
+      fps: 25,
+      defaultDur: 2,
+    });
+    const first = slides[0];
+    assert.ok(first);
+    const primary = first.texts?.[0];
+    assert.ok(primary);
+    assert.ok(primary?.background);
+    const pad = Math.round((primary.fontSize ?? 0) * TEXT.BOX_PAD_FACTOR);
+    assert.equal(primary.background?.x, box.x - pad);
+    assert.equal(primary.background?.y, box.y - pad);
+    assert.equal(primary.background?.width, box.w + pad * 2);
+  } finally {
+    paths.images = prevImages;
+    paths.tts = prevTts;
+  }
+});
+
 test("wrapText splits by length", () => {
   const lines = wrapText("uno due tre quattro cinque", 7);
   assert.deepEqual(lines, ["uno due", "tre", "quattro", "cinque"]);
