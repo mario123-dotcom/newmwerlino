@@ -1063,6 +1063,18 @@ export function getTextBoxFromTemplate(
     }
   }
 
+  const minTemplateWidthRatio = TEXT.BOX_MIN_WIDTH_RATIO;
+  if (minTemplateWidthRatio > 0) {
+    const minTemplateWidth = Math.round(Math.min(W, W * minTemplateWidthRatio));
+    if (minTemplateWidth > 0) {
+      if (!(w > 0) || w < minTemplateWidth) {
+        w = minTemplateWidth;
+      } else if (w > W) {
+        w = W;
+      }
+    }
+  }
+
   let left = x - w * xAnchor;
   let top = y - h * yAnchor;
 
