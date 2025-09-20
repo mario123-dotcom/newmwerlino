@@ -1002,6 +1002,7 @@ export function getTextBoxFromTemplate(
   let w = rawW;
   let h = rawH;
 
+  const alignX = parseAlignmentFactor((txtEl as any)?.x_alignment);
   const templateFont = lenToPx((txtEl as any)?.font_size, W, H);
   const templateLetterSpacing = parseLetterSpacing(
     (txtEl as any)?.letter_spacing,
@@ -1053,13 +1054,22 @@ export function getTextBoxFromTemplate(
   const baseLeft = x - rawW * xAnchor;
   const baseTop = y - rawH * yAnchor;
 
-  if (!(w > 0)) {
+  let mirroredWidth: number | undefined;
+  if (!(rawW > 0)) {
     const mirrorLeft = Math.max(0, Math.min(W, baseLeft));
     const mirrorWidth = W - mirrorLeft * 2;
     if (mirrorWidth > 0) {
-      w = mirrorWidth;
+      mirroredWidth = mirrorWidth;
     }
   }
+  if (mirroredWidth != null) {
+    if (alignX != null && Math.abs(alignX - 0.5) <= 0.001) {
+      w = Math.max(w > 0 ? w : 0, mirroredWidth);
+    } else if (!(w > 0)) {
+      w = mirroredWidth;
+    }
+  }
+
   if (!(h > 0)) {
     const mirrorTop = Math.max(0, Math.min(H, baseTop));
     const mirrorHeight = H - mirrorTop * 2;

@@ -114,6 +114,36 @@ test("getTextBoxFromTemplate expands zero-width boxes using override text", () =
   assert.equal(box.x, expectedX);
 });
 
+test("getTextBoxFromTemplate preserves mirrored width for centered overrides", () => {
+  const tpl: TemplateDoc = {
+    width: 800,
+    height: 600,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "25%",
+            y: "50%",
+            x_anchor: "0%",
+            y_anchor: "50%",
+            x_alignment: "50%",
+            font_size: 80,
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const override = "CIAO";
+  const box = getTextBoxFromTemplate(tpl, 0, undefined, { textOverride: override })!;
+  assert.equal(box.x, 200);
+  assert.equal(box.w, 400);
+});
+
 test("getTextBoxFromTemplate keeps anchors beyond 100 percent", () => {
   const tpl: TemplateDoc = {
     width: 200,
