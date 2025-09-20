@@ -1123,11 +1123,13 @@ export function getTextBoxFromTemplate(
   }
   let top = y - h * yAnchor;
 
+  const templateProvidesBox = rawW > 0;
   const wantsLeftMargin =
     !opts?.preserveMirrorCenter &&
     TEXT.LEFT_MARGIN_P > 0 &&
     W > 0 &&
-    (Number.isFinite(xAnchor) ? xAnchor <= 0.01 : true);
+    (Number.isFinite(xAnchor) ? xAnchor <= 0.01 : true) &&
+    (!templateProvidesBox || usedMirrorFallback);
   const rawMargin = wantsLeftMargin ? Math.round(W * TEXT.LEFT_MARGIN_P) : 0;
   const leftMarginPx = rawMargin > 0 ? Math.min(rawMargin, W) : 0;
 
