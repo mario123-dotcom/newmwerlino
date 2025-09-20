@@ -120,7 +120,13 @@ export function findChildByName(
 /** Converte percentuali o stringhe in pixel, altrimenti restituisce numeri come sono. */
 export function pctToPx(val: number | string | undefined, base: number): number | undefined {
   if (val == null) return undefined;
-  if (typeof val === "number") return val;
+  if (typeof val === "number") {
+    if (!Number.isFinite(val)) return undefined;
+    if (base > 0 && Math.abs(val) > 0 && Math.abs(val) <= 1) {
+      return val * base;
+    }
+    return val;
+  }
   const s = String(val).trim();
   if (s.endsWith("%")) {
     const n = parseFloat(s.slice(0, -1));
@@ -128,7 +134,11 @@ export function pctToPx(val: number | string | undefined, base: number): number 
     return (n / 100) * base;
   }
   const n = parseFloat(s);
-  return Number.isFinite(n) ? n : undefined;
+  if (!Number.isFinite(n)) return undefined;
+  if (base > 0 && Math.abs(n) > 0 && Math.abs(n) <= 1) {
+    return n * base;
+  }
+  return n;
 }
 
 /** Piccolo helper per avere un font di fallback cross-platform */
