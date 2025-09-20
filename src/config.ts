@@ -31,14 +31,6 @@ export const TEXT = {
   CHAR_WIDTH_K: 0.55, // 0.52–0.58 a seconda del font
   /** padding extra per gli sfondi del testo (in multipli del font size) */
   BOX_PAD_FACTOR: 0.30,
-  /** larghezza minima dello sfondo del testo rispetto alla larghezza del video */
-  BOX_MIN_WIDTH_RATIO: 0.75,
-  /** fattore di scala applicato ai font letti dal template per avvicinarsi al layout originale */
-  TEMPLATE_FONT_SCALE: 2,
-  /** numero massimo di caratteri desiderato per riga prima di forzare un nuovo wrap */
-  MAX_CHARS_PER_LINE: 28,
-  /** tolleranza percentuale oltre il limite preferito per consentire una distribuzione più equilibrata delle righe */
-  WRAP_OVERSHOOT_RATIO: 0.12,
 };
 
 /** Scale di base (fontsize ≈ scale * videoH) */
