@@ -181,37 +181,68 @@ function applyExtraBackgroundPadding(
   block: TextBlockSpec,
   fontPx: number | undefined,
   maxW: number,
-  maxH: number
+  maxH: number,
+  opts: { skipMinWidth?: boolean } = {}
 ): number {
-  if (!(fontPx && fontPx > 0)) return 0;
-  const extra = Math.round(fontPx * TEXT.BOX_PAD_FACTOR);
-  if (!(extra > 0)) return 0;
+  let extra = 0;
+  if (fontPx && fontPx > 0) {
+    extra = Math.round(fontPx * TEXT.BOX_PAD_FACTOR);
+    if (extra > 0) {
+      if (block.background) {
+        const grown = clampRect(
+          block.background.x - extra,
+          block.background.y - extra,
+          block.background.width + extra * 2,
+          block.background.height + extra * 2,
+          maxW,
+          maxH
+        );
+        if (grown) {
+          block.background = {
+            ...block.background,
+            x: grown.x,
+            y: grown.y,
+            width: grown.w,
+            height: grown.h,
+          };
+        }
+      }
 
-  if (block.background) {
-    const grown = clampRect(
-      block.background.x - extra,
-      block.background.y - extra,
-      block.background.width + extra * 2,
-      block.background.height + extra * 2,
-      maxW,
-      maxH
-    );
-    if (grown) {
-      block.background = {
-        ...block.background,
-        x: grown.x,
-        y: grown.y,
-        width: grown.w,
-        height: grown.h,
-      };
+      if (block.box) {
+        const prev = block.boxBorderW ?? 0;
+        block.boxBorderW = prev + extra;
+      } else if (typeof block.boxBorderW === "number") {
+        block.boxBorderW = block.boxBorderW + extra;
+      }
     }
   }
 
-  if (block.box) {
-    const prev = block.boxBorderW ?? 0;
-    block.boxBorderW = prev + extra;
-  } else if (typeof block.boxBorderW === "number") {
-    block.boxBorderW = block.boxBorderW + extra;
+  if (block.background && !opts.skipMinWidth) {
+    const minWidth = Math.round(maxW * TEXT.BOX_MIN_WIDTH_RATIO);
+    if (minWidth > 0) {
+      const targetWidth = Math.min(maxW, Math.max(minWidth, block.background.width));
+      if (targetWidth > block.background.width) {
+        const desiredLeft = block.background.x;
+        const boundedLeft = Math.max(0, Math.min(desiredLeft, maxW - targetWidth));
+        const widened = clampRect(
+          boundedLeft,
+          block.background.y,
+          targetWidth,
+          block.background.height,
+          maxW,
+          maxH
+        );
+        if (widened) {
+          block.background = {
+            ...block.background,
+            x: widened.x,
+            y: widened.y,
+            width: widened.w,
+            height: widened.h,
+          };
+        }
+      }
+    }
   }
 
   return extra;
@@ -976,7 +1007,9 @@ function defaultTextBlock(x = 120, y = 160): TextBlockSpec {
 export function getTextBoxFromTemplate(
   tpl: TemplateDoc,
   slideIndexOrName: number | string,
-  textName?: string
+  textName?: string,
+  minWidthPx?: number,
+  opts?: { preserveMirrorCenter?: boolean }
 ): { x: number; y: number; w: number; h: number } | undefined {
   const compName =
     typeof slideIndexOrName === "number"
@@ -1016,11 +1049,13 @@ export function getTextBoxFromTemplate(
   const baseLeft = x - rawW * xAnchor;
   const baseTop = y - rawH * yAnchor;
 
+  let usedMirrorFallback = false;
   if (!(w > 0)) {
     const mirrorLeft = Math.max(0, Math.min(W, baseLeft));
     const mirrorWidth = W - mirrorLeft * 2;
     if (mirrorWidth > 0) {
       w = mirrorWidth;
+      usedMirrorFallback = true;
     }
   }
   if (!(h > 0)) {
@@ -1031,11 +1066,82 @@ export function getTextBoxFromTemplate(
     }
   }
 
-  let left = x - w * xAnchor;
+  const widthBeforeEnforcement = w > 0 ? w : undefined;
+  const leftBeforeEnforcement =
+    widthBeforeEnforcement &&
+    typeof x === "number" &&
+    Number.isFinite(x)
+      ? x - widthBeforeEnforcement * xAnchor
+      : undefined;
+
+  const ratioMin =
+    TEXT.BOX_MIN_WIDTH_RATIO > 0
+      ? Math.round(Math.min(W, W * TEXT.BOX_MIN_WIDTH_RATIO))
+      : 0;
+  const minWidthRaw = typeof minWidthPx === "number" ? minWidthPx : 0;
+  const explicitMin =
+    Number.isFinite(minWidthRaw) && minWidthRaw > 0
+      ? Math.min(W, Math.round(minWidthRaw))
+      : 0;
+  const enforcedMin = Math.max(explicitMin, ratioMin, 0);
+
+  if (!(w > 0)) {
+    if (enforcedMin > 0) {
+      w = enforcedMin;
+    }
+  } else if (enforcedMin > 0 && w < enforcedMin) {
+    w = enforcedMin;
+  }
+
+  if (w > W) {
+    w = W;
+  }
+
+  const anchorLeft =
+    typeof x === "number" && Number.isFinite(x) ? x - w * xAnchor : undefined;
+  const desiredLeft = Number.isFinite(anchorLeft)
+    ? (anchorLeft as number)
+    : Number.isFinite(baseLeft)
+    ? (baseLeft as number)
+    : typeof x === "number" && Number.isFinite(x)
+    ? x - w * xAnchor
+    : 0;
+  let left = desiredLeft;
+  if (
+    opts?.preserveMirrorCenter &&
+    usedMirrorFallback &&
+    widthBeforeEnforcement &&
+    widthBeforeEnforcement > 0 &&
+    typeof leftBeforeEnforcement === "number" &&
+    Number.isFinite(leftBeforeEnforcement) &&
+    w > widthBeforeEnforcement
+  ) {
+    const center = leftBeforeEnforcement + widthBeforeEnforcement / 2;
+    if (Number.isFinite(center)) {
+      left = center - w / 2;
+    }
+  }
   let top = y - h * yAnchor;
 
-  if (w > 0) left = Math.max(0, Math.min(W - w, left));
-  else left = Math.max(0, Math.min(W - 10, left));
+  const templateProvidesBox = rawW > 0;
+  const wantsLeftMargin =
+    !opts?.preserveMirrorCenter &&
+    TEXT.LEFT_MARGIN_P > 0 &&
+    W > 0 &&
+    (Number.isFinite(xAnchor) ? xAnchor <= 0.01 : true) &&
+    (!templateProvidesBox || usedMirrorFallback);
+  const rawMargin = wantsLeftMargin ? Math.round(W * TEXT.LEFT_MARGIN_P) : 0;
+  const leftMarginPx = rawMargin > 0 ? Math.min(rawMargin, W) : 0;
+
+  if (w > 0) {
+    const maxLeft = Math.max(0, W - w);
+    const minLeft = leftMarginPx > 0 ? Math.min(leftMarginPx, maxLeft) : 0;
+    left = Math.max(minLeft, Math.min(maxLeft, left));
+  } else {
+    const maxLeft = Math.max(0, W - 10);
+    const minLeft = leftMarginPx > 0 ? Math.min(leftMarginPx, maxLeft) : 0;
+    left = Math.max(minLeft, Math.min(maxLeft, left));
+  }
   if (h > 0) top = Math.max(0, Math.min(H - h, top));
   else top = Math.max(0, Math.min(H - 10, top));
 
@@ -1105,6 +1211,24 @@ export const APPROX_CHAR_WIDTH_RATIO = 0.56;
 const MIN_FONT_SIZE = 24;
 const MAX_FONT_LAYOUT_ITERATIONS = 6;
 
+function scaleTemplateFontPx(
+  value: number | undefined,
+  multiplier = TEXT.TEMPLATE_FONT_SCALE
+): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value) || !(value > 0)) {
+    return value;
+  }
+  if (
+    typeof multiplier !== "number" ||
+    !Number.isFinite(multiplier) ||
+    !(multiplier > 0)
+  ) {
+    return value;
+  }
+  if (Math.abs(multiplier - 1) < 1e-6) return value;
+  return value * multiplier;
+}
+
 function clamp01(value: number): number {
   if (!Number.isFinite(value)) return 0;
   if (value <= 0) return 0;
@@ -1133,7 +1257,11 @@ function maxCharsForWidth(width: number, fontSize: number): number {
   if (!(width > 0) || !(fontSize > 0)) return DEFAULT_CHARS_PER_LINE;
   const approxChar = fontSize * APPROX_CHAR_WIDTH_RATIO;
   if (!(approxChar > 0)) return DEFAULT_CHARS_PER_LINE;
-  const maxChars = Math.floor(width / approxChar);
+  let maxChars = Math.floor(width / approxChar);
+  const targetWrap = Math.floor(TEXT.MAX_CHARS_PER_LINE ?? 0);
+  if (targetWrap > 0) {
+    maxChars = Math.min(maxChars, targetWrap);
+  }
   return Math.max(1, maxChars || 0);
 }
 
@@ -1162,13 +1290,27 @@ function deriveFontSizing(
   element: TemplateElement | undefined,
   fallback: number,
   W: number,
-  H: number
+  H: number,
+  opts?: { scaleMultiplier?: number }
 ): FontSizingInfo {
-  const fallbackFont =
+  const multiplier = opts?.scaleMultiplier ?? 1;
+  const applyScale = (value: number | undefined): number | undefined =>
+    scaleTemplateFontPx(value, multiplier);
+
+  const fallbackBase =
     Number.isFinite(fallback) && fallback > 0 ? fallback : MIN_FONT_SIZE;
-  const explicit = lenToPx((element as any)?.font_size, W, H);
-  const min = lenToPx((element as any)?.font_size_minimum, W, H);
-  const max = lenToPx((element as any)?.font_size_maximum, W, H);
+  let fallbackFont = applyScale(fallbackBase);
+  if (
+    typeof fallbackFont !== "number" ||
+    !Number.isFinite(fallbackFont) ||
+    !(fallbackFont > 0)
+  ) {
+    fallbackFont = fallbackBase;
+  }
+
+  const explicit = applyScale(lenToPx((element as any)?.font_size, W, H));
+  const min = applyScale(lenToPx((element as any)?.font_size_minimum, W, H));
+  const max = applyScale(lenToPx((element as any)?.font_size_maximum, W, H));
 
   const clamp = (value: number): number => {
     let next = Number.isFinite(value) && value > 0 ? value : fallbackFont;
@@ -1306,24 +1448,159 @@ function applyHorizontalAlignment(
   block.x = clamped;
 }
 
-export function wrapText(text: string, maxPerLine: number): string[] {
-  const words = text.split(/\s+/).filter(Boolean);
+function greedyWrap(words: string[], limit: number): string[] {
   const lines: string[] = [];
-  let line = "";
-  for (const w of words) {
-    const candidate = line ? `${line} ${w}` : w;
-    if (candidate.length > maxPerLine && line) {
-      lines.push(line);
-      line = w;
-    } else if (candidate.length > maxPerLine) {
-      lines.push(w);
-      line = "";
+  let current = "";
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (candidate.length > limit && current) {
+      lines.push(current);
+      current = word;
+    } else if (candidate.length > limit) {
+      lines.push(word);
+      current = "";
     } else {
-      line = candidate;
+      current = candidate;
     }
   }
-  if (line) lines.push(line);
+  if (current) lines.push(current);
   return lines;
+}
+
+function computeLinePenalty(
+  line: string,
+  len: number,
+  preferred: number,
+  limit: number,
+  isLast: boolean
+): number {
+  if (!(len > 0)) return Number.POSITIVE_INFINITY;
+  if (len > limit) return Number.POSITIVE_INFINITY;
+
+  const safePreferred = Math.max(1, preferred);
+  const slackBase = safePreferred - Math.min(len, safePreferred);
+  const slack = slackBase > 0 ? slackBase : 0;
+
+  let penalty = isLast ? slack * slack * 0.25 : slack * slack;
+
+  if (len > safePreferred) {
+    const overflow = len - safePreferred;
+    penalty += Math.pow(Math.max(overflow * 4, 1), 2);
+  }
+
+  if (!isLast) {
+    const lastChar = line[line.length - 1];
+    if (lastChar && /[,;:]/.test(lastChar)) {
+      penalty += safePreferred * safePreferred * 0.2;
+    }
+
+    if (slack >= Math.max(2, Math.floor(safePreferred * 0.35))) {
+      penalty += Math.pow(slack + 1.5, 2);
+    }
+  } else if (line.length && /[,;:]$/.test(line)) {
+    penalty += safePreferred * safePreferred * 0.1;
+  }
+
+  return penalty;
+}
+
+function balancedWrap(words: string[], preferred: number, limit: number): string[] | undefined {
+  const n = words.length;
+  if (!n) return [];
+
+  const dp = new Array<number>(n + 1).fill(Number.POSITIVE_INFINITY);
+  const prevBreak = new Array<number>(n + 1).fill(-1);
+  dp[0] = 0;
+
+  for (let i = 0; i < n; i++) {
+    if (!Number.isFinite(dp[i])) continue;
+    let line = "";
+    for (let j = i; j < n; j++) {
+      line = line ? `${line} ${words[j]}` : words[j];
+      const len = line.length;
+      if (len > limit) break;
+      const isLast = j === n - 1;
+      const penalty = computeLinePenalty(line, len, preferred, limit, isLast);
+      if (!Number.isFinite(penalty)) continue;
+      const cost = dp[i] + penalty;
+      if (cost < dp[j + 1]) {
+        dp[j + 1] = cost;
+        prevBreak[j + 1] = i;
+      }
+    }
+  }
+
+  if (!Number.isFinite(dp[n])) return undefined;
+
+  const lines: string[] = [];
+  let idx = n;
+  while (idx > 0) {
+    const start = prevBreak[idx];
+    if (start < 0 || start >= idx) return undefined;
+    const segment = words.slice(start, idx).join(" ");
+    lines.push(segment);
+    idx = start;
+  }
+
+  lines.reverse();
+  return lines.length ? lines : undefined;
+}
+
+function rebalanceTrailingShortWord(lines: string[], limit: number): string[] {
+  let result = [...lines];
+  let changed = false;
+
+  while (result.length >= 2) {
+    const lastIdx = result.length - 1;
+    const lastLine = result[lastIdx];
+    const prevLine = result[lastIdx - 1];
+    if (!lastLine || !prevLine) break;
+
+    const words = lastLine.split(/\s+/).filter(Boolean);
+    if (!words.length) break;
+    const first = words[0];
+    if (!first) break;
+    const remainderWords = words.slice(1);
+    const isShortPreposition = first.length <= 3 && remainderWords.length <= 1;
+    const isMoveCandidate =
+      (first.length >= 4 && first.length <= 8 && !/^[0-9.,:;!?-]+$/.test(first)) || isShortPreposition;
+    if (!isMoveCandidate) break;
+
+    const candidatePrev = `${prevLine} ${first}`;
+    if (candidatePrev.length > limit) break;
+
+    const remainder = remainderWords.join(" ");
+    result[lastIdx - 1] = candidatePrev;
+    if (remainder) {
+      result[lastIdx] = remainder;
+    } else {
+      result.pop();
+    }
+    changed = true;
+  }
+
+  return changed ? result : lines;
+}
+
+export function wrapText(text: string, maxPerLine: number): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+
+  const preferred = Math.max(1, Math.floor(maxPerLine));
+  const rawOvershoot = TEXT.WRAP_OVERSHOOT_RATIO;
+  const overshootRatio =
+    typeof rawOvershoot === "number" && Number.isFinite(rawOvershoot)
+      ? Math.max(0.05, Math.min(0.2, rawOvershoot))
+      : 0.12;
+  const extra = Math.max(2, Math.round(preferred * overshootRatio));
+  const limit = Math.max(preferred + extra, words.reduce((m, w) => Math.max(m, w.length), 0));
+
+  const balanced = balancedWrap(words, preferred, limit);
+  if (balanced && balanced.length) {
+    return rebalanceTrailingShortWord(balanced, limit);
+  }
+
+  return greedyWrap(words, limit);
 }
 
 function linesEqual(a: string[], b: string[]): boolean {
@@ -1459,9 +1736,18 @@ function buildCopyrightBlock(
   const box = getTextBoxFromTemplate(template, compName, elementName);
   if (!box) return undefined;
 
-  const explicitFont = lenToPx((element as any)?.font_size, videoW, videoH);
-  const minFontPx = lenToPx((element as any)?.font_size_minimum, videoW, videoH);
-  const maxFontPx = lenToPx((element as any)?.font_size_maximum, videoW, videoH);
+  const explicitFont = scaleTemplateFontPx(
+    lenToPx((element as any)?.font_size, videoW, videoH),
+    1
+  );
+  const minFontPx = scaleTemplateFontPx(
+    lenToPx((element as any)?.font_size_minimum, videoW, videoH),
+    1
+  );
+  const maxFontPx = scaleTemplateFontPx(
+    lenToPx((element as any)?.font_size_maximum, videoW, videoH),
+    1
+  );
   const clampFontSize = (value: number): number => {
     let next = Number.isFinite(value) && value > 0 ? value : MIN_FONT_SIZE;
     if (typeof maxFontPx === "number" && Number.isFinite(maxFontPx) && maxFontPx > 0) {
@@ -1540,28 +1826,45 @@ function buildCopyrightBlock(
   };
 
   if (bg) {
-    const approxCharWidth = fontSize * APPROX_CHAR_WIDTH_RATIO;
-    const longestLine = lines.reduce((max, line) => Math.max(max, line.length), 0);
-    let textWidth =
-      longestLine > 0 && approxCharWidth > 0
-        ? longestLine * approxCharWidth
-        : approxCharWidth;
-    if (!(textWidth > 0)) {
-      textWidth = fontSize;
+    // Wrap the copyright background tightly around the rendered text instead of
+    // stretching across the full template width.
+    const prefersTemplateBox = false;
+    let rect = prefersTemplateBox
+      ? clampRect(
+          box.x - padX,
+          box.y - padY,
+          box.w + padX * 2,
+          box.h + padY * 2,
+          videoW,
+          videoH
+        )
+      : undefined;
+
+    if (!rect) {
+      const approxCharWidth = fontSize * APPROX_CHAR_WIDTH_RATIO;
+      const longestLine = lines.reduce((max, line) => Math.max(max, line.length), 0);
+      let textWidth =
+        longestLine > 0 && approxCharWidth > 0
+          ? longestLine * approxCharWidth
+          : approxCharWidth;
+      if (!(textWidth > 0)) {
+        textWidth = fontSize;
+      }
+      const maxAllowedWidth = box.w && box.w > 0 ? box.w : textWidth;
+      textWidth = Math.min(textWidth, maxAllowedWidth);
+      const lineCount = lines.length || 1;
+      const totalSpacing = Math.max(0, lineCount - 1) * Math.max(0, spacing);
+      const textHeight = fontSize * lineCount + totalSpacing;
+      rect = clampRect(
+        block.x - padX,
+        y - padY,
+        textWidth + padX * 2,
+        textHeight + padY * 2,
+        videoW,
+        videoH
+      );
     }
-    const maxAllowedWidth = box.w && box.w > 0 ? box.w : textWidth;
-    textWidth = Math.min(textWidth, maxAllowedWidth);
-    const lineCount = lines.length || 1;
-    const totalSpacing = Math.max(0, lineCount - 1) * Math.max(0, spacing);
-    const textHeight = fontSize * lineCount + totalSpacing;
-    const rect = clampRect(
-      block.x - padX,
-      y - padY,
-      textWidth + padX * 2,
-      textHeight + padY * 2,
-      videoW,
-      videoH
-    );
+
     if (rect) {
       block.background = {
         x: rect.x,
@@ -1583,6 +1886,8 @@ function buildCopyrightBlock(
       block.boxBorderW = pad;
     }
   }
+
+  applyExtraBackgroundPadding(block, fontSize, videoW, videoH, { skipMinWidth: true });
 
   return block;
 }
@@ -1679,7 +1984,12 @@ export function buildTimelineFromLayout(
 
     const txtStr = typeof mods[`Testo-${i}`] === "string" ? mods[`Testo-${i}`].trim() : "";
 
-    const txtBox = getTextBoxFromTemplate(template, i) || { x: 120, y: 160, w: 0, h: 0 };
+    const minTextWidthPx =
+      TEXT.BOX_MIN_WIDTH_RATIO > 0
+        ? Math.round(Math.min(videoW, videoW * TEXT.BOX_MIN_WIDTH_RATIO))
+        : undefined;
+    const txtBox =
+      getTextBoxFromTemplate(template, i, undefined, minTextWidthPx) || { x: 120, y: 160, w: 0, h: 0 };
     const baseBlock = defaultTextBlock(txtBox.x, txtBox.y);
     if (txtEl) {
       const bg = parseRGBA((txtEl as any).background_color);
@@ -1720,7 +2030,8 @@ export function buildTimelineFromLayout(
       txtEl as TemplateElement | undefined,
       baseBlock.fontSize ?? MIN_FONT_SIZE,
       videoW,
-      videoH
+      videoH,
+      { scaleMultiplier: TEXT.TEMPLATE_FONT_SCALE }
     );
     const initialFontSize = fontSizing.initial;
     baseBlock.fontSize = initialFontSize;
@@ -1960,7 +2271,13 @@ export function buildTimelineFromLayout(
     );
     const logoBox = getLogoBoxFromTemplate(template, "Outro");
     const textEl = findChildByName(outroComp, "Testo-outro") as any;
-    const textBox = getTextBoxFromTemplate(template, "Outro", "Testo-outro");
+    const textBox = getTextBoxFromTemplate(
+      template,
+      "Outro",
+      "Testo-outro",
+      undefined,
+      { preserveMirrorCenter: true }
+    );
     const fontFam = getFontFamilyFromTemplate(template, "Outro", "Testo-outro");
     const fontPath = fontFam ? findFontPath(fontFam) : undefined;
     const outroBgNames = outroBackgroundNameCandidates();
@@ -2009,7 +2326,8 @@ export function buildTimelineFromLayout(
         textEl as TemplateElement | undefined,
         baseOut.fontSize ?? MIN_FONT_SIZE,
         videoW,
-        videoH
+        videoH,
+        { scaleMultiplier: 1 }
       );
       const initialOutSize = fontSizing.initial;
       baseOut.fontSize = initialOutSize;
