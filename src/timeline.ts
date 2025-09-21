@@ -1922,6 +1922,7 @@ export function buildTimelineFromLayout(
   const slides: SlideSpec[] = [];
   let prevEnd = 0;
   let globalShapeIndex = 0;
+  let lastBackgroundImagePath: string | undefined;
 
   const fillerComps = collectFillerCompositions(template, mods, defaultDur);
   let fillerCursor = 0;
@@ -1944,15 +1945,59 @@ export function buildTimelineFromLayout(
     };
   };
 
+  const readFillerLogoBox = (source: number | string) => {
+    const tplBox = getLogoBoxFromTemplate(template, source);
+    const width = Math.min(Math.max(tplBox.w ?? defaultLogoBox.w, 1), videoW);
+    const height = Math.min(Math.max(tplBox.h ?? defaultLogoBox.h, 1), videoH);
+    const left = Math.max(0, Math.round((videoW - width) / 2));
+    const top = Math.max(0, Math.round((videoH - height) / 2));
+    return { x: left, y: top, w: width, h: height };
+  };
+
+  const parseImageIndexFromName = (name: string | undefined): number | undefined => {
+    if (!name) return undefined;
+    const match = name.match(/(\d+)(?!.*\d)/);
+    if (!match) return undefined;
+    const idx = parseInt(match[1], 10);
+    return Number.isFinite(idx) ? idx : undefined;
+  };
+
+  const findBackgroundImageForComposition = (
+    comp: TemplateElement | undefined
+  ): string | undefined => {
+    if (!comp || !Array.isArray((comp as any)?.elements)) return undefined;
+    const queue: TemplateElement[] = [
+      ...(((comp as any).elements as TemplateElement[]) || []),
+    ];
+    while (queue.length) {
+      const el = queue.shift();
+      if (!el) continue;
+      if (Array.isArray((el as any)?.elements)) {
+        queue.push(...(((el as any).elements as TemplateElement[]) || []));
+      }
+      const type = typeof el.type === "string" ? el.type.toLowerCase() : "";
+      if (type !== "image") continue;
+      const idx = parseImageIndexFromName(
+        typeof el.name === "string" ? el.name : undefined
+      );
+      if (idx == null) continue;
+      const imgPath = findImageForSlide(idx);
+      if (imgPath) return imgPath;
+    }
+    return undefined;
+  };
+
   const pushLogoOnlyFiller = (duration: number, source: number | string) => {
     if (!(duration > FILLER_EPS)) return;
-    const box = readLogoBox(source);
+    const box = readFillerLogoBox(source);
+    const background = lastBackgroundImagePath;
     slides.push({
       width: videoW,
       height: videoH,
       fps,
       durationSec: duration,
       outPath: "",
+      bgImagePath: background,
       logoPath: join(paths.images, "logo.png"),
       logoWidth: box.w,
       logoHeight: box.h,
@@ -1960,11 +2005,14 @@ export function buildTimelineFromLayout(
       logoY: box.y,
       backgroundAnimated: false,
     });
+    if (background) {
+      lastBackgroundImagePath = background;
+    }
     prevEnd += duration;
   };
 
   const pushFillerFromComposition = (info: FillerCompositionInfo) => {
-    const box = readLogoBox(info.name);
+    const box = readFillerLogoBox(info.name);
     const bgNames = fillerBackgroundNameCandidates(info.name);
     const shadowSources: Array<() => ShadowInfo | undefined> = [
       () => extractShadow(info.comp, videoW, videoH),
@@ -1973,6 +2021,8 @@ export function buildTimelineFromLayout(
       ...bgNames.map((name) => () => extractShadowFromMods(mods, name, videoW, videoH)),
     ];
     const hasShadow = shadowSources.some((get) => !!get());
+    const bgImagePath =
+      findBackgroundImageForComposition(info.comp) ?? lastBackgroundImagePath;
     const shapes = extractShapesFromComposition(
       info.comp,
       mods,
@@ -1988,6 +2038,7 @@ export function buildTimelineFromLayout(
       fps,
       durationSec: info.duration,
       outPath: "",
+      bgImagePath,
       logoPath: join(paths.images, "logo.png"),
       logoWidth: box.w,
       logoHeight: box.h,
@@ -1996,6 +2047,9 @@ export function buildTimelineFromLayout(
       shapes: shapes.length ? shapes : undefined,
       shadowEnabled: hasShadow ? true : undefined,
     });
+    if (bgImagePath) {
+      lastBackgroundImagePath = bgImagePath;
+    }
     prevEnd += info.duration;
   };
 
@@ -2339,6 +2393,10 @@ export function buildTimelineFromLayout(
       slide.backgroundAnimated = false;
     } else if (bgImagePath && i > 0) {
       slide.backgroundAnimated = true;
+    }
+
+    if (slide.bgImagePath) {
+      lastBackgroundImagePath = slide.bgImagePath;
     }
 
     if (process.env.DEBUG_TIMELINE) {

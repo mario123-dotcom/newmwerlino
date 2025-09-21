@@ -1463,6 +1463,86 @@ test("buildTimelineFromLayout animates backgrounds after the first slide", () =>
   }
 });
 
+test(
+  "buildTimelineFromLayout centers filler logo and reuses template image background",
+  () => {
+    const tpl: TemplateDoc = {
+      width: 1920,
+      height: 1080,
+      elements: [
+        {
+          type: "composition",
+          name: "Slide_0",
+          duration: 2,
+          elements: [
+            { type: "text", name: "Testo-0", x: "0%", y: "0%", width: "10%", height: "10%" },
+          ],
+        },
+        {
+          type: "composition",
+          name: "Intro",
+          time: 2,
+          duration: 2,
+          elements: [
+            {
+              type: "image",
+              name: "Immagine-3",
+              width: "100%",
+              height: "100%",
+              x: "50%",
+              y: "50%",
+              x_anchor: "50%",
+              y_anchor: "50%",
+            } as any,
+            {
+              type: "image",
+              name: "Logo",
+              width: "50%",
+              height: "40%",
+            } as any,
+          ],
+        },
+        {
+          type: "composition",
+          name: "Slide_1",
+          time: 4,
+          duration: 2,
+          elements: [
+            { type: "text", name: "Testo-1", x: "0%", y: "0%", width: "10%", height: "10%" },
+          ],
+        },
+      ],
+    } as any;
+    const mods = { "Testo-0": "uno", "Testo-1": "due", "Slide_1.time": "4 s" };
+    const prevImages = paths.images;
+    const prevTts = paths.tts;
+    const tmpDir = mkdtempSync(join(process.cwd(), "timeline-filler-center-"));
+    try {
+      writeFileSync(join(tmpDir, "img3.png"), "fake");
+      paths.images = tmpDir;
+      paths.tts = join(process.cwd(), "no-tts");
+      const slides = buildTimelineFromLayout(mods, tpl, {
+        videoW: 1920,
+        videoH: 1080,
+        fps: 30,
+        defaultDur: 2,
+      });
+      const filler = slides.find(
+        (s) => !s.texts && s.bgImagePath === join(tmpDir, "img3.png")
+      );
+      assert.ok(filler);
+      assert.equal(filler!.logoWidth, 960);
+      assert.equal(filler!.logoHeight, 432);
+      assert.equal(filler!.logoX, 480);
+      assert.equal(filler!.logoY, 324);
+    } finally {
+      paths.images = prevImages;
+      paths.tts = prevTts;
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  }
+);
+
 test("buildTimelineFromLayout keeps outro background static", () => {
   const tpl: TemplateDoc = {
     width: 1920,
