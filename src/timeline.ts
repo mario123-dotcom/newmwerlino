@@ -59,6 +59,16 @@ export type ShapeBlockSpec = {
   animations?: AnimationSpec[];
 };
 
+function cloneAnimations(anims: AnimationSpec[] | undefined): AnimationSpec[] | undefined {
+  if (!Array.isArray(anims) || anims.length === 0) return undefined;
+  return anims.map((an) => ({ ...an }));
+}
+
+function cloneShapes(shapes: ShapeBlockSpec[] | undefined): ShapeBlockSpec[] | undefined {
+  if (!Array.isArray(shapes) || shapes.length === 0) return undefined;
+  return shapes.map((shape) => ({ ...shape, animations: cloneAnimations(shape.animations) }));
+}
+
 export type SlideSpec = {
   width?: number;
   height?: number;
@@ -1828,31 +1838,6 @@ export function buildTimelineFromLayout(
 
     const start = parseSec(mods[`Slide_${i}.time`], prevEnd);
 
-    // Inserisci filler se c'è un gap rispetto alla fine precedente
-    if (start > prevEnd + 0.001) {
-      const gap = start - prevEnd;
-      const fLogo = getLogoBoxFromTemplate(template, i) || {
-        x: Math.round((videoW - 240) / 2),
-        y: Math.round((videoH - 140) / 2),
-        w: 240,
-        h: 140,
-      };
-      slides.push({
-        width: videoW,
-        height: videoH,
-        fps,
-        durationSec: gap,
-        outPath: "",
-        logoPath: join(paths.images, "logo.png"),
-        logoWidth: fLogo.w,
-        logoHeight: fLogo.h,
-        logoX: fLogo.x,
-        logoY: fLogo.y,
-        backgroundAnimated: false,
-      });
-      prevEnd = start;
-    }
-
     let slideDur = parseSec(
       mods[`Slide_${i}.duration`],
       parseSec(comp?.duration, defaultDur)
@@ -2098,6 +2083,31 @@ export function buildTimelineFromLayout(
       globalShapeIndex
     );
     globalShapeIndex += shapes.length;
+    if (start > prevEnd + 0.001) {
+      const gap = start - prevEnd;
+      const fillerLogoWidth = logoBox.w ?? 240;
+      const fillerLogoHeight = logoBox.h ?? 140;
+      const fillerLogoX = logoBox.x ?? 161;
+      const fillerLogoY = logoBox.y ?? 713;
+      slides.push({
+        width: videoW,
+        height: videoH,
+        fps,
+        durationSec: gap,
+        outPath: "",
+        bgImagePath,
+        logoPath: join(paths.images, "logo.png"),
+        logoWidth: fillerLogoWidth,
+        logoHeight: fillerLogoHeight,
+        logoX: fillerLogoX,
+        logoY: fillerLogoY,
+        shapes: cloneShapes(shapes),
+        shadowEnabled: slideHasShadow ? true : undefined,
+        backgroundAnimated: false,
+      });
+      prevEnd = start;
+    }
+
     const texts: TextBlockSpec[] = textFiles.map((tf, idx) => ({
       ...baseBlock,
       background: idx === 0 ? backgroundRect : undefined,
@@ -2176,40 +2186,7 @@ export function buildTimelineFromLayout(
     );
   if (outroVisible) {
     const outroStart = parseSec(mods["Outro.time"], prevEnd);
-    if (outroStart > prevEnd + 0.001) {
-      const gap = outroStart - prevEnd;
-      const fLogo = getLogoBoxFromTemplate(template, "Outro") || {
-        x: Math.round((videoW - 240) / 2),
-        y: Math.round((videoH - 140) / 2),
-        w: 240,
-        h: 140,
-      };
-      slides.push({
-        width: videoW,
-        height: videoH,
-        fps,
-        durationSec: gap,
-        outPath: "",
-        logoPath: join(paths.images, "logo.png"),
-        logoWidth: fLogo.w,
-        logoHeight: fLogo.h,
-        logoX: fLogo.x,
-        logoY: fLogo.y,
-      });
-      prevEnd = outroStart;
-    }
-
-    const outDur = parseSec(
-      mods["Outro.duration"],
-      parseSec(outroComp.duration, defaultDur)
-    );
-    const logoBox = getLogoBoxFromTemplate(template, "Outro");
-    const textEl = findChildByName(outroComp, "Testo-outro") as any;
-    const textBox = getTextBoxFromTemplate(template, "Outro", "Testo-outro", {
-      preserveAnchor: true,
-    });
-    const fontFam = getFontFamilyFromTemplate(template, "Outro", "Testo-outro");
-    const fontPath = fontFam ? findFontPath(fontFam) : undefined;
+    const outroLogoBox = getLogoBoxFromTemplate(template, "Outro");
     const outroBgNames = outroBackgroundNameCandidates();
     const outroShadowSources: Array<() => ShadowInfo | undefined> = [
       () => extractShadow(outroComp, videoW, videoH),
@@ -2220,6 +2197,52 @@ export function buildTimelineFromLayout(
       ),
     ];
     const outroHasShadow = outroShadowSources.some((get) => !!get());
+    const outroShapes = extractShapesFromComposition(
+      outroComp,
+      mods,
+      videoW,
+      videoH,
+      globalShapeIndex
+    );
+    globalShapeIndex += outroShapes.length;
+
+    if (outroStart > prevEnd + 0.001) {
+      const gap = outroStart - prevEnd;
+      const fillerLogoWidth = outroLogoBox.w ?? 240;
+      const fillerLogoHeight = outroLogoBox.h ?? 140;
+      const fillerLogoX =
+        outroLogoBox.x ?? Math.round((videoW - fillerLogoWidth) / 2);
+      const fillerLogoY =
+        outroLogoBox.y ?? Math.round((videoH - fillerLogoHeight) / 2);
+      slides.push({
+        width: videoW,
+        height: videoH,
+        fps,
+        durationSec: gap,
+        outPath: "",
+        logoPath: join(paths.images, "logo.png"),
+        logoWidth: fillerLogoWidth,
+        logoHeight: fillerLogoHeight,
+        logoX: fillerLogoX,
+        logoY: fillerLogoY,
+        shapes: cloneShapes(outroShapes),
+        shadowEnabled: outroHasShadow ? true : undefined,
+        backgroundAnimated: false,
+      });
+      prevEnd = outroStart;
+    }
+
+    const outDur = parseSec(
+      mods["Outro.duration"],
+      parseSec(outroComp.duration, defaultDur)
+    );
+    const logoBox = outroLogoBox;
+    const textEl = findChildByName(outroComp, "Testo-outro") as any;
+    const textBox = getTextBoxFromTemplate(template, "Outro", "Testo-outro", {
+      preserveAnchor: true,
+    });
+    const fontFam = getFontFamilyFromTemplate(template, "Outro", "Testo-outro");
+    const fontPath = fontFam ? findFontPath(fontFam) : undefined;
     const txt = textEl?.text as string | undefined;
     let texts: TextBlockSpec[] | undefined;
     if (txt && textBox) {
@@ -2456,6 +2479,7 @@ export function buildTimelineFromLayout(
       logoY: logoBox.y ?? Math.round((videoH - (logoBox.h ?? 140)) / 2),
       fontFile: fontPath,
       texts,
+      shapes: outroShapes.length ? outroShapes : undefined,
       shadowEnabled: outroHasShadow ? true : undefined,
     });
   }
