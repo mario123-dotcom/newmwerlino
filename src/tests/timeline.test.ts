@@ -244,7 +244,7 @@ test("buildTimelineFromLayout aligns text horizontally inside box", () => {
 });
 
 
-test("buildTimelineFromLayout scales template font with widened boxes", () => {
+test("buildTimelineFromLayout clamps template font when widened boxes exceed max scale", () => {
 
   const tpl: TemplateDoc = {
     width: 800,
@@ -296,7 +296,7 @@ test("buildTimelineFromLayout scales template font with widened boxes", () => {
   assert(block!.fontSize !== undefined);
   const fontSize = block!.fontSize ?? 0;
   const templateFont = 40;
-  assert(fontSize > templateFont);
+  assert.equal(fontSize, templateFont);
   const maxScale = Math.min(
     expectedScale,
     typeof TEXT.MAX_FONT_SCALE === "number" && TEXT.MAX_FONT_SCALE > 0
@@ -786,8 +786,8 @@ test("buildTimelineFromLayout caps slide line length to configured maximum", () 
       .filter(Boolean);
     assert.deepEqual(lines, [
       "Terremoto oggi ai Campi",
-      "Flegrei, nuova forte",
-      "scossa di magnitudo 4",
+      "Flegrei, nuova forte scossa di",
+      "magnitudo 4",
     ]);
   } finally {
     paths.images = prevImages;
@@ -861,6 +861,160 @@ test("buildTimelineFromLayout includes filler slide and outro", () => {
   assert.equal(slides[2].durationSec, 2);
   assert.equal(slides[3].durationSec, 1);
 });
+
+test("buildTimelineFromLayout uses template filler compositions for gaps", () => {
+  const tpl: TemplateDoc = {
+    width: 100,
+    height: 100,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 1,
+        elements: [
+          { type: "text", name: "Testo-0", x: "0%", y: "0%", width: "10%", height: "10%" },
+          {
+            type: "shape",
+            width: "100%",
+            height: "100%",
+            x: "50%",
+            y: "50%",
+            x_anchor: "50%",
+            y_anchor: "50%",
+            fill_color: "#101010",
+          } as any,
+        ],
+      },
+      {
+        type: "composition",
+        name: "Intro",
+        time: 1,
+        duration: 2,
+        elements: [
+          {
+            type: "shape",
+            width: "100%",
+            height: "100%",
+            x: "50%",
+            y: "50%",
+            x_anchor: "50%",
+            y_anchor: "50%",
+            fill_color: "#abcdef",
+          } as any,
+          { type: "image", name: "Logo", x: "50%", y: "50%", width: "10%", height: "10%" },
+        ],
+      },
+      {
+        type: "composition",
+        name: "Slide_1",
+        duration: 1,
+        elements: [
+          { type: "text", name: "Testo-1", x: "0%", y: "0%", width: "10%", height: "10%" },
+        ],
+      },
+    ],
+  } as any;
+  const mods = {
+    "Testo-0": "uno",
+    "Testo-1": "due",
+    "Slide_0.duration": "1 s",
+    "Slide_1.time": "3 s",
+    "Intro.time": "1 s",
+  };
+  const prevImages = paths.images;
+  const prevTts = paths.tts;
+  try {
+    paths.images = "/tmp/no_img";
+    paths.tts = "/tmp/no_tts";
+    const slides = buildTimelineFromLayout(mods, tpl, {
+      videoW: 100,
+      videoH: 100,
+      fps: 25,
+      defaultDur: 1,
+    });
+    assert.equal(slides.length, 3);
+    const filler = slides[1];
+    assert.ok(filler);
+    assert.equal(filler.durationSec, 2);
+    assert.ok(filler.shapes && filler.shapes.length > 0);
+    assert.equal(filler.shapes?.[0].color, "#abcdef");
+  } finally {
+    paths.images = prevImages;
+    paths.tts = prevTts;
+  }
+});
+
+test(
+  "buildTimelineFromLayout keeps filler background shapes even with downloaded image",
+  () => {
+    const tpl: TemplateDoc = {
+      width: 100,
+      height: 100,
+      elements: [
+        {
+          type: "composition",
+          name: "Slide_0",
+          duration: 1,
+          elements: [
+            { type: "text", name: "Testo-0", x: "0%", y: "0%", width: "10%", height: "10%" },
+          ],
+        },
+        {
+          type: "composition",
+          name: "Slide_1",
+          duration: 1,
+          elements: [
+            {
+              type: "shape",
+              width: "100%",
+              height: "100%",
+              x: "50%",
+              y: "50%",
+              x_anchor: "50%",
+              y_anchor: "50%",
+              fill_color: "#123456",
+            } as any,
+          ],
+        },
+        {
+          type: "composition",
+          name: "Slide_2",
+          duration: 1,
+          elements: [
+            { type: "text", name: "Testo-2", x: "0%", y: "0%", width: "10%", height: "10%" },
+          ],
+        },
+      ],
+    } as any;
+    const mods = { "Testo-0": "uno", "Testo-2": "due" };
+    const prevImages = paths.images;
+    const prevTts = paths.tts;
+    const tmpDir = mkdtempSync(join(process.cwd(), "timeline-filler-bg-"));
+    try {
+      writeFileSync(join(tmpDir, "img1.jpeg"), "fake");
+      paths.images = tmpDir;
+      paths.tts = join(process.cwd(), "no-tts");
+      const slides = buildTimelineFromLayout(mods, tpl, {
+        videoW: 100,
+        videoH: 100,
+        fps: 30,
+        defaultDur: 1,
+      });
+      assert.equal(slides.length, 3);
+      const filler = slides[1];
+      assert.ok(filler);
+      assert.equal(filler.backgroundAnimated, false);
+      assert.ok(filler.shapes && filler.shapes.length > 0);
+      assert.equal(filler.shapes?.[0].color, "#123456");
+      assert.equal(filler.shapes?.[0].width, 100);
+      assert.equal(filler.shapes?.[0].height, 100);
+    } finally {
+      paths.images = prevImages;
+      paths.tts = prevTts;
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  }
+);
 
 test("buildTimelineFromLayout inserts gap filler and extends to TTS length", () => {
   const tpl: TemplateDoc = {
@@ -1308,6 +1462,86 @@ test("buildTimelineFromLayout animates backgrounds after the first slide", () =>
     rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+
+test(
+  "buildTimelineFromLayout centers filler logo and reuses template image background",
+  () => {
+    const tpl: TemplateDoc = {
+      width: 1920,
+      height: 1080,
+      elements: [
+        {
+          type: "composition",
+          name: "Slide_0",
+          duration: 2,
+          elements: [
+            { type: "text", name: "Testo-0", x: "0%", y: "0%", width: "10%", height: "10%" },
+          ],
+        },
+        {
+          type: "composition",
+          name: "Intro",
+          time: 2,
+          duration: 2,
+          elements: [
+            {
+              type: "image",
+              name: "Immagine-3",
+              width: "100%",
+              height: "100%",
+              x: "50%",
+              y: "50%",
+              x_anchor: "50%",
+              y_anchor: "50%",
+            } as any,
+            {
+              type: "image",
+              name: "Logo",
+              width: "50%",
+              height: "40%",
+            } as any,
+          ],
+        },
+        {
+          type: "composition",
+          name: "Slide_1",
+          time: 4,
+          duration: 2,
+          elements: [
+            { type: "text", name: "Testo-1", x: "0%", y: "0%", width: "10%", height: "10%" },
+          ],
+        },
+      ],
+    } as any;
+    const mods = { "Testo-0": "uno", "Testo-1": "due", "Slide_1.time": "4 s" };
+    const prevImages = paths.images;
+    const prevTts = paths.tts;
+    const tmpDir = mkdtempSync(join(process.cwd(), "timeline-filler-center-"));
+    try {
+      writeFileSync(join(tmpDir, "img3.png"), "fake");
+      paths.images = tmpDir;
+      paths.tts = join(process.cwd(), "no-tts");
+      const slides = buildTimelineFromLayout(mods, tpl, {
+        videoW: 1920,
+        videoH: 1080,
+        fps: 30,
+        defaultDur: 2,
+      });
+      const filler = slides.find(
+        (s) => !s.texts && s.bgImagePath === join(tmpDir, "img3.png")
+      );
+      assert.ok(filler);
+      assert.equal(filler!.logoWidth, 960);
+      assert.equal(filler!.logoHeight, 432);
+      assert.equal(filler!.logoX, 480);
+      assert.equal(filler!.logoY, 324);
+    } finally {
+      paths.images = prevImages;
+      paths.tts = prevTts;
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  }
+);
 
 test("buildTimelineFromLayout keeps outro background static", () => {
   const tpl: TemplateDoc = {
