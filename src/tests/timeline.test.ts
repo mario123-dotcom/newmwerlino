@@ -531,7 +531,7 @@ test("buildTimelineFromLayout stabilizes font after single-line fallback", () =>
   const text = "Ciao mondo meraviglioso";
   const box = getTextBoxFromTemplate(tpl, 0, undefined, { preserveOrigin: true })!;
   const fallbackFont = 24;
-  const approxCharWidth = 0.56;
+  const approxCharWidth = APPROX_CHAR_WIDTH_RATIO;
   const fallbackMaxChars = Math.floor(box.w / (fallbackFont * approxCharWidth));
   const fallbackLayout = wrapText(text, fallbackMaxChars);
   assert.equal(fallbackLayout.length, 1);
@@ -643,6 +643,72 @@ test("buildTimelineFromLayout adds extra padding to intro background", () => {
   } finally {
     paths.images = prevImages;
     paths.tts = prevTts;
+  }
+});
+
+test("buildTimelineFromLayout caps slide line length to configured maximum", () => {
+  const tpl: TemplateDoc = {
+    width: 1920,
+    height: 1080,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 3,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "37.5%",
+            y: "92.3%",
+            width: "54.2%",
+            height: "42.7%",
+            x_anchor: "52%",
+            y_anchor: "122%",
+            line_height: "200%",
+            background_color: "rgba(0,0,0,1)",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const prevImages = paths.images;
+  const prevTts = paths.tts;
+  const prevAudio = paths.audio;
+  const prevFonts = paths.fonts;
+
+  paths.images = "/tmp/no_img";
+  paths.tts = "/tmp/no_tts";
+  paths.audio = "/tmp/no_audio";
+  paths.fonts = "/tmp/no_fonts";
+
+  try {
+    const text =
+      "Terremoto oggi ai Campi Flegrei, nuova forte scossa di magnitudo 4";
+    const slides = buildTimelineFromLayout({ "Testo-0": text }, tpl, {
+      videoW: 1920,
+      videoH: 1080,
+      fps: 25,
+      defaultDur: 3,
+    });
+    const main = slides[0];
+    assert.ok(main);
+    const lines = (main.texts ?? [])
+      .map((block) =>
+        block.textFile ? readFileSync(block.textFile, "utf8").trim() : block.text ?? ""
+      )
+      .filter(Boolean);
+    assert.deepEqual(lines, [
+      "Terremoto oggi ai Campi",
+      "Flegrei, nuova forte",
+      "scossa di magnitudo 4",
+    ]);
+  } finally {
+    paths.images = prevImages;
+    paths.tts = prevTts;
+    paths.audio = prevAudio;
+    paths.fonts = prevFonts;
   }
 });
 
