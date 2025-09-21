@@ -1031,6 +1031,16 @@ export function getTextBoxFromTemplate(
     }
   }
 
+  if (W > 0 && Number.isFinite(W)) {
+    const minWidth = Math.round(W * TEXT.MIN_BOX_WIDTH_RATIO);
+    if (minWidth > 0) {
+      const widthTarget = Math.min(W, minWidth);
+      if (!(w > 0) || w < widthTarget) {
+        w = widthTarget;
+      }
+    }
+  }
+
   let left = x - w * xAnchor;
   let top = y - h * yAnchor;
 
@@ -1976,16 +1986,34 @@ export function buildTimelineFromLayout(
     const txt = textEl?.text as string | undefined;
     let texts: TextBlockSpec[] | undefined;
     if (txt && textBox) {
-      const baseOut = defaultTextBlock(textBox.x, textBox.y);
+      let outroTextBox = textBox;
+      if (textBox.w > 0 && videoW > 0) {
+        let centerTarget: number | undefined;
+        if (typeof logoBox.x === "number" && typeof logoBox.w === "number") {
+          centerTarget = logoBox.x + logoBox.w / 2;
+        } else {
+          centerTarget = videoW / 2;
+        }
+        if (centerTarget !== undefined && Number.isFinite(centerTarget)) {
+          const desiredLeft = Math.round(centerTarget - textBox.w / 2);
+          const maxLeft = Math.max(0, videoW - textBox.w);
+          const safeLeft = Math.max(0, Math.min(maxLeft, desiredLeft));
+          if (safeLeft !== textBox.x) {
+            outroTextBox = { ...textBox, x: safeLeft };
+          }
+        }
+      }
+
+      const baseOut = defaultTextBlock(outroTextBox.x, outroTextBox.y);
       const bg = parseRGBA(textEl?.background_color);
       if (bg) {
         const padX = lenToPx(textEl?.x_padding, videoW, videoH) ?? 0;
         const padY = lenToPx(textEl?.y_padding, videoW, videoH) ?? 0;
         const rect = clampRect(
-          textBox.x - padX,
-          textBox.y - padY,
-          textBox.w > 0 ? textBox.w + padX * 2 : 0,
-          textBox.h > 0 ? textBox.h + padY * 2 : 0,
+          outroTextBox.x - padX,
+          outroTextBox.y - padY,
+          outroTextBox.w > 0 ? outroTextBox.w + padX * 2 : 0,
+          outroTextBox.h > 0 ? outroTextBox.h + padY * 2 : 0,
           videoW,
           videoH
         );
@@ -2014,17 +2042,19 @@ export function buildTimelineFromLayout(
       const initialOutSize = fontSizing.initial;
       baseOut.fontSize = initialOutSize;
       const initialOutMax =
-        textBox.w > 0 ? maxCharsForWidth(textBox.w, initialOutSize) : DEFAULT_CHARS_PER_LINE;
+        outroTextBox.w > 0
+          ? maxCharsForWidth(outroTextBox.w, initialOutSize)
+          : DEFAULT_CHARS_PER_LINE;
       let linesOut = wrapText(txt, initialOutMax);
       const lineHeightFactorOut =
         parseLineHeightFactor(textEl?.line_height) ?? 1.35;
       const computeSpacingOut = (font: number, lineCount: number): number =>
-        computeLineSpacingForBox(font, lineCount, textBox.h, lineHeightFactorOut);
+        computeLineSpacingForBox(font, lineCount, outroTextBox.h, lineHeightFactorOut);
 
       if (linesOut.length) {
         const layout = resolveTextLayout(
           txt,
-          textBox,
+          outroTextBox,
           baseOut.fontSize ?? initialOutSize,
           lineHeightFactorOut
         );
@@ -2043,7 +2073,7 @@ export function buildTimelineFromLayout(
         applyExtraBackgroundPadding(baseOut, finalFont, videoW, videoH);
       }
 
-      const alignX = parseAlignmentFactor(textEl?.x_alignment);
+      const alignX = 0.5;
       const fontForAlign = baseOut.fontSize ?? initialOutSize;
       const letterSpacingPx = parseLetterSpacing(
         textEl?.letter_spacing,
@@ -2057,21 +2087,21 @@ export function buildTimelineFromLayout(
         fontForAlign,
         letterSpacingPx,
         alignX,
-        textBox,
+        outroTextBox,
         videoW
       );
 
       const alignY = parseAlignmentFactor(textEl?.y_alignment) ?? 0;
-      baseOut.y = textBox.y;
-      if (linesOut.length && textBox.h > 0) {
+      baseOut.y = outroTextBox.y;
+      if (linesOut.length && outroTextBox.h > 0) {
         const font = baseOut.fontSize ?? initialOutSize;
         const spacing = baseOut.lineSpacing ?? 0;
         const usedHeight = font * linesOut.length + spacing * Math.max(0, linesOut.length - 1);
         if (usedHeight > 0) {
-          const free = textBox.h - usedHeight;
+          const free = outroTextBox.h - usedHeight;
           if (free > 0 && alignY > 0) {
             const offset = Math.round(Math.min(free, Math.max(0, free * alignY)));
-            baseOut.y = textBox.y + offset;
+            baseOut.y = outroTextBox.y + offset;
           }
         }
       }

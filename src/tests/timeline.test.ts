@@ -39,9 +39,9 @@ test("getTextBoxFromTemplate uses anchors and keeps box inside canvas", () => {
     ],
   };
   const box = getTextBoxFromTemplate(tpl, 0)!;
-  assert.equal(box.x, 20);
+  assert.equal(box.x, 13);
   assert.equal(box.y, 30);
-  assert.equal(box.w, 60);
+  assert.equal(box.w, 75);
   assert.equal(box.h, 40);
 });
 
@@ -70,7 +70,7 @@ test("getTextBoxFromTemplate mirrors point text margins", () => {
 
   const box = getTextBoxFromTemplate(tpl, 0)!;
   assert.equal(box.x, 100);
-  assert.equal(box.w, 200);
+  assert.equal(box.w, 300);
   assert.equal(box.y, 20);
   assert.equal(box.h, 160);
 });
@@ -100,9 +100,9 @@ test("getTextBoxFromTemplate keeps anchors beyond 100 percent", () => {
   } as any;
 
   const box = getTextBoxFromTemplate(tpl, 0)!;
-  assert.equal(box.x, 60);
+  assert.equal(box.x, 25);
   assert.equal(box.y, 5);
-  assert.equal(box.w, 80);
+  assert.equal(box.w, 150);
   assert.equal(box.h, 50);
 });
 
@@ -130,7 +130,7 @@ test("getTextBoxFromTemplate clamps to slide bounds", () => {
     ],
   };
   const box = getTextBoxFromTemplate(tpl, 0)!;
-  assert.equal(box.x, 80);
+  assert.equal(box.x, 25);
   assert.equal(box.y, 5);
 });
 
@@ -262,6 +262,87 @@ test("buildTimelineFromLayout centers outro point text", () => {
   const clamped = Math.max(0, Math.min(Math.max(0, Math.floor(available)), offset));
   const expected = clamped;
   assert.equal(block!.x, expected);
+});
+
+test("buildTimelineFromLayout centers outro textbox and text", () => {
+  const tpl: TemplateDoc = {
+    width: 800,
+    height: 600,
+    elements: [
+      {
+        type: "composition",
+        name: "Outro",
+        duration: 3,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-outro",
+            x: "40%",
+            y: "30%",
+            width: "30%",
+            height: "10%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+            x_alignment: "0%",
+            line_height: "100%",
+            background_color: "rgba(255, 255, 255, 1)",
+            text: "ARRIVEDERCI",
+          },
+          {
+            type: "image",
+            name: "Logo",
+            x: "50%",
+            y: "60%",
+            width: "20%",
+            height: "20%",
+            x_anchor: "50%",
+            y_anchor: "50%",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const prevImages = paths.images;
+  const prevTts = paths.tts;
+  const tmpDir = mkdtempSync(join(process.cwd(), "timeline-outro-center-"));
+  try {
+    writeFileSync(join(tmpDir, "img0.jpg"), "");
+    paths.images = tmpDir;
+    paths.tts = tmpDir;
+
+    const slides = buildTimelineFromLayout({ "Testo-outro": "ARRIVEDERCI" }, tpl, {
+      videoW: 800,
+      videoH: 600,
+      fps: 30,
+      defaultDur: 3,
+    });
+
+    const outro = slides[slides.length - 1];
+    const block = outro.texts?.[0];
+    assert.ok(block);
+    assert.ok(block?.background);
+
+    const bg = block!.background!;
+    const expectedCenter = 800 / 2;
+    const bgCenter = bg.x + bg.width / 2;
+    assert.ok(Math.abs(bgCenter - expectedCenter) <= 1);
+
+    assert.ok(block!.textFile);
+    const rendered = readFileSync(block!.textFile!, "utf8");
+    const lines = rendered.split(/\r?\n/).filter(Boolean);
+    assert.ok(lines.length > 0);
+    const fontPx = block!.fontSize ?? 0;
+    const textWidth = Math.max(
+      ...lines.map((ln) => ln.length * fontPx * APPROX_CHAR_WIDTH_RATIO)
+    );
+    const textCenter = block!.x + textWidth / 2;
+    assert.ok(Math.abs(textCenter - expectedCenter) <= 1);
+  } finally {
+    paths.images = prevImages;
+    paths.tts = prevTts;
+    rmSync(tmpDir, { recursive: true, force: true });
+  }
 });
 
 test("getLogoBoxFromTemplate uses anchors and clamps", () => {
@@ -1264,7 +1345,7 @@ test("buildTimelineFromLayout uses fixed wipe timings", () => {
       },
     ],
   } as any;
-  const mods = { "Testo-0": "a b" };
+  const mods = { "Testo-0": "a b c d e" };
   paths.images = "/tmp/no_img";
   paths.tts = "/tmp/no_tts";
   const slides = buildTimelineFromLayout(mods, tpl, {
