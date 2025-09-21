@@ -976,7 +976,8 @@ function defaultTextBlock(x = 120, y = 160): TextBlockSpec {
 export function getTextBoxFromTemplate(
   tpl: TemplateDoc,
   slideIndexOrName: number | string,
-  textName?: string
+  textName?: string,
+  opts?: { preserveAnchor?: boolean; preserveOrigin?: boolean }
 ): { x: number; y: number; w: number; h: number } | undefined {
   const compName =
     typeof slideIndexOrName === "number"
@@ -1041,8 +1042,24 @@ export function getTextBoxFromTemplate(
     }
   }
 
-  let left = x - w * xAnchor;
-  let top = y - h * yAnchor;
+  const preserveAnchor = opts?.preserveAnchor === true;
+  const preserveOrigin = !preserveAnchor && opts?.preserveOrigin === true;
+
+  const desiredLeft =
+    preserveAnchor || !(rawW > 0)
+      ? x - w * xAnchor
+      : preserveOrigin
+        ? baseLeft
+        : x - w * xAnchor;
+  const desiredTop =
+    preserveAnchor || !(rawH > 0)
+      ? y - h * yAnchor
+      : preserveOrigin
+        ? baseTop
+        : y - h * yAnchor;
+
+  let left = desiredLeft;
+  let top = desiredTop;
 
   if (w > 0) left = Math.max(0, Math.min(W - w, left));
   else left = Math.max(0, Math.min(W - 10, left));
@@ -1176,10 +1193,10 @@ function deriveFontSizing(
   opts?: { scaleMultiplier?: number }
 ): FontSizingInfo {
   const rawScale = opts?.scaleMultiplier;
-  const scale =
-    typeof rawScale === "number" && Number.isFinite(rawScale) && rawScale > 0
-      ? Math.max(1, rawScale)
-      : 1;
+  let scale = 1;
+  if (typeof rawScale === "number" && Number.isFinite(rawScale) && rawScale > 0) {
+    scale = Math.min(rawScale, 1);
+  }
   const scaleValue = (value: number | undefined): number | undefined => {
     if (!(typeof value === "number" && Number.isFinite(value) && value > 0)) return undefined;
     const scaled = value * scale;
@@ -1554,7 +1571,9 @@ function buildCopyrightBlock(
   const text = modText || tplText;
   if (!text) return undefined;
 
-  const box = getTextBoxFromTemplate(template, compName, elementName);
+  const box = getTextBoxFromTemplate(template, compName, elementName, {
+    preserveOrigin: true,
+  });
   if (!box) return undefined;
 
   const templateWidth =
@@ -1802,7 +1821,9 @@ export function buildTimelineFromLayout(
 
     const txtStr = typeof mods[`Testo-${i}`] === "string" ? mods[`Testo-${i}`].trim() : "";
 
-    const txtBox = getTextBoxFromTemplate(template, i) || { x: 120, y: 160, w: 0, h: 0 };
+    const txtBox =
+      getTextBoxFromTemplate(template, i, undefined, { preserveOrigin: true }) ||
+      { x: 120, y: 160, w: 0, h: 0 };
     const baseBlock = defaultTextBlock(txtBox.x, txtBox.y);
     if (txtEl) {
       const bg = parseRGBA((txtEl as any).background_color);
@@ -2120,7 +2141,9 @@ export function buildTimelineFromLayout(
     );
     const logoBox = getLogoBoxFromTemplate(template, "Outro");
     const textEl = findChildByName(outroComp, "Testo-outro") as any;
-    const textBox = getTextBoxFromTemplate(template, "Outro", "Testo-outro");
+    const textBox = getTextBoxFromTemplate(template, "Outro", "Testo-outro", {
+      preserveAnchor: true,
+    });
     const fontFam = getFontFamilyFromTemplate(template, "Outro", "Testo-outro");
     const fontPath = fontFam ? findFontPath(fontFam) : undefined;
     const outroBgNames = outroBackgroundNameCandidates();
