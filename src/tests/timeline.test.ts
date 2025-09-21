@@ -912,7 +912,7 @@ test("buildTimelineFromLayout honors response durations when inserting filler", 
   assert.equal(slides[1].durationSec, 2);
 });
 
-test("gap filler mirrors previous slide visuals", () => {
+test("gap filler mirrors upcoming slide template", () => {
   const tpl: TemplateDoc = {
     width: 100,
     height: 100,
@@ -985,7 +985,9 @@ test("gap filler mirrors previous slide visuals", () => {
   const prevTts = paths.tts;
   const tmpImages = mkdtempSync(join(process.cwd(), "tmp-filler-"));
   const img0 = join(tmpImages, "img0.jpeg");
+  const img1 = join(tmpImages, "img1.jpeg");
   writeFileSync(img0, "fake");
+  writeFileSync(img1, "fake");
   paths.images = tmpImages;
   paths.tts = "/tmp/no_tts";
   try {
@@ -997,14 +999,15 @@ test("gap filler mirrors previous slide visuals", () => {
     });
     assert.equal(slides.length, 3);
     const filler = slides[1];
-    const prev = slides[0];
+    const next = slides[2];
     assert.ok(filler.shapes && filler.shapes.length === 1);
-    assert.deepEqual(filler.shapes, prev.shapes);
-    assert.equal(filler.logoX, prev.logoX);
-    assert.equal(filler.logoY, prev.logoY);
-    assert.equal(filler.logoWidth, prev.logoWidth);
-    assert.equal(filler.logoHeight, prev.logoHeight);
-    assert.equal(filler.bgImagePath, prev.bgImagePath);
+    assert.deepEqual(filler.shapes, next.shapes);
+    assert.equal(filler.logoX, next.logoX);
+    assert.equal(filler.logoY, next.logoY);
+    assert.equal(filler.logoWidth, next.logoWidth);
+    assert.equal(filler.logoHeight, next.logoHeight);
+    assert.equal(filler.bgImagePath, next.bgImagePath);
+    assert.equal(filler.shadowEnabled, next.shadowEnabled);
     assert.equal(filler.backgroundAnimated, false);
   } finally {
     paths.images = prevImages;

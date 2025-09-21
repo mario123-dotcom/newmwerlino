@@ -2086,16 +2086,34 @@ export function buildTimelineFromLayout(
     if (start > prevEnd + 0.001) {
       const gap = start - prevEnd;
       const prevSlide = slides.length ? slides[slides.length - 1] : undefined;
-      const fillerLogoWidth = prevSlide?.logoWidth ?? logoBox.w ?? 240;
-      const fillerLogoHeight = prevSlide?.logoHeight ?? logoBox.h ?? 140;
-      const fillerLogoX = prevSlide?.logoX ?? logoBox.x ?? 161;
-      const fillerLogoY = prevSlide?.logoY ?? logoBox.y ?? 713;
-      const fillerBgImagePath = prevSlide?.bgImagePath ?? bgImagePath;
-      const fillerShapes = prevSlide?.shapes
-        ? cloneShapes(prevSlide.shapes)
-        : cloneShapes(shapes);
-      const fillerShadow =
-        prevSlide?.shadowEnabled ?? (slideHasShadow ? true : undefined);
+      const fillerLogoWidth = logoBox.w ?? prevSlide?.logoWidth ?? 240;
+      const fillerLogoHeight = logoBox.h ?? prevSlide?.logoHeight ?? 140;
+      const fallbackLogoX =
+        typeof fillerLogoWidth === "number"
+          ? Math.round((videoW - fillerLogoWidth) / 2)
+          : undefined;
+      const fallbackLogoY =
+        typeof fillerLogoHeight === "number"
+          ? Math.round((videoH - fillerLogoHeight) / 2)
+          : undefined;
+      const fillerLogoX =
+        logoBox.x ??
+        prevSlide?.logoX ??
+        fallbackLogoX ??
+        161;
+      const fillerLogoY =
+        logoBox.y ??
+        prevSlide?.logoY ??
+        fallbackLogoY ??
+        713;
+      const fillerBgImagePath = bgImagePath ?? prevSlide?.bgImagePath;
+      const fillerShapes =
+        shapes.length > 0
+          ? cloneShapes(shapes)
+          : prevSlide?.shapes
+          ? cloneShapes(prevSlide.shapes)
+          : undefined;
+      const fillerShadow = slideHasShadow ? true : prevSlide?.shadowEnabled;
       slides.push({
         width: videoW,
         height: videoH,
@@ -2216,22 +2234,34 @@ export function buildTimelineFromLayout(
     if (outroStart > prevEnd + 0.001) {
       const gap = outroStart - prevEnd;
       const prevSlide = slides.length ? slides[slides.length - 1] : undefined;
-      const fillerLogoWidth = prevSlide?.logoWidth ?? outroLogoBox.w ?? 240;
-      const fillerLogoHeight = prevSlide?.logoHeight ?? outroLogoBox.h ?? 140;
+      const fillerLogoWidth = outroLogoBox.w ?? prevSlide?.logoWidth ?? 240;
+      const fillerLogoHeight = outroLogoBox.h ?? prevSlide?.logoHeight ?? 140;
+      const outroFallbackX =
+        typeof fillerLogoWidth === "number"
+          ? Math.round((videoW - fillerLogoWidth) / 2)
+          : undefined;
+      const outroFallbackY =
+        typeof fillerLogoHeight === "number"
+          ? Math.round((videoH - fillerLogoHeight) / 2)
+          : undefined;
       const fillerLogoX =
-        prevSlide?.logoX ??
         outroLogoBox.x ??
-        Math.round((videoW - fillerLogoWidth) / 2);
+        outroFallbackX ??
+        prevSlide?.logoX ??
+        161;
       const fillerLogoY =
-        prevSlide?.logoY ??
         outroLogoBox.y ??
-        Math.round((videoH - fillerLogoHeight) / 2);
+        outroFallbackY ??
+        prevSlide?.logoY ??
+        713;
       const fillerBgImagePath = prevSlide?.bgImagePath;
-      const fillerShapes = prevSlide?.shapes
-        ? cloneShapes(prevSlide.shapes)
-        : cloneShapes(outroShapes);
-      const fillerShadow =
-        prevSlide?.shadowEnabled ?? (outroHasShadow ? true : undefined);
+      const fillerShapes =
+        outroShapes.length > 0
+          ? cloneShapes(outroShapes)
+          : prevSlide?.shapes
+          ? cloneShapes(prevSlide.shapes)
+          : undefined;
+      const fillerShadow = outroHasShadow ? true : prevSlide?.shadowEnabled;
       slides.push({
         width: videoW,
         height: videoH,
