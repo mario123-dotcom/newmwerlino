@@ -2085,24 +2085,31 @@ export function buildTimelineFromLayout(
     globalShapeIndex += shapes.length;
     if (start > prevEnd + 0.001) {
       const gap = start - prevEnd;
-      const fillerLogoWidth = logoBox.w ?? 240;
-      const fillerLogoHeight = logoBox.h ?? 140;
-      const fillerLogoX = logoBox.x ?? 161;
-      const fillerLogoY = logoBox.y ?? 713;
+      const prevSlide = slides.length ? slides[slides.length - 1] : undefined;
+      const fillerLogoWidth = prevSlide?.logoWidth ?? logoBox.w ?? 240;
+      const fillerLogoHeight = prevSlide?.logoHeight ?? logoBox.h ?? 140;
+      const fillerLogoX = prevSlide?.logoX ?? logoBox.x ?? 161;
+      const fillerLogoY = prevSlide?.logoY ?? logoBox.y ?? 713;
+      const fillerBgImagePath = prevSlide?.bgImagePath ?? bgImagePath;
+      const fillerShapes = prevSlide?.shapes
+        ? cloneShapes(prevSlide.shapes)
+        : cloneShapes(shapes);
+      const fillerShadow =
+        prevSlide?.shadowEnabled ?? (slideHasShadow ? true : undefined);
       slides.push({
         width: videoW,
         height: videoH,
         fps,
         durationSec: gap,
         outPath: "",
-        bgImagePath,
+        bgImagePath: fillerBgImagePath,
         logoPath: join(paths.images, "logo.png"),
         logoWidth: fillerLogoWidth,
         logoHeight: fillerLogoHeight,
         logoX: fillerLogoX,
         logoY: fillerLogoY,
-        shapes: cloneShapes(shapes),
-        shadowEnabled: slideHasShadow ? true : undefined,
+        shapes: fillerShapes,
+        shadowEnabled: fillerShadow,
         backgroundAnimated: false,
       });
       prevEnd = start;
@@ -2208,25 +2215,37 @@ export function buildTimelineFromLayout(
 
     if (outroStart > prevEnd + 0.001) {
       const gap = outroStart - prevEnd;
-      const fillerLogoWidth = outroLogoBox.w ?? 240;
-      const fillerLogoHeight = outroLogoBox.h ?? 140;
+      const prevSlide = slides.length ? slides[slides.length - 1] : undefined;
+      const fillerLogoWidth = prevSlide?.logoWidth ?? outroLogoBox.w ?? 240;
+      const fillerLogoHeight = prevSlide?.logoHeight ?? outroLogoBox.h ?? 140;
       const fillerLogoX =
-        outroLogoBox.x ?? Math.round((videoW - fillerLogoWidth) / 2);
+        prevSlide?.logoX ??
+        outroLogoBox.x ??
+        Math.round((videoW - fillerLogoWidth) / 2);
       const fillerLogoY =
-        outroLogoBox.y ?? Math.round((videoH - fillerLogoHeight) / 2);
+        prevSlide?.logoY ??
+        outroLogoBox.y ??
+        Math.round((videoH - fillerLogoHeight) / 2);
+      const fillerBgImagePath = prevSlide?.bgImagePath;
+      const fillerShapes = prevSlide?.shapes
+        ? cloneShapes(prevSlide.shapes)
+        : cloneShapes(outroShapes);
+      const fillerShadow =
+        prevSlide?.shadowEnabled ?? (outroHasShadow ? true : undefined);
       slides.push({
         width: videoW,
         height: videoH,
         fps,
         durationSec: gap,
         outPath: "",
+        bgImagePath: fillerBgImagePath,
         logoPath: join(paths.images, "logo.png"),
         logoWidth: fillerLogoWidth,
         logoHeight: fillerLogoHeight,
         logoX: fillerLogoX,
         logoY: fillerLogoY,
-        shapes: cloneShapes(outroShapes),
-        shadowEnabled: outroHasShadow ? true : undefined,
+        shapes: fillerShapes,
+        shadowEnabled: fillerShadow,
         backgroundAnimated: false,
       });
       prevEnd = outroStart;

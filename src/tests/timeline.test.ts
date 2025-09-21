@@ -912,7 +912,7 @@ test("buildTimelineFromLayout honors response durations when inserting filler", 
   assert.equal(slides[1].durationSec, 2);
 });
 
-test("gap filler reuses template shapes and logo placement", () => {
+test("gap filler mirrors previous slide visuals", () => {
   const tpl: TemplateDoc = {
     width: 100,
     height: 100,
@@ -931,6 +931,17 @@ test("gap filler reuses template shapes and logo placement", () => {
             height: "10%",
             x_anchor: "0%",
             y_anchor: "0%",
+          },
+          {
+            type: "shape",
+            name: "Shape-0",
+            x: "10%",
+            y: "10%",
+            width: "20%",
+            height: "20%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+            fill_color: "#00ff00",
           },
           { type: "image", name: "Logo", x: "0%", y: "0%", width: "10%", height: "10%", x_anchor: "0%", y_anchor: "0%" },
         ],
@@ -972,7 +983,10 @@ test("gap filler reuses template shapes and logo placement", () => {
   };
   const prevImages = paths.images;
   const prevTts = paths.tts;
-  paths.images = "/tmp/no_img";
+  const tmpImages = mkdtempSync(join(process.cwd(), "tmp-filler-"));
+  const img0 = join(tmpImages, "img0.jpeg");
+  writeFileSync(img0, "fake");
+  paths.images = tmpImages;
   paths.tts = "/tmp/no_tts";
   try {
     const slides = buildTimelineFromLayout(mods, tpl, {
@@ -983,17 +997,19 @@ test("gap filler reuses template shapes and logo placement", () => {
     });
     assert.equal(slides.length, 3);
     const filler = slides[1];
-    const main = slides[2];
+    const prev = slides[0];
     assert.ok(filler.shapes && filler.shapes.length === 1);
-    assert.deepEqual(filler.shapes, main.shapes);
-    assert.equal(filler.logoX, main.logoX);
-    assert.equal(filler.logoY, main.logoY);
-    assert.equal(filler.logoWidth, main.logoWidth);
-    assert.equal(filler.logoHeight, main.logoHeight);
+    assert.deepEqual(filler.shapes, prev.shapes);
+    assert.equal(filler.logoX, prev.logoX);
+    assert.equal(filler.logoY, prev.logoY);
+    assert.equal(filler.logoWidth, prev.logoWidth);
+    assert.equal(filler.logoHeight, prev.logoHeight);
+    assert.equal(filler.bgImagePath, prev.bgImagePath);
     assert.equal(filler.backgroundAnimated, false);
   } finally {
     paths.images = prevImages;
     paths.tts = prevTts;
+    rmSync(tmpImages, { recursive: true, force: true });
   }
 });
 
