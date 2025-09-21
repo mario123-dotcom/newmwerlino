@@ -39,7 +39,7 @@ test("getTextBoxFromTemplate uses anchors and keeps box inside canvas", () => {
     ],
   };
   const box = getTextBoxFromTemplate(tpl, 0)!;
-  assert.equal(box.x, 20);
+  assert.equal(box.x, 40);
   assert.equal(box.y, 30);
   assert.equal(box.w, 60);
   assert.equal(box.h, 40);
@@ -100,10 +100,134 @@ test("getTextBoxFromTemplate keeps anchors beyond 100 percent", () => {
   } as any;
 
   const box = getTextBoxFromTemplate(tpl, 0)!;
-  assert.equal(box.x, 60);
+  assert.equal(box.x, 100);
   assert.equal(box.y, 5);
   assert.equal(box.w, 80);
   assert.equal(box.h, 50);
+});
+
+test("getTextBoxFromTemplate treats fractional widths as percentages", () => {
+  const tpl: TemplateDoc = {
+    width: 1920,
+    height: 1080,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: 120,
+            y: 200,
+            width: 0.5,
+            height: 0.25,
+            x_anchor: "0%",
+            y_anchor: "0%",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const box = getTextBoxFromTemplate(tpl, 0)!;
+  assert.equal(box.x, 120);
+  assert.equal(box.w, 960);
+  assert.equal(box.y, 200);
+  assert.equal(box.h, 270);
+});
+
+test("getTextBoxFromTemplate treats numeric string widths as percentages", () => {
+  const tpl: TemplateDoc = {
+    width: 1920,
+    height: 1080,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: 120,
+            y: 200,
+            width: "50",
+            height: 0.25,
+            x_anchor: "0%",
+            y_anchor: "0%",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const box = getTextBoxFromTemplate(tpl, 0)!;
+  assert.equal(box.x, 120);
+  assert.equal(box.w, 960);
+  assert.equal(box.y, 200);
+  assert.equal(box.h, 270);
+});
+
+test("getTextBoxFromTemplate treats integer numeric widths as percentages when coords use percents", () => {
+  const tpl: TemplateDoc = {
+    width: 1920,
+    height: 1080,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "10%",
+            y: "10%",
+            width: 50,
+            height: 25,
+            x_anchor: "0%",
+            y_anchor: "0%",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const box = getTextBoxFromTemplate(tpl, 0)!;
+  assert.equal(box.x, 192); // 10% of 1920
+  assert.equal(box.w, 960); // 50% of 1920
+  assert.equal(box.y, 108); // 10% of 1080
+  assert.equal(box.h, 270); // 25% of 1080
+});
+
+test("getTextBoxFromTemplate keeps numeric pixel widths when coords are absolute", () => {
+  const tpl: TemplateDoc = {
+    width: 1920,
+    height: 1080,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: 200,
+            y: 100,
+            width: 80,
+            height: 40,
+            x_anchor: "0%",
+            y_anchor: "0%",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const box = getTextBoxFromTemplate(tpl, 0)!;
+  assert.equal(box.x, 200);
+  assert.equal(box.w, 80);
+  assert.equal(box.y, 100);
+  assert.equal(box.h, 40);
 });
 
 test("getTextBoxFromTemplate clamps to slide bounds", () => {
@@ -589,6 +713,62 @@ test("buildTimelineFromLayout adds extra padding to intro background", () => {
     for (let idx = 1; idx < blocks.length; idx++) {
       assert.equal(blocks[idx].background, undefined);
     }
+  } finally {
+    paths.images = prevImages;
+    paths.tts = prevTts;
+  }
+});
+
+test("buildTimelineFromLayout keeps template background width for short text", () => {
+  const tpl: TemplateDoc = {
+    width: 1920,
+    height: 1080,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 2,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "40%",
+            y: "90%",
+            width: "50%",
+            height: "40%",
+            x_anchor: "50%",
+            y_anchor: "100%",
+            line_height: "200%",
+            background_color: "rgba(0,0,0,0.8)",
+            font_family: "Archivo",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const box = getTextBoxFromTemplate(tpl, 0)!;
+  const prevImages = paths.images;
+  const prevTts = paths.tts;
+  paths.images = "/tmp/no_img";
+  paths.tts = "/tmp/no_tts";
+
+  try {
+    const slides = buildTimelineFromLayout({ "Testo-0": "ciao" }, tpl, {
+      videoW: 1920,
+      videoH: 1080,
+      fps: 25,
+      defaultDur: 2,
+    });
+    const first = slides[0];
+    assert.ok(first);
+    const primary = first.texts?.[0];
+    assert.ok(primary);
+    assert.ok(primary?.background);
+    const pad = Math.round((primary.fontSize ?? 0) * TEXT.BOX_PAD_FACTOR);
+    assert.equal(primary.background?.x, box.x - pad);
+    assert.equal(primary.background?.y, box.y - pad);
+    assert.equal(primary.background?.width, box.w + pad * 2);
   } finally {
     paths.images = prevImages;
     paths.tts = prevTts;
