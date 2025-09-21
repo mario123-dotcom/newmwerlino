@@ -185,6 +185,58 @@ test("buildTimelineFromLayout aligns text horizontally inside box", () => {
   assert.equal(block!.x, expected);
 });
 
+test("buildTimelineFromLayout scales fonts with widened boxes", () => {
+  const tpl: TemplateDoc = {
+    width: 800,
+    height: 450,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 3,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "12%",
+            y: "18%",
+            width: "32%",
+            height: "60%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+            font_size: 40,
+            line_height: "130%",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const textValue =
+    "Una serie di scosse ha colpito i Campi Flegrei culminando alle prime luci di lunedì";
+  const slides = buildTimelineFromLayout({ "Testo-0": textValue }, tpl, {
+    videoW: 800,
+    videoH: 450,
+    fps: 25,
+    defaultDur: 3,
+  });
+
+  const slide = slides[0];
+  assert.ok(slide);
+  const block = slide.texts?.[0];
+  assert.ok(block);
+  const box = getTextBoxFromTemplate(tpl, 0)!;
+  const templateWidth = (tpl.width * 32) / 100;
+  const expectedScale = box.w / templateWidth;
+  assert(expectedScale > 1);
+  assert(block!.fontSize !== undefined);
+  const fontSize = block!.fontSize ?? 0;
+  const templateFont = 40;
+  const minExpected = Math.round(templateFont * 1.2);
+  assert(fontSize >= minExpected);
+  assert.equal(block!.x, box.x);
+});
+
 test("buildTimelineFromLayout centers outro point text", () => {
   const tpl: TemplateDoc = {
     width: 600,

@@ -1172,13 +1172,27 @@ function deriveFontSizing(
   element: TemplateElement | undefined,
   fallback: number,
   W: number,
-  H: number
+  H: number,
+  opts?: { scaleMultiplier?: number }
 ): FontSizingInfo {
-  const fallbackFont =
-    Number.isFinite(fallback) && fallback > 0 ? fallback : MIN_FONT_SIZE;
-  const explicit = lenToPx((element as any)?.font_size, W, H);
-  const min = lenToPx((element as any)?.font_size_minimum, W, H);
-  const max = lenToPx((element as any)?.font_size_maximum, W, H);
+  const rawScale = opts?.scaleMultiplier;
+  const scale =
+    typeof rawScale === "number" && Number.isFinite(rawScale) && rawScale > 0
+      ? Math.max(1, rawScale)
+      : 1;
+  const scaleValue = (value: number | undefined): number | undefined => {
+    if (!(typeof value === "number" && Number.isFinite(value) && value > 0)) return undefined;
+    const scaled = value * scale;
+    if (!(Number.isFinite(scaled) && scaled > 0)) return undefined;
+    return scaled;
+  };
+
+  const fallbackBase = Number.isFinite(fallback) && fallback > 0 ? fallback : MIN_FONT_SIZE;
+  const fallbackFont = Math.max(MIN_FONT_SIZE, Math.round(fallbackBase * scale));
+
+  const explicit = scaleValue(lenToPx((element as any)?.font_size, W, H));
+  const min = scaleValue(lenToPx((element as any)?.font_size_minimum, W, H));
+  const max = scaleValue(lenToPx((element as any)?.font_size_maximum, W, H));
 
   const clamp = (value: number): number => {
     let next = Number.isFinite(value) && value > 0 ? value : fallbackFont;
@@ -1206,6 +1220,21 @@ function deriveFontSizing(
 
   initial = clamp(initial);
   return { initial, clamp };
+}
+
+function computeWidthScaleFromTemplate(
+  element: TemplateElement | undefined,
+  finalWidth: number,
+  templateWidth: number
+): number {
+  if (!element) return 1;
+  if (!(finalWidth > 0)) return 1;
+  if (!(templateWidth > 0)) return 1;
+  const raw = pctToPx((element as any)?.width, templateWidth);
+  if (!(typeof raw === "number" && Number.isFinite(raw) && raw > 0)) return 1;
+  const ratio = finalWidth / raw;
+  if (!(Number.isFinite(ratio) && ratio > 1)) return 1;
+  return ratio;
 }
 
 function parseLineHeightFactor(raw: any): number | undefined {
@@ -1351,7 +1380,8 @@ function resolveTextLayout(
   text: string,
   box: { w?: number; h?: number },
   initialFont: number,
-  lineHeightFactor: number
+  lineHeightFactor: number,
+  opts?: { widthScale?: number }
 ): TextLayoutResult | undefined {
   if (!text) return undefined;
   const width = typeof box.w === "number" ? box.w : 0;
@@ -1364,9 +1394,15 @@ function resolveTextLayout(
   let prevLines: string[] | undefined;
   let prevFont = fontGuess;
   const layouts: TextLayoutResult[] = [];
+  const widthMultiplier =
+    opts && typeof opts.widthScale === "number" && opts.widthScale > 1
+      ? opts.widthScale
+      : 1;
 
   for (let iter = 0; iter < MAX_FONT_LAYOUT_ITERATIONS; iter++) {
-    const maxChars = width > 0 ? maxCharsForWidth(width, fontGuess) : DEFAULT_CHARS_PER_LINE;
+    const wrapFont = widthMultiplier > 1 ? fontGuess / widthMultiplier : fontGuess;
+    const maxChars =
+      width > 0 ? maxCharsForWidth(width, wrapFont) : DEFAULT_CHARS_PER_LINE;
     const lines = wrapText(text, maxChars);
     if (!lines.length) break;
 
@@ -1385,7 +1421,8 @@ function resolveTextLayout(
       if (longest > 0) {
         const approx = Math.floor(width / (longest * APPROX_CHAR_WIDTH_RATIO));
         if (Number.isFinite(approx) && approx > 0) {
-          widthFont = Math.max(MIN_FONT_SIZE, approx);
+          const scaledApprox = widthMultiplier > 1 ? approx * widthMultiplier : approx;
+          widthFont = Math.max(MIN_FONT_SIZE, scaledApprox);
         }
       }
     }
@@ -1424,7 +1461,10 @@ function resolveTextLayout(
 
   for (let idx = layouts.length - 1; idx >= 0; idx--) {
     const candidate = layouts[idx];
-    const maxChars = width > 0 ? maxCharsForWidth(width, candidate.font) : DEFAULT_CHARS_PER_LINE;
+    const wrapFont =
+      widthMultiplier > 1 ? candidate.font / widthMultiplier : candidate.font;
+    const maxChars =
+      width > 0 ? maxCharsForWidth(width, wrapFont) : DEFAULT_CHARS_PER_LINE;
     const recomputed = wrapText(text, maxChars);
     if (linesEqual(recomputed, candidate.lines)) {
       return candidate;
@@ -1432,6 +1472,54 @@ function resolveTextLayout(
   }
 
   return layouts[layouts.length - 1];
+}
+
+function fitTextWithTargetFont(
+  text: string,
+  layoutWidth: number | undefined,
+  actualBox: { w: number; h: number },
+  desiredFont: number,
+  minimumFont: number,
+  widthScale: number,
+  lineHeightFactor: number
+): TextLayoutResult | undefined {
+  if (!text) return undefined;
+  const safeWidth =
+    typeof layoutWidth === "number" && layoutWidth > 0
+      ? layoutWidth
+      : actualBox.w > 0
+        ? actualBox.w
+        : 0;
+  const safeHeight = actualBox.h > 0 ? actualBox.h : 0;
+  if (!(safeWidth > 0) && !(safeHeight > 0)) return undefined;
+
+  const widthMultiplier = widthScale > 1 ? widthScale : 1;
+  const upper = Math.max(MIN_FONT_SIZE, Math.round(desiredFont));
+  const lower = Math.max(MIN_FONT_SIZE, Math.round(minimumFont));
+
+  for (let font = upper; font >= lower; font--) {
+    const wrapFont = widthMultiplier > 1 ? font / widthMultiplier : font;
+    const maxChars =
+      safeWidth > 0 ? maxCharsForWidth(safeWidth, wrapFont) : DEFAULT_CHARS_PER_LINE;
+    const lines = wrapText(text, maxChars);
+    if (!lines.length) continue;
+
+    const spacing = computeLineSpacingForBox(font, lines.length, safeHeight, lineHeightFactor);
+    const usedHeight = font * lines.length + spacing * Math.max(0, lines.length - 1);
+    if (safeHeight > 0 && usedHeight > safeHeight + 0.01) {
+      continue;
+    }
+
+    const approxWidth = estimateTextWidth(lines, font, undefined);
+    const maxWidth = actualBox.w > 0 ? actualBox.w : safeWidth;
+    if (maxWidth > 0 && approxWidth > maxWidth + 0.01) {
+      continue;
+    }
+
+    return { lines, font, spacing };
+  }
+
+  return undefined;
 }
 
 function isExplicitlyFalse(value: unknown): boolean {
@@ -1469,48 +1557,69 @@ function buildCopyrightBlock(
   const box = getTextBoxFromTemplate(template, compName, elementName);
   if (!box) return undefined;
 
-  const explicitFont = lenToPx((element as any)?.font_size, videoW, videoH);
-  const minFontPx = lenToPx((element as any)?.font_size_minimum, videoW, videoH);
-  const maxFontPx = lenToPx((element as any)?.font_size_maximum, videoW, videoH);
-  const clampFontSize = (value: number): number => {
-    let next = Number.isFinite(value) && value > 0 ? value : MIN_FONT_SIZE;
-    if (typeof maxFontPx === "number" && Number.isFinite(maxFontPx) && maxFontPx > 0) {
-      next = Math.min(next, maxFontPx);
-    }
-    if (typeof minFontPx === "number" && Number.isFinite(minFontPx) && minFontPx > 0) {
-      next = Math.max(next, minFontPx);
-    }
-    if (!(next > 0)) next = MIN_FONT_SIZE;
-    return Math.max(MIN_FONT_SIZE, Math.round(next));
-  };
+  const templateWidth =
+    typeof template.width === "number" && Number.isFinite(template.width) && template.width > 0
+      ? template.width
+      : videoW;
+  const widthScale = computeWidthScaleFromTemplate(element, box.w, templateWidth);
+  const layoutWidth =
+    widthScale > 1 && box.w > 0 ? Math.round(box.w / widthScale) : box.w;
+  const layoutBox =
+    typeof layoutWidth === "number" && layoutWidth > 0 ? { ...box, w: layoutWidth } : box;
 
-  let fontGuess = explicitFont ?? minFontPx ?? maxFontPx ?? MIN_FONT_SIZE;
-  if (!(fontGuess > 0)) fontGuess = MIN_FONT_SIZE;
-  fontGuess = clampFontSize(fontGuess);
-
+  const fontSizing = deriveFontSizing(
+    element,
+    MIN_FONT_SIZE,
+    videoW,
+    videoH,
+    { scaleMultiplier: widthScale }
+  );
+  const initialFont = fontSizing.initial;
   const lineHeightFactor = parseLineHeightFactor((element as any)?.line_height) ?? 1.2;
 
   const manualBreaks = text.includes("\n");
-  let lines = manualBreaks
-    ? text.split(/\r?\n/)
-    : wrapText(
-        text,
-        box.w > 0 ? maxCharsForWidth(box.w, Math.round(fontGuess)) : DEFAULT_CHARS_PER_LINE
-      );
+  const wrapFontInitial = widthScale > 1 ? initialFont / widthScale : initialFont;
+  const initialMax =
+    typeof layoutBox.w === "number" && layoutBox.w > 0
+      ? maxCharsForWidth(layoutBox.w, Math.round(wrapFontInitial))
+      : DEFAULT_CHARS_PER_LINE;
+  let lines = manualBreaks ? text.split(/\r?\n/) : wrapText(text, initialMax);
   lines = lines.map((ln) => ln.trim()).filter((ln) => ln);
   if (!lines.length) return undefined;
 
   const computeSpacing = (font: number, lineCount: number): number =>
     computeLineSpacingForBox(font, lineCount, box.h, lineHeightFactor);
 
-  let fontSize = clampFontSize(fontGuess);
+  let fontSize = fontSizing.clamp(initialFont);
   let spacing = computeSpacing(fontSize, lines.length);
   if (!manualBreaks) {
-    const layout = resolveTextLayout(text, box, fontSize, lineHeightFactor);
+    const layout = resolveTextLayout(text, layoutBox, fontSize, lineHeightFactor, {
+      widthScale,
+    });
     if (layout) {
       lines = [...layout.lines];
-      fontSize = clampFontSize(layout.font);
+      fontSize = fontSizing.clamp(layout.font);
       spacing = computeSpacing(fontSize, lines.length);
+    }
+  }
+
+  if (widthScale > 1) {
+    const desiredFont = fontSizing.clamp(initialFont);
+    if (desiredFont > fontSize) {
+      const manual = fitTextWithTargetFont(
+        text,
+        typeof layoutBox.w === "number" ? layoutBox.w : box.w,
+        { w: box.w, h: box.h },
+        desiredFont,
+        fontSize,
+        widthScale,
+        lineHeightFactor
+      );
+      if (manual) {
+        lines = [...manual.lines];
+        fontSize = fontSizing.clamp(manual.font);
+        spacing = computeSpacing(fontSize, lines.length);
+      }
     }
   }
 
@@ -1609,6 +1718,10 @@ export function buildTimelineFromLayout(
 ): SlideSpec[] {
   const { videoW, videoH, fps, defaultDur = 7 } = opts;
   const mods = modifications || {};
+  const templateW =
+    typeof template.width === "number" && Number.isFinite(template.width) && template.width > 0
+      ? template.width
+      : videoW;
 
   // Numero di slide: oltre a testo/tts/immagini, consideriamo anche le
   // occorrenze `Slide_i.time` nelle modifications per includere eventuali
@@ -1726,16 +1839,30 @@ export function buildTimelineFromLayout(
       }
     }
 
+    const widthScale = computeWidthScaleFromTemplate(
+      txtEl as TemplateElement | undefined,
+      txtBox.w,
+      templateW
+    );
+    const layoutWidth =
+      widthScale > 1 && txtBox.w > 0 ? Math.round(txtBox.w / widthScale) : txtBox.w;
+    const textLayoutBox =
+      typeof layoutWidth === "number" && layoutWidth > 0 ? { ...txtBox, w: layoutWidth } : txtBox;
     const fontSizing = deriveFontSizing(
       txtEl as TemplateElement | undefined,
       baseBlock.fontSize ?? MIN_FONT_SIZE,
       videoW,
-      videoH
+      videoH,
+      { scaleMultiplier: widthScale }
     );
     const initialFontSize = fontSizing.initial;
     baseBlock.fontSize = initialFontSize;
+    const wrapFontInitial =
+      widthScale > 1 ? initialFontSize / widthScale : initialFontSize;
     const initialMaxChars =
-      txtBox.w > 0 ? maxCharsForWidth(txtBox.w, initialFontSize) : DEFAULT_CHARS_PER_LINE;
+      typeof textLayoutBox.w === "number" && textLayoutBox.w > 0
+        ? maxCharsForWidth(textLayoutBox.w, wrapFontInitial)
+        : DEFAULT_CHARS_PER_LINE;
     let lines = txtStr ? wrapText(txtStr, initialMaxChars) : [];
     const lineHeightFactor =
       parseLineHeightFactor((txtEl as any)?.line_height) ?? 1.35;
@@ -1745,9 +1872,10 @@ export function buildTimelineFromLayout(
     if (lines.length) {
       const layout = resolveTextLayout(
         txtStr,
-        txtBox,
+        textLayoutBox,
         baseBlock.fontSize ?? initialFontSize,
-        lineHeightFactor
+        lineHeightFactor,
+        { widthScale }
       );
       if (layout) {
         lines = [...layout.lines];
@@ -1758,6 +1886,28 @@ export function buildTimelineFromLayout(
         const adjustedFont = fontSizing.clamp(baseBlock.fontSize ?? initialFontSize);
         baseBlock.fontSize = adjustedFont;
         baseBlock.lineSpacing = computeSpacing(adjustedFont, lines.length);
+      }
+
+      if (widthScale > 1) {
+        const desiredFont = fontSizing.clamp(initialFontSize);
+        const currentFont = baseBlock.fontSize ?? initialFontSize;
+        if (desiredFont > currentFont) {
+          const manual = fitTextWithTargetFont(
+            txtStr,
+            typeof textLayoutBox.w === "number" ? textLayoutBox.w : txtBox.w,
+            { w: txtBox.w, h: txtBox.h },
+            desiredFont,
+            currentFont,
+            widthScale,
+            lineHeightFactor
+          );
+          if (manual) {
+            lines = [...manual.lines];
+            const adjustedFont = fontSizing.clamp(manual.font);
+            baseBlock.fontSize = adjustedFont;
+            baseBlock.lineSpacing = computeSpacing(adjustedFont, lines.length);
+          }
+        }
       }
 
       const finalFont = baseBlock.fontSize ?? initialFontSize;
@@ -2033,17 +2183,33 @@ export function buildTimelineFromLayout(
           baseOut.boxAlpha = bg.alpha;
         }
       }
+      const outroWidthScale = computeWidthScaleFromTemplate(
+        textEl as TemplateElement | undefined,
+        outroTextBox.w,
+        templateW
+      );
+      const outroLayoutWidth =
+        outroWidthScale > 1 && outroTextBox.w > 0
+          ? Math.round(outroTextBox.w / outroWidthScale)
+          : outroTextBox.w;
+      const outroLayoutBox =
+        typeof outroLayoutWidth === "number" && outroLayoutWidth > 0
+          ? { ...outroTextBox, w: outroLayoutWidth }
+          : outroTextBox;
       const fontSizing = deriveFontSizing(
         textEl as TemplateElement | undefined,
         baseOut.fontSize ?? MIN_FONT_SIZE,
         videoW,
-        videoH
+        videoH,
+        { scaleMultiplier: outroWidthScale }
       );
       const initialOutSize = fontSizing.initial;
       baseOut.fontSize = initialOutSize;
+      const wrapFontInitial =
+        outroWidthScale > 1 ? initialOutSize / outroWidthScale : initialOutSize;
       const initialOutMax =
-        outroTextBox.w > 0
-          ? maxCharsForWidth(outroTextBox.w, initialOutSize)
+        typeof outroLayoutBox.w === "number" && outroLayoutBox.w > 0
+          ? maxCharsForWidth(outroLayoutBox.w, wrapFontInitial)
           : DEFAULT_CHARS_PER_LINE;
       let linesOut = wrapText(txt, initialOutMax);
       const lineHeightFactorOut =
@@ -2054,9 +2220,10 @@ export function buildTimelineFromLayout(
       if (linesOut.length) {
         const layout = resolveTextLayout(
           txt,
-          outroTextBox,
+          outroLayoutBox,
           baseOut.fontSize ?? initialOutSize,
-          lineHeightFactorOut
+          lineHeightFactorOut,
+          { widthScale: outroWidthScale }
         );
         if (layout) {
           linesOut = [...layout.lines];
@@ -2067,6 +2234,28 @@ export function buildTimelineFromLayout(
           const adjustedFont = fontSizing.clamp(baseOut.fontSize ?? initialOutSize);
           baseOut.fontSize = adjustedFont;
           baseOut.lineSpacing = computeSpacingOut(adjustedFont, linesOut.length);
+        }
+
+        if (outroWidthScale > 1) {
+          const desiredFont = fontSizing.clamp(initialOutSize);
+          const currentFont = baseOut.fontSize ?? initialOutSize;
+          if (desiredFont > currentFont) {
+            const manual = fitTextWithTargetFont(
+              txt,
+              typeof outroLayoutBox.w === "number" ? outroLayoutBox.w : outroTextBox.w,
+              { w: outroTextBox.w, h: outroTextBox.h },
+              desiredFont,
+              currentFont,
+              outroWidthScale,
+              lineHeightFactorOut
+            );
+            if (manual) {
+              linesOut = [...manual.lines];
+              const adjustedFont = fontSizing.clamp(manual.font);
+              baseOut.fontSize = adjustedFont;
+              baseOut.lineSpacing = computeSpacingOut(adjustedFont, linesOut.length);
+            }
+          }
         }
 
         const finalFont = baseOut.fontSize ?? initialOutSize;
