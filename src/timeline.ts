@@ -2270,8 +2270,10 @@ export function buildTimelineFromLayout(
       const wrapFontInitial =
         outroWidthScale > 1 ? initialOutSize / outroWidthScale : initialOutSize;
       const initialOutMax =
+
         typeof outroLayoutBox.w === "number" && outroLayoutBox.w > 0
           ? maxCharsForWidth(outroLayoutBox.w, wrapFontInitial)
+
           : DEFAULT_CHARS_PER_LINE;
       let linesOut = wrapText(txt, initialOutMax);
       const lineHeightFactorOut =
@@ -2282,7 +2284,9 @@ export function buildTimelineFromLayout(
       if (linesOut.length) {
         const layout = resolveTextLayout(
           txt,
+
           outroLayoutBox,
+
           baseOut.fontSize ?? initialOutSize,
           lineHeightFactorOut,
           { widthScale: outroWidthScale }
