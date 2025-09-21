@@ -912,6 +912,110 @@ test("buildTimelineFromLayout honors response durations when inserting filler", 
   assert.equal(slides[1].durationSec, 2);
 });
 
+test("gap filler mirrors upcoming slide template", () => {
+  const tpl: TemplateDoc = {
+    width: 100,
+    height: 100,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 1,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "0%",
+            y: "0%",
+            width: "10%",
+            height: "10%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+          },
+          {
+            type: "shape",
+            name: "Shape-0",
+            x: "10%",
+            y: "10%",
+            width: "20%",
+            height: "20%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+            fill_color: "#00ff00",
+          },
+          { type: "image", name: "Logo", x: "0%", y: "0%", width: "10%", height: "10%", x_anchor: "0%", y_anchor: "0%" },
+        ],
+      },
+      {
+        type: "composition",
+        name: "Slide_1",
+        duration: 1,
+        elements: [
+          {
+            type: "shape",
+            name: "Shape-1",
+            x: "10%",
+            y: "10%",
+            width: "20%",
+            height: "20%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+            fill_color: "#ff0000",
+          },
+          {
+            type: "image",
+            name: "Logo",
+            x: "20%",
+            y: "30%",
+            width: "40%",
+            height: "30%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+          },
+        ],
+      },
+    ],
+  } as any;
+  const mods = {
+    "Slide_0.time": "0 s",
+    "Slide_0.duration": "1 s",
+    "Slide_1.time": "3 s",
+  };
+  const prevImages = paths.images;
+  const prevTts = paths.tts;
+  const tmpImages = mkdtempSync(join(process.cwd(), "tmp-filler-"));
+  const img0 = join(tmpImages, "img0.jpeg");
+  const img1 = join(tmpImages, "img1.jpeg");
+  writeFileSync(img0, "fake");
+  writeFileSync(img1, "fake");
+  paths.images = tmpImages;
+  paths.tts = "/tmp/no_tts";
+  try {
+    const slides = buildTimelineFromLayout(mods, tpl, {
+      videoW: 100,
+      videoH: 100,
+      fps: 30,
+      defaultDur: 1,
+    });
+    assert.equal(slides.length, 3);
+    const filler = slides[1];
+    const next = slides[2];
+    assert.ok(filler.shapes && filler.shapes.length === 1);
+    assert.deepEqual(filler.shapes, next.shapes);
+    assert.equal(filler.logoX, next.logoX);
+    assert.equal(filler.logoY, next.logoY);
+    assert.equal(filler.logoWidth, next.logoWidth);
+    assert.equal(filler.logoHeight, next.logoHeight);
+    assert.equal(filler.bgImagePath, next.bgImagePath);
+    assert.equal(filler.shadowEnabled, next.shadowEnabled);
+    assert.equal(filler.backgroundAnimated, false);
+  } finally {
+    paths.images = prevImages;
+    paths.tts = prevTts;
+    rmSync(tmpImages, { recursive: true, force: true });
+  }
+});
+
 test("buildTimelineFromLayout skips slides marked invisible", () => {
   const tpl: TemplateDoc = {
     width: 100,
