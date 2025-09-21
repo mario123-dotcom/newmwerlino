@@ -38,11 +38,52 @@ test("getTextBoxFromTemplate uses anchors and keeps box inside canvas", () => {
       },
     ],
   };
-  const box = getTextBoxFromTemplate(tpl, 0)!;
+  const box = getTextBoxFromTemplate(tpl, 0, undefined, {
+    preserveOrigin: true,
+    minWidthRatio: TEXT.MIN_BOX_WIDTH_RATIO,
+  })!;
   assert.equal(box.x, 20);
   assert.equal(box.y, 30);
-  assert.equal(box.w, 60);
+  assert.equal(box.w, 75);
   assert.equal(box.h, 40);
+});
+
+test("getTextBoxFromTemplate enforces optional minimum width ratio", () => {
+  const tpl: TemplateDoc = {
+    width: 400,
+    height: 200,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "10%",
+            y: "20%",
+            width: "15%",
+            height: "30%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const defaultBox = getTextBoxFromTemplate(tpl, 0, undefined, {
+    preserveOrigin: true,
+  })!;
+  assert.equal(defaultBox.w, 60);
+  assert.equal(defaultBox.x, 40);
+
+  const widened = getTextBoxFromTemplate(tpl, 0, undefined, {
+    preserveOrigin: true,
+    minWidthRatio: 0.8,
+  })!;
+  assert.equal(widened.w, 320);
+  assert.equal(widened.x, 40);
 });
 
 test("getTextBoxFromTemplate mirrors point text margins", () => {
@@ -68,9 +109,12 @@ test("getTextBoxFromTemplate mirrors point text margins", () => {
     ],
   } as any;
 
-  const box = getTextBoxFromTemplate(tpl, 0)!;
+  const box = getTextBoxFromTemplate(tpl, 0, undefined, {
+    preserveAnchor: true,
+    minWidthRatio: TEXT.MIN_BOX_WIDTH_RATIO,
+  })!;
   assert.equal(box.x, 100);
-  assert.equal(box.w, 200);
+  assert.equal(box.w, 300);
   assert.equal(box.y, 20);
   assert.equal(box.h, 160);
 });
@@ -99,10 +143,13 @@ test("getTextBoxFromTemplate keeps anchors beyond 100 percent", () => {
     ],
   } as any;
 
-  const box = getTextBoxFromTemplate(tpl, 0)!;
-  assert.equal(box.x, 60);
+  const box = getTextBoxFromTemplate(tpl, 0, undefined, {
+    preserveAnchor: true,
+    minWidthRatio: TEXT.MIN_BOX_WIDTH_RATIO,
+  })!;
+  assert.equal(box.x, 25);
   assert.equal(box.y, 5);
-  assert.equal(box.w, 80);
+  assert.equal(box.w, 150);
   assert.equal(box.h, 50);
 });
 
@@ -129,8 +176,11 @@ test("getTextBoxFromTemplate clamps to slide bounds", () => {
       },
     ],
   };
-  const box = getTextBoxFromTemplate(tpl, 0)!;
-  assert.equal(box.x, 80);
+  const box = getTextBoxFromTemplate(tpl, 0, undefined, {
+    preserveOrigin: true,
+    minWidthRatio: TEXT.MIN_BOX_WIDTH_RATIO,
+  })!;
+  assert.equal(box.x, 25);
   assert.equal(box.y, 5);
 });
 
@@ -179,10 +229,67 @@ test("buildTimelineFromLayout aligns text horizontally inside box", () => {
   const textWidth = Math.max(
     ...lines.map((ln) => ln.length * fontPx * APPROX_CHAR_WIDTH_RATIO)
   );
-  const box = getTextBoxFromTemplate(tpl, 0)!;
+  const box = getTextBoxFromTemplate(tpl, 0, undefined, {
+    preserveOrigin: true,
+    minWidthRatio: TEXT.MIN_BOX_WIDTH_RATIO,
+  })!;
   const free = box.w - textWidth;
   const expected = box.x + Math.round(Math.min(free, Math.max(0, free)));
   assert.equal(block!.x, expected);
+});
+
+test("buildTimelineFromLayout keeps template font with widened boxes", () => {
+  const tpl: TemplateDoc = {
+    width: 800,
+    height: 450,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 3,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "12%",
+            y: "18%",
+            width: "32%",
+            height: "60%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+            font_size: 40,
+            line_height: "130%",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const textValue =
+    "Una serie di scosse ha colpito i Campi Flegrei culminando alle prime luci di lunedì";
+  const slides = buildTimelineFromLayout({ "Testo-0": textValue }, tpl, {
+    videoW: 800,
+    videoH: 450,
+    fps: 25,
+    defaultDur: 3,
+  });
+
+  const slide = slides[0];
+  assert.ok(slide);
+  const block = slide.texts?.[0];
+  assert.ok(block);
+  const box = getTextBoxFromTemplate(tpl, 0, undefined, {
+    preserveOrigin: true,
+    minWidthRatio: TEXT.MIN_BOX_WIDTH_RATIO,
+  })!;
+  const templateWidth = (tpl.width * 32) / 100;
+  const expectedScale = box.w / templateWidth;
+  assert(expectedScale > 1);
+  assert(block!.fontSize !== undefined);
+  const fontSize = block!.fontSize ?? 0;
+  const templateFont = 40;
+  assert.equal(fontSize, templateFont);
+  assert.equal(block!.x, box.x);
 });
 
 test("buildTimelineFromLayout centers outro point text", () => {
@@ -262,6 +369,87 @@ test("buildTimelineFromLayout centers outro point text", () => {
   const clamped = Math.max(0, Math.min(Math.max(0, Math.floor(available)), offset));
   const expected = clamped;
   assert.equal(block!.x, expected);
+});
+
+test("buildTimelineFromLayout centers outro textbox and text", () => {
+  const tpl: TemplateDoc = {
+    width: 800,
+    height: 600,
+    elements: [
+      {
+        type: "composition",
+        name: "Outro",
+        duration: 3,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-outro",
+            x: "40%",
+            y: "30%",
+            width: "30%",
+            height: "10%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+            x_alignment: "0%",
+            line_height: "100%",
+            background_color: "rgba(255, 255, 255, 1)",
+            text: "ARRIVEDERCI",
+          },
+          {
+            type: "image",
+            name: "Logo",
+            x: "50%",
+            y: "60%",
+            width: "20%",
+            height: "20%",
+            x_anchor: "50%",
+            y_anchor: "50%",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const prevImages = paths.images;
+  const prevTts = paths.tts;
+  const tmpDir = mkdtempSync(join(process.cwd(), "timeline-outro-center-"));
+  try {
+    writeFileSync(join(tmpDir, "img0.jpg"), "");
+    paths.images = tmpDir;
+    paths.tts = tmpDir;
+
+    const slides = buildTimelineFromLayout({ "Testo-outro": "ARRIVEDERCI" }, tpl, {
+      videoW: 800,
+      videoH: 600,
+      fps: 30,
+      defaultDur: 3,
+    });
+
+    const outro = slides[slides.length - 1];
+    const block = outro.texts?.[0];
+    assert.ok(block);
+    assert.ok(block?.background);
+
+    const bg = block!.background!;
+    const expectedCenter = 800 / 2;
+    const bgCenter = bg.x + bg.width / 2;
+    assert.ok(Math.abs(bgCenter - expectedCenter) <= 1);
+
+    assert.ok(block!.textFile);
+    const rendered = readFileSync(block!.textFile!, "utf8");
+    const lines = rendered.split(/\r?\n/).filter(Boolean);
+    assert.ok(lines.length > 0);
+    const fontPx = block!.fontSize ?? 0;
+    const textWidth = Math.max(
+      ...lines.map((ln) => ln.length * fontPx * APPROX_CHAR_WIDTH_RATIO)
+    );
+    const textCenter = block!.x + textWidth / 2;
+    assert.ok(Math.abs(textCenter - expectedCenter) <= 1);
+  } finally {
+    paths.images = prevImages;
+    paths.tts = prevTts;
+    rmSync(tmpDir, { recursive: true, force: true });
+  }
 });
 
 test("getLogoBoxFromTemplate uses anchors and clamps", () => {
@@ -397,9 +585,12 @@ test("buildTimelineFromLayout stabilizes font after single-line fallback", () =>
   } as any;
 
   const text = "Ciao mondo meraviglioso";
-  const box = getTextBoxFromTemplate(tpl, 0)!;
+  const box = getTextBoxFromTemplate(tpl, 0, undefined, {
+    preserveOrigin: true,
+    minWidthRatio: TEXT.MIN_BOX_WIDTH_RATIO,
+  })!;
   const fallbackFont = 24;
-  const approxCharWidth = 0.56;
+  const approxCharWidth = APPROX_CHAR_WIDTH_RATIO;
   const fallbackMaxChars = Math.floor(box.w / (fallbackFont * approxCharWidth));
   const fallbackLayout = wrapText(text, fallbackMaxChars);
   assert.equal(fallbackLayout.length, 1);
@@ -474,7 +665,10 @@ test("buildTimelineFromLayout adds extra padding to intro background", () => {
     ],
   } as any;
 
-  const box = getTextBoxFromTemplate(tpl, 0)!;
+  const box = getTextBoxFromTemplate(tpl, 0, undefined, {
+    preserveOrigin: true,
+    minWidthRatio: TEXT.MIN_BOX_WIDTH_RATIO,
+  })!;
   const prevImages = paths.images;
   const prevTts = paths.tts;
   paths.images = "/tmp/no_img";
@@ -511,6 +705,72 @@ test("buildTimelineFromLayout adds extra padding to intro background", () => {
   } finally {
     paths.images = prevImages;
     paths.tts = prevTts;
+  }
+});
+
+test("buildTimelineFromLayout caps slide line length to configured maximum", () => {
+  const tpl: TemplateDoc = {
+    width: 1920,
+    height: 1080,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 3,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "37.5%",
+            y: "92.3%",
+            width: "54.2%",
+            height: "42.7%",
+            x_anchor: "52%",
+            y_anchor: "122%",
+            line_height: "200%",
+            background_color: "rgba(0,0,0,1)",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const prevImages = paths.images;
+  const prevTts = paths.tts;
+  const prevAudio = paths.audio;
+  const prevFonts = paths.fonts;
+
+  paths.images = "/tmp/no_img";
+  paths.tts = "/tmp/no_tts";
+  paths.audio = "/tmp/no_audio";
+  paths.fonts = "/tmp/no_fonts";
+
+  try {
+    const text =
+      "Terremoto oggi ai Campi Flegrei, nuova forte scossa di magnitudo 4";
+    const slides = buildTimelineFromLayout({ "Testo-0": text }, tpl, {
+      videoW: 1920,
+      videoH: 1080,
+      fps: 25,
+      defaultDur: 3,
+    });
+    const main = slides[0];
+    assert.ok(main);
+    const lines = (main.texts ?? [])
+      .map((block) =>
+        block.textFile ? readFileSync(block.textFile, "utf8").trim() : block.text ?? ""
+      )
+      .filter(Boolean);
+    assert.deepEqual(lines, [
+      "Terremoto oggi ai Campi",
+      "Flegrei, nuova forte",
+      "scossa di magnitudo 4",
+    ]);
+  } finally {
+    paths.images = prevImages;
+    paths.tts = prevTts;
+    paths.audio = prevAudio;
+    paths.fonts = prevFonts;
   }
 });
 
@@ -1264,7 +1524,7 @@ test("buildTimelineFromLayout uses fixed wipe timings", () => {
       },
     ],
   } as any;
-  const mods = { "Testo-0": "a b" };
+  const mods = { "Testo-0": "a b c d e" };
   paths.images = "/tmp/no_img";
   paths.tts = "/tmp/no_tts";
   const slides = buildTimelineFromLayout(mods, tpl, {
