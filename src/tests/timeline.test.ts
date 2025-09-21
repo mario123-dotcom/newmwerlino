@@ -38,6 +38,7 @@ test("getTextBoxFromTemplate uses anchors and keeps box inside canvas", () => {
       },
     ],
   };
+
   const box = getTextBoxFromTemplate(tpl, 0, undefined, {
     preserveOrigin: true,
     minWidthRatio: TEXT.MIN_BOX_WIDTH_RATIO,
@@ -45,6 +46,7 @@ test("getTextBoxFromTemplate uses anchors and keeps box inside canvas", () => {
   assert.equal(box.x, 15);
   assert.equal(box.y, 30);
   assert.equal(box.w, 85);
+
   assert.equal(box.h, 40);
 });
 
@@ -115,6 +117,7 @@ test("getTextBoxFromTemplate mirrors point text margins", () => {
   })!;
   assert.equal(box.x, 60);
   assert.equal(box.w, 340);
+
   assert.equal(box.y, 20);
   assert.equal(box.h, 160);
 });
@@ -181,6 +184,7 @@ test("getTextBoxFromTemplate clamps to slide bounds", () => {
     minWidthRatio: TEXT.MIN_BOX_WIDTH_RATIO,
   })!;
   assert.equal(box.x, 15);
+
   assert.equal(box.y, 5);
 });
 
@@ -233,12 +237,15 @@ test("buildTimelineFromLayout aligns text horizontally inside box", () => {
     preserveOrigin: true,
     minWidthRatio: TEXT.MIN_BOX_WIDTH_RATIO,
   })!;
+
   const free = box.w - textWidth;
   const expected = box.x + Math.round(Math.min(free, Math.max(0, free)));
   assert.equal(block!.x, expected);
 });
 
+
 test("buildTimelineFromLayout scales template font with widened boxes", () => {
+
   const tpl: TemplateDoc = {
     width: 800,
     height: 450,
@@ -282,6 +289,7 @@ test("buildTimelineFromLayout scales template font with widened boxes", () => {
     preserveOrigin: true,
     minWidthRatio: TEXT.MIN_BOX_WIDTH_RATIO,
   })!;
+
   const templateWidth = (tpl.width * 32) / 100;
   const expectedScale = box.w / templateWidth;
   assert(expectedScale > 1);
@@ -297,6 +305,7 @@ test("buildTimelineFromLayout scales template font with widened boxes", () => {
   );
   const maxExpected = Math.round(templateFont * maxScale);
   assert(fontSize <= maxExpected);
+
   assert.equal(block!.x, box.x);
 });
 
@@ -597,6 +606,7 @@ test("buildTimelineFromLayout stabilizes font after single-line fallback", () =>
     preserveOrigin: true,
     minWidthRatio: TEXT.MIN_BOX_WIDTH_RATIO,
   })!;
+
   const fallbackFont = 24;
   const approxCharWidth = APPROX_CHAR_WIDTH_RATIO;
   const fallbackMaxChars = Math.floor(box.w / (fallbackFont * approxCharWidth));
@@ -677,6 +687,7 @@ test("buildTimelineFromLayout adds extra padding to intro background", () => {
     preserveOrigin: true,
     minWidthRatio: TEXT.MIN_BOX_WIDTH_RATIO,
   })!;
+
   const prevImages = paths.images;
   const prevTts = paths.tts;
   paths.images = "/tmp/no_img";

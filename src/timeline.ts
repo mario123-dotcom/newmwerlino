@@ -982,6 +982,7 @@ export function getTextBoxFromTemplate(
     preserveOrigin?: boolean;
     minWidthRatio?: number;
   }
+
 ): { x: number; y: number; w: number; h: number } | undefined {
   const compName =
     typeof slideIndexOrName === "number"
@@ -1049,6 +1050,7 @@ export function getTextBoxFromTemplate(
         if (!(w > 0) || w < widthTarget) {
           w = widthTarget;
         }
+
       }
     }
   }
@@ -1225,6 +1227,7 @@ function deriveFontSizing(
       : undefined;
   if (scaleCap && scale > scaleCap) {
     scale = scaleCap;
+
   }
   const scaleValue = (value: number | undefined): number | undefined => {
     if (!(typeof value === "number" && Number.isFinite(value) && value > 0)) return undefined;
@@ -1873,6 +1876,7 @@ export function buildTimelineFromLayout(
         preserveOrigin: true,
         minWidthRatio: TEXT.MIN_BOX_WIDTH_RATIO,
       }) ||
+
       { x: 120, y: 160, w: 0, h: 0 };
     const baseBlock = defaultTextBlock(txtBox.x, txtBox.y);
     if (txtEl) {
@@ -2293,6 +2297,7 @@ export function buildTimelineFromLayout(
       const initialOutMax =
         typeof outroLayoutBox.w === "number" && outroLayoutBox.w > 0
           ? maxCharsForWidth(outroLayoutBox.w, wrapFontInitial)
+
           : DEFAULT_CHARS_PER_LINE;
       let linesOut = wrapText(txt, initialOutMax);
       const lineHeightFactorOut =
@@ -2304,6 +2309,7 @@ export function buildTimelineFromLayout(
         const layout = resolveTextLayout(
           txt,
           outroLayoutBox,
+
           baseOut.fontSize ?? initialOutSize,
           lineHeightFactorOut,
           { widthScale: outroWidthScale }
