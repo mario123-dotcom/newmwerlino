@@ -2048,6 +2048,7 @@ export function buildTimelineFromLayout(
     }
 
     const textFiles = lines.length ? writeTextFilesForSlide(i, lines) : [];
+    const isFillerSlide = !ttsPath && !txtStr && textFiles.length === 0;
 
     // Animazioni per ciascuna linea
     const lineHeight = (baseBlock.fontSize ?? 60) + (baseBlock.lineSpacing ?? 8);
@@ -2111,7 +2112,7 @@ export function buildTimelineFromLayout(
       videoW,
       videoH,
       globalShapeIndex,
-      { includeFullFrame: !bgImagePath }
+      { includeFullFrame: isFillerSlide || !bgImagePath }
     );
     globalShapeIndex += shapes.length;
     const texts: TextBlockSpec[] = textFiles.map((tf, idx) => ({
@@ -2133,8 +2134,6 @@ export function buildTimelineFromLayout(
     if (copyrightBlock) {
       texts.push(copyrightBlock);
     }
-
-    const isFillerSlide = !ttsPath && !txtStr && texts.length === 0;
 
     const slide: SlideSpec = {
       width: videoW,
