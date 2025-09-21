@@ -238,7 +238,7 @@ test("buildTimelineFromLayout aligns text horizontally inside box", () => {
   assert.equal(block!.x, expected);
 });
 
-test("buildTimelineFromLayout keeps template font with widened boxes", () => {
+test("buildTimelineFromLayout scales template font with widened boxes", () => {
   const tpl: TemplateDoc = {
     width: 800,
     height: 450,
@@ -288,7 +288,9 @@ test("buildTimelineFromLayout keeps template font with widened boxes", () => {
   assert(block!.fontSize !== undefined);
   const fontSize = block!.fontSize ?? 0;
   const templateFont = 40;
-  assert.equal(fontSize, templateFont);
+  assert(fontSize > templateFont);
+  const maxExpected = Math.round(templateFont * expectedScale);
+  assert(fontSize <= maxExpected);
   assert.equal(block!.x, box.x);
 });
 

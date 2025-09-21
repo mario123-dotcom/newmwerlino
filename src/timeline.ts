@@ -1217,7 +1217,7 @@ function deriveFontSizing(
   const rawScale = opts?.scaleMultiplier;
   let scale = 1;
   if (typeof rawScale === "number" && Number.isFinite(rawScale) && rawScale > 0) {
-    scale = Math.min(rawScale, 1);
+    scale = rawScale;
   }
   const scaleValue = (value: number | undefined): number | undefined => {
     if (!(typeof value === "number" && Number.isFinite(value) && value > 0)) return undefined;
