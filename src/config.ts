@@ -33,7 +33,7 @@ export const TEXT = {
 
   MAX_CHARS_PER_LINE: 30,
   /** fattore massimo di scala per i font ricavati dal template quando il box si allarga */
-  MAX_FONT_SCALE: 1,
+  MAX_FONT_SCALE: 2,
   /** padding extra per gli sfondi del testo (in multipli del font size) */
   BOX_PAD_FACTOR: 0.30,
   /** larghezza minima del box testo (percentuale della larghezza video) */

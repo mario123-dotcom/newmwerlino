@@ -870,11 +870,13 @@ function extractShapesFromComposition(
   mods: Record<string, any>,
   W: number,
   H: number,
-  startIndex: number
+  startIndex: number,
+  opts?: { includeFullFrame?: boolean }
 ): ShapeBlockSpec[] {
   if (!comp || !Array.isArray(comp.elements)) return [];
   const queue: TemplateElement[] = [...comp.elements];
   const shapes: ShapeBlockSpec[] = [];
+  const includeFullFrame = opts?.includeFullFrame ?? false;
   while (queue.length) {
     const el = queue.shift();
     if (!el) continue;
@@ -903,7 +905,7 @@ function extractShapesFromComposition(
       H
     );
     if (!rect) continue;
-    if (rect.w >= W * 0.98 && rect.h >= H * 0.98) continue;
+    if (!includeFullFrame && rect.w >= W * 0.98 && rect.h >= H * 0.98) continue;
     const globalIndex = startIndex + shapes.length;
     const color = resolveShapeColor(el, mods, comp.name, globalIndex);
     if (!color) continue;
@@ -917,6 +919,19 @@ function extractShapesFromComposition(
       alpha: color.alpha,
       animations: animations.length ? animations : undefined,
     });
+  }
+  if (includeFullFrame && !shapes.length) {
+    const baseColor = parseShapeColor((comp as any)?.fill_color ?? (comp as any)?.fillColor);
+    if (baseColor && baseColor.alpha > 0) {
+      shapes.push({
+        x: 0,
+        y: 0,
+        width: Math.max(Math.round(W), 0),
+        height: Math.max(Math.round(H), 0),
+        color: baseColor.color,
+        alpha: Math.max(0, Math.min(1, baseColor.alpha)),
+      });
+    }
   }
   return shapes;
 }
@@ -2095,7 +2110,8 @@ export function buildTimelineFromLayout(
       mods,
       videoW,
       videoH,
-      globalShapeIndex
+      globalShapeIndex,
+      { includeFullFrame: !bgImagePath }
     );
     globalShapeIndex += shapes.length;
     const texts: TextBlockSpec[] = textFiles.map((tf, idx) => ({
@@ -2443,6 +2459,15 @@ export function buildTimelineFromLayout(
       if (!texts) texts = [];
       texts.push(outroCopyright);
     }
+    const outroShapes = extractShapesFromComposition(
+      outroComp,
+      mods,
+      videoW,
+      videoH,
+      globalShapeIndex,
+      { includeFullFrame: true }
+    );
+    globalShapeIndex += outroShapes.length;
     slides.push({
       width: videoW,
       height: videoH,
@@ -2457,6 +2482,7 @@ export function buildTimelineFromLayout(
       fontFile: fontPath,
       texts,
       shadowEnabled: outroHasShadow ? true : undefined,
+      shapes: outroShapes.length ? outroShapes : undefined,
     });
   }
 
