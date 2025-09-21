@@ -38,11 +38,54 @@ test("getTextBoxFromTemplate uses anchors and keeps box inside canvas", () => {
       },
     ],
   };
-  const box = getTextBoxFromTemplate(tpl, 0, undefined, { preserveOrigin: true })!;
-  assert.equal(box.x, 20);
+
+  const box = getTextBoxFromTemplate(tpl, 0, undefined, {
+    preserveOrigin: true,
+    minWidthRatio: TEXT.MIN_BOX_WIDTH_RATIO,
+  })!;
+  assert.equal(box.x, 15);
   assert.equal(box.y, 30);
-  assert.equal(box.w, 75);
+  assert.equal(box.w, 85);
+
   assert.equal(box.h, 40);
+});
+
+test("getTextBoxFromTemplate enforces optional minimum width ratio", () => {
+  const tpl: TemplateDoc = {
+    width: 400,
+    height: 200,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "10%",
+            y: "20%",
+            width: "15%",
+            height: "30%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const defaultBox = getTextBoxFromTemplate(tpl, 0, undefined, {
+    preserveOrigin: true,
+  })!;
+  assert.equal(defaultBox.w, 60);
+  assert.equal(defaultBox.x, 40);
+
+  const widened = getTextBoxFromTemplate(tpl, 0, undefined, {
+    preserveOrigin: true,
+    minWidthRatio: 0.8,
+  })!;
+  assert.equal(widened.w, 320);
+  assert.equal(widened.x, 40);
 });
 
 test("getTextBoxFromTemplate mirrors point text margins", () => {
@@ -68,9 +111,13 @@ test("getTextBoxFromTemplate mirrors point text margins", () => {
     ],
   } as any;
 
-  const box = getTextBoxFromTemplate(tpl, 0, undefined, { preserveAnchor: true })!;
-  assert.equal(box.x, 100);
-  assert.equal(box.w, 300);
+  const box = getTextBoxFromTemplate(tpl, 0, undefined, {
+    preserveAnchor: true,
+    minWidthRatio: TEXT.MIN_BOX_WIDTH_RATIO,
+  })!;
+  assert.equal(box.x, 60);
+  assert.equal(box.w, 340);
+
   assert.equal(box.y, 20);
   assert.equal(box.h, 160);
 });
@@ -99,10 +146,13 @@ test("getTextBoxFromTemplate keeps anchors beyond 100 percent", () => {
     ],
   } as any;
 
-  const box = getTextBoxFromTemplate(tpl, 0, undefined, { preserveAnchor: true })!;
-  assert.equal(box.x, 25);
+  const box = getTextBoxFromTemplate(tpl, 0, undefined, {
+    preserveAnchor: true,
+    minWidthRatio: TEXT.MIN_BOX_WIDTH_RATIO,
+  })!;
+  assert.equal(box.x, 15);
   assert.equal(box.y, 5);
-  assert.equal(box.w, 150);
+  assert.equal(box.w, 170);
   assert.equal(box.h, 50);
 });
 
@@ -129,8 +179,12 @@ test("getTextBoxFromTemplate clamps to slide bounds", () => {
       },
     ],
   };
-  const box = getTextBoxFromTemplate(tpl, 0, undefined, { preserveOrigin: true })!;
-  assert.equal(box.x, 25);
+  const box = getTextBoxFromTemplate(tpl, 0, undefined, {
+    preserveOrigin: true,
+    minWidthRatio: TEXT.MIN_BOX_WIDTH_RATIO,
+  })!;
+  assert.equal(box.x, 15);
+
   assert.equal(box.y, 5);
 });
 
@@ -179,13 +233,19 @@ test("buildTimelineFromLayout aligns text horizontally inside box", () => {
   const textWidth = Math.max(
     ...lines.map((ln) => ln.length * fontPx * APPROX_CHAR_WIDTH_RATIO)
   );
-  const box = getTextBoxFromTemplate(tpl, 0, undefined, { preserveOrigin: true })!;
+  const box = getTextBoxFromTemplate(tpl, 0, undefined, {
+    preserveOrigin: true,
+    minWidthRatio: TEXT.MIN_BOX_WIDTH_RATIO,
+  })!;
+
   const free = box.w - textWidth;
   const expected = box.x + Math.round(Math.min(free, Math.max(0, free)));
   assert.equal(block!.x, expected);
 });
 
-test("buildTimelineFromLayout keeps template font with widened boxes", () => {
+
+test("buildTimelineFromLayout scales template font with widened boxes", () => {
+
   const tpl: TemplateDoc = {
     width: 800,
     height: 450,
@@ -225,14 +285,27 @@ test("buildTimelineFromLayout keeps template font with widened boxes", () => {
   assert.ok(slide);
   const block = slide.texts?.[0];
   assert.ok(block);
-  const box = getTextBoxFromTemplate(tpl, 0, undefined, { preserveOrigin: true })!;
+  const box = getTextBoxFromTemplate(tpl, 0, undefined, {
+    preserveOrigin: true,
+    minWidthRatio: TEXT.MIN_BOX_WIDTH_RATIO,
+  })!;
+
   const templateWidth = (tpl.width * 32) / 100;
   const expectedScale = box.w / templateWidth;
   assert(expectedScale > 1);
   assert(block!.fontSize !== undefined);
   const fontSize = block!.fontSize ?? 0;
   const templateFont = 40;
-  assert.equal(fontSize, templateFont);
+  assert(fontSize > templateFont);
+  const maxScale = Math.min(
+    expectedScale,
+    typeof TEXT.MAX_FONT_SCALE === "number" && TEXT.MAX_FONT_SCALE > 0
+      ? TEXT.MAX_FONT_SCALE
+      : expectedScale
+  );
+  const maxExpected = Math.round(templateFont * maxScale);
+  assert(fontSize <= maxExpected);
+
   assert.equal(block!.x, box.x);
 });
 
@@ -529,7 +602,11 @@ test("buildTimelineFromLayout stabilizes font after single-line fallback", () =>
   } as any;
 
   const text = "Ciao mondo meraviglioso";
-  const box = getTextBoxFromTemplate(tpl, 0, undefined, { preserveOrigin: true })!;
+  const box = getTextBoxFromTemplate(tpl, 0, undefined, {
+    preserveOrigin: true,
+    minWidthRatio: TEXT.MIN_BOX_WIDTH_RATIO,
+  })!;
+
   const fallbackFont = 24;
   const approxCharWidth = APPROX_CHAR_WIDTH_RATIO;
   const fallbackMaxChars = Math.floor(box.w / (fallbackFont * approxCharWidth));
@@ -606,7 +683,11 @@ test("buildTimelineFromLayout adds extra padding to intro background", () => {
     ],
   } as any;
 
-  const box = getTextBoxFromTemplate(tpl, 0, undefined, { preserveOrigin: true })!;
+  const box = getTextBoxFromTemplate(tpl, 0, undefined, {
+    preserveOrigin: true,
+    minWidthRatio: TEXT.MIN_BOX_WIDTH_RATIO,
+  })!;
+
   const prevImages = paths.images;
   const prevTts = paths.tts;
   paths.images = "/tmp/no_img";
@@ -627,10 +708,14 @@ test("buildTimelineFromLayout adds extra padding to intro background", () => {
     assert.ok(primary.background);
     const pad = Math.round((primary.fontSize ?? 0) * TEXT.BOX_PAD_FACTOR);
     assert.ok(pad > 0);
-    assert.equal(primary.background?.x, box.x - pad);
-    assert.equal(primary.background?.y, box.y - pad);
-    assert.equal(primary.background?.width, box.w + pad * 2);
-    assert.equal(primary.background?.height, box.h + pad * 2);
+    const expectedBgX = Math.max(0, box.x - pad);
+    const expectedBgY = Math.max(0, box.y - pad);
+    const expectedBgW = Math.min(1920 - expectedBgX, box.w + pad * 2);
+    const expectedBgH = Math.min(1080 - expectedBgY, box.h + pad * 2);
+    assert.equal(primary.background?.x, expectedBgX);
+    assert.equal(primary.background?.y, expectedBgY);
+    assert.equal(primary.background?.width, expectedBgW);
+    assert.equal(primary.background?.height, expectedBgH);
     assert.equal(primary.background?.color, "#000000");
     assert.equal(primary.background?.alpha, 0.8);
     assert.equal(primary.box, true);

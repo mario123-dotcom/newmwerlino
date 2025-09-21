@@ -977,7 +977,12 @@ export function getTextBoxFromTemplate(
   tpl: TemplateDoc,
   slideIndexOrName: number | string,
   textName?: string,
-  opts?: { preserveAnchor?: boolean; preserveOrigin?: boolean }
+  opts?: {
+    preserveAnchor?: boolean;
+    preserveOrigin?: boolean;
+    minWidthRatio?: number;
+  }
+
 ): { x: number; y: number; w: number; h: number } | undefined {
   const compName =
     typeof slideIndexOrName === "number"
@@ -1032,12 +1037,20 @@ export function getTextBoxFromTemplate(
     }
   }
 
+  const rawMinRatio = opts?.minWidthRatio;
   if (W > 0 && Number.isFinite(W)) {
-    const minWidth = Math.round(W * TEXT.MIN_BOX_WIDTH_RATIO);
-    if (minWidth > 0) {
-      const widthTarget = Math.min(W, minWidth);
-      if (!(w > 0) || w < widthTarget) {
-        w = widthTarget;
+    const minRatio =
+      typeof rawMinRatio === "number" && Number.isFinite(rawMinRatio)
+        ? Math.max(0, Math.min(rawMinRatio, 1))
+        : undefined;
+    if (typeof minRatio === "number" && minRatio > 0) {
+      const minWidth = Math.round(W * minRatio);
+      if (minWidth > 0) {
+        const widthTarget = Math.min(W, minWidth);
+        if (!(w > 0) || w < widthTarget) {
+          w = widthTarget;
+        }
+
       }
     }
   }
@@ -1206,7 +1219,15 @@ function deriveFontSizing(
   const rawScale = opts?.scaleMultiplier;
   let scale = 1;
   if (typeof rawScale === "number" && Number.isFinite(rawScale) && rawScale > 0) {
-    scale = Math.min(rawScale, 1);
+    scale = rawScale;
+  }
+  const scaleCap =
+    typeof TEXT.MAX_FONT_SCALE === "number" && Number.isFinite(TEXT.MAX_FONT_SCALE)
+      ? Math.max(0, TEXT.MAX_FONT_SCALE)
+      : undefined;
+  if (scaleCap && scale > scaleCap) {
+    scale = scaleCap;
+
   }
   const scaleValue = (value: number | undefined): number | undefined => {
     if (!(typeof value === "number" && Number.isFinite(value) && value > 0)) return undefined;
@@ -1851,7 +1872,11 @@ export function buildTimelineFromLayout(
     const txtStr = typeof mods[`Testo-${i}`] === "string" ? mods[`Testo-${i}`].trim() : "";
 
     const txtBox =
-      getTextBoxFromTemplate(template, i, undefined, { preserveOrigin: true }) ||
+      getTextBoxFromTemplate(template, i, undefined, {
+        preserveOrigin: true,
+        minWidthRatio: TEXT.MIN_BOX_WIDTH_RATIO,
+      }) ||
+
       { x: 120, y: 160, w: 0, h: 0 };
     const baseBlock = defaultTextBlock(txtBox.x, txtBox.y);
     if (txtEl) {
@@ -2270,7 +2295,6 @@ export function buildTimelineFromLayout(
       const wrapFontInitial =
         outroWidthScale > 1 ? initialOutSize / outroWidthScale : initialOutSize;
       const initialOutMax =
-
         typeof outroLayoutBox.w === "number" && outroLayoutBox.w > 0
           ? maxCharsForWidth(outroLayoutBox.w, wrapFontInitial)
 
@@ -2284,7 +2308,6 @@ export function buildTimelineFromLayout(
       if (linesOut.length) {
         const layout = resolveTextLayout(
           txt,
-
           outroLayoutBox,
 
           baseOut.fontSize ?? initialOutSize,

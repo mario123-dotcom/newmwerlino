@@ -30,11 +30,15 @@ export const TEXT = {
   /** rapporto medio larghezza/carattere in px ≈ k * fontsize */
   CHAR_WIDTH_K: 0.55, // 0.52–0.58 a seconda del font
   /** limite massimo indicativo di caratteri per riga sulle slide principali */
-  MAX_CHARS_PER_LINE: 24,
+
+  MAX_CHARS_PER_LINE: 30,
+  /** fattore massimo di scala per i font ricavati dal template quando il box si allarga */
+  MAX_FONT_SCALE: 1,
   /** padding extra per gli sfondi del testo (in multipli del font size) */
   BOX_PAD_FACTOR: 0.30,
   /** larghezza minima del box testo (percentuale della larghezza video) */
-  MIN_BOX_WIDTH_RATIO: 0.75,
+  MIN_BOX_WIDTH_RATIO: 0.85,
+
 };
 
 /** Scale di base (fontsize ≈ scale * videoH) */
