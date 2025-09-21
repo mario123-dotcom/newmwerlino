@@ -1219,6 +1219,13 @@ function deriveFontSizing(
   if (typeof rawScale === "number" && Number.isFinite(rawScale) && rawScale > 0) {
     scale = rawScale;
   }
+  const scaleCap =
+    typeof TEXT.MAX_FONT_SCALE === "number" && Number.isFinite(TEXT.MAX_FONT_SCALE)
+      ? Math.max(0, TEXT.MAX_FONT_SCALE)
+      : undefined;
+  if (scaleCap && scale > scaleCap) {
+    scale = scaleCap;
+  }
   const scaleValue = (value: number | undefined): number | undefined => {
     if (!(typeof value === "number" && Number.isFinite(value) && value > 0)) return undefined;
     const scaled = value * scale;

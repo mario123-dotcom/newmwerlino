@@ -289,7 +289,13 @@ test("buildTimelineFromLayout scales template font with widened boxes", () => {
   const fontSize = block!.fontSize ?? 0;
   const templateFont = 40;
   assert(fontSize > templateFont);
-  const maxExpected = Math.round(templateFont * expectedScale);
+  const maxScale = Math.min(
+    expectedScale,
+    typeof TEXT.MAX_FONT_SCALE === "number" && TEXT.MAX_FONT_SCALE > 0
+      ? TEXT.MAX_FONT_SCALE
+      : expectedScale
+  );
+  const maxExpected = Math.round(templateFont * maxScale);
   assert(fontSize <= maxExpected);
   assert.equal(block!.x, box.x);
 });
