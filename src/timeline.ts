@@ -654,6 +654,101 @@ function outroBackgroundNameCandidates(): string[] {
   ]);
 }
 
+function isSlideCompositionName(name: string | undefined): boolean {
+  if (!name) return false;
+  return /^slide_\d+$/i.test(name.trim());
+}
+
+type FillerCompositionInfo = {
+  name: string;
+  comp: TemplateElement;
+  start: number;
+  duration: number;
+};
+
+function collectFillerCompositions(
+  template: TemplateDoc,
+  mods: Record<string, any>,
+  defaultDur: number
+): FillerCompositionInfo[] {
+  const out: FillerCompositionInfo[] = [];
+  const seen = new Set<string>();
+  const visit = (elements: TemplateElement[] | undefined) => {
+    if (!Array.isArray(elements)) return;
+    for (const el of elements) {
+      if (!el || typeof el !== "object") continue;
+      if (el.type === "composition" && typeof el.name === "string") {
+        const name = el.name.trim();
+        if (name && !seen.has(name) && !isSlideCompositionName(name) && name !== "Outro") {
+          const visMod = mods[`${name}.visible`];
+          const visible = !(
+            visMod === false ||
+            visMod === 0 ||
+            String(visMod).toLowerCase() === "false" ||
+            el.visible === false
+          );
+          if (visible) {
+            const start = parseSec(mods[`${name}.time`], parseSec((el as any)?.time, 0));
+            const duration = parseSec(
+              mods[`${name}.duration`],
+              parseSec((el as any)?.duration, defaultDur)
+            );
+            if (duration > 0) {
+              out.push({ name, comp: el, start, duration });
+            }
+          }
+          seen.add(name);
+        }
+      }
+      if (Array.isArray((el as any)?.elements)) {
+        visit((el as any).elements as TemplateElement[]);
+      }
+    }
+  };
+  visit(template.elements);
+  out.sort((a, b) => a.start - b.start);
+  return out;
+}
+
+function fillerBackgroundNameCandidates(name: string): string[] {
+  const clean = typeof name === "string" ? name.trim() : "";
+  if (!clean) return [];
+  return uniqueNames([
+    `${clean}.background`,
+    `${clean}.Background`,
+    `${clean}.media`,
+    `${clean}.Media`,
+    `${clean}.video`,
+    `${clean}.Video`,
+    `${clean}.image`,
+    `${clean}.Image`,
+    `${clean}_background`,
+    `${clean}-background`,
+    `${clean} background`,
+    `${clean}_media`,
+    `${clean}-media`,
+    `${clean} media`,
+    `${clean}_video`,
+    `${clean}-video`,
+    `${clean} video`,
+    `${clean}_image`,
+    `${clean}-image`,
+    `${clean} image`,
+    `Background-${clean}`,
+    `Background_${clean}`,
+    `Background ${clean}`,
+    `Media-${clean}`,
+    `Media_${clean}`,
+    `Media ${clean}`,
+    `Video-${clean}`,
+    `Video_${clean}`,
+    `Video ${clean}`,
+    `Image-${clean}`,
+    `Image_${clean}`,
+    `Image ${clean}`,
+  ]);
+}
+
 function findShadowBearingDescendant(
   parent: TemplateElement | undefined
 ): TemplateElement | undefined {
@@ -1828,6 +1923,100 @@ export function buildTimelineFromLayout(
   let prevEnd = 0;
   let globalShapeIndex = 0;
 
+  const fillerComps = collectFillerCompositions(template, mods, defaultDur);
+  let fillerCursor = 0;
+  const FILLER_EPS = 0.001;
+
+  const defaultLogoBox = {
+    x: Math.round((videoW - 240) / 2),
+    y: Math.round((videoH - 140) / 2),
+    w: 240,
+    h: 140,
+  };
+
+  const readLogoBox = (source: number | string) => {
+    const tplBox = getLogoBoxFromTemplate(template, source);
+    return {
+      x: tplBox.x ?? defaultLogoBox.x,
+      y: tplBox.y ?? defaultLogoBox.y,
+      w: tplBox.w ?? defaultLogoBox.w,
+      h: tplBox.h ?? defaultLogoBox.h,
+    };
+  };
+
+  const pushLogoOnlyFiller = (duration: number, source: number | string) => {
+    if (!(duration > FILLER_EPS)) return;
+    const box = readLogoBox(source);
+    slides.push({
+      width: videoW,
+      height: videoH,
+      fps,
+      durationSec: duration,
+      outPath: "",
+      logoPath: join(paths.images, "logo.png"),
+      logoWidth: box.w,
+      logoHeight: box.h,
+      logoX: box.x,
+      logoY: box.y,
+      backgroundAnimated: false,
+    });
+    prevEnd += duration;
+  };
+
+  const pushFillerFromComposition = (info: FillerCompositionInfo) => {
+    const box = readLogoBox(info.name);
+    const bgNames = fillerBackgroundNameCandidates(info.name);
+    const shadowSources: Array<() => ShadowInfo | undefined> = [
+      () => extractShadow(info.comp, videoW, videoH),
+      () => extractShadow(findShadowSource(info.comp, bgNames), videoW, videoH),
+      () => extractShadowFromMods(mods, info.name, videoW, videoH),
+      ...bgNames.map((name) => () => extractShadowFromMods(mods, name, videoW, videoH)),
+    ];
+    const hasShadow = shadowSources.some((get) => !!get());
+    const shapes = extractShapesFromComposition(
+      info.comp,
+      mods,
+      videoW,
+      videoH,
+      globalShapeIndex,
+      { includeFullFrame: true }
+    );
+    globalShapeIndex += shapes.length;
+    slides.push({
+      width: videoW,
+      height: videoH,
+      fps,
+      durationSec: info.duration,
+      outPath: "",
+      logoPath: join(paths.images, "logo.png"),
+      logoWidth: box.w,
+      logoHeight: box.h,
+      logoX: box.x,
+      logoY: box.y,
+      shapes: shapes.length ? shapes : undefined,
+      shadowEnabled: hasShadow ? true : undefined,
+    });
+    prevEnd += info.duration;
+  };
+
+  const consumeTemplateFillersUntil = (
+    targetStart: number,
+    fallbackLogoSource: number | string
+  ) => {
+    while (fillerCursor < fillerComps.length) {
+      const info = fillerComps[fillerCursor];
+      if (info.start > targetStart + FILLER_EPS) break;
+      fillerCursor++;
+      if (!(info.duration > FILLER_EPS)) continue;
+      if (info.start > prevEnd + FILLER_EPS) {
+        pushLogoOnlyFiller(info.start - prevEnd, fallbackLogoSource);
+      } else if (info.start < prevEnd - FILLER_EPS) {
+        continue;
+      }
+      pushFillerFromComposition(info);
+    }
+  };
+
   for (let i = 0; i < n; i++) {
     const comp = findComposition(template, `Slide_${i}`);
     const txtEl = findChildByName(comp, `Testo-${i}`);
@@ -1844,28 +2033,14 @@ export function buildTimelineFromLayout(
     const start = parseSec(mods[`Slide_${i}.time`], prevEnd);
 
     // Inserisci filler se c'è un gap rispetto alla fine precedente
-    if (start > prevEnd + 0.001) {
-      const gap = start - prevEnd;
-      const fLogo = getLogoBoxFromTemplate(template, i) || {
-        x: Math.round((videoW - 240) / 2),
-        y: Math.round((videoH - 140) / 2),
-        w: 240,
-        h: 140,
-      };
-      slides.push({
-        width: videoW,
-        height: videoH,
-        fps,
-        durationSec: gap,
-        outPath: "",
-        logoPath: join(paths.images, "logo.png"),
-        logoWidth: fLogo.w,
-        logoHeight: fLogo.h,
-        logoX: fLogo.x,
-        logoY: fLogo.y,
-        backgroundAnimated: false,
-      });
-      prevEnd = start;
+    if (start > prevEnd + FILLER_EPS) {
+      consumeTemplateFillersUntil(start, i);
+      if (start > prevEnd + FILLER_EPS) {
+        pushLogoOnlyFiller(start - prevEnd, i);
+      }
+      if (Math.abs(prevEnd - start) <= FILLER_EPS) {
+        prevEnd = start;
+      }
     }
 
     let slideDur = parseSec(
@@ -2191,27 +2366,14 @@ export function buildTimelineFromLayout(
     );
   if (outroVisible) {
     const outroStart = parseSec(mods["Outro.time"], prevEnd);
-    if (outroStart > prevEnd + 0.001) {
-      const gap = outroStart - prevEnd;
-      const fLogo = getLogoBoxFromTemplate(template, "Outro") || {
-        x: Math.round((videoW - 240) / 2),
-        y: Math.round((videoH - 140) / 2),
-        w: 240,
-        h: 140,
-      };
-      slides.push({
-        width: videoW,
-        height: videoH,
-        fps,
-        durationSec: gap,
-        outPath: "",
-        logoPath: join(paths.images, "logo.png"),
-        logoWidth: fLogo.w,
-        logoHeight: fLogo.h,
-        logoX: fLogo.x,
-        logoY: fLogo.y,
-      });
-      prevEnd = outroStart;
+    if (outroStart > prevEnd + FILLER_EPS) {
+      consumeTemplateFillersUntil(outroStart, "Outro");
+      if (outroStart > prevEnd + FILLER_EPS) {
+        pushLogoOnlyFiller(outroStart - prevEnd, "Outro");
+      }
+      if (Math.abs(prevEnd - outroStart) <= FILLER_EPS) {
+        prevEnd = outroStart;
+      }
     }
 
     const outDur = parseSec(

@@ -862,6 +862,88 @@ test("buildTimelineFromLayout includes filler slide and outro", () => {
   assert.equal(slides[3].durationSec, 1);
 });
 
+test("buildTimelineFromLayout uses template filler compositions for gaps", () => {
+  const tpl: TemplateDoc = {
+    width: 100,
+    height: 100,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 1,
+        elements: [
+          { type: "text", name: "Testo-0", x: "0%", y: "0%", width: "10%", height: "10%" },
+          {
+            type: "shape",
+            width: "100%",
+            height: "100%",
+            x: "50%",
+            y: "50%",
+            x_anchor: "50%",
+            y_anchor: "50%",
+            fill_color: "#101010",
+          } as any,
+        ],
+      },
+      {
+        type: "composition",
+        name: "Intro",
+        time: 1,
+        duration: 2,
+        elements: [
+          {
+            type: "shape",
+            width: "100%",
+            height: "100%",
+            x: "50%",
+            y: "50%",
+            x_anchor: "50%",
+            y_anchor: "50%",
+            fill_color: "#abcdef",
+          } as any,
+          { type: "image", name: "Logo", x: "50%", y: "50%", width: "10%", height: "10%" },
+        ],
+      },
+      {
+        type: "composition",
+        name: "Slide_1",
+        duration: 1,
+        elements: [
+          { type: "text", name: "Testo-1", x: "0%", y: "0%", width: "10%", height: "10%" },
+        ],
+      },
+    ],
+  } as any;
+  const mods = {
+    "Testo-0": "uno",
+    "Testo-1": "due",
+    "Slide_0.duration": "1 s",
+    "Slide_1.time": "3 s",
+    "Intro.time": "1 s",
+  };
+  const prevImages = paths.images;
+  const prevTts = paths.tts;
+  try {
+    paths.images = "/tmp/no_img";
+    paths.tts = "/tmp/no_tts";
+    const slides = buildTimelineFromLayout(mods, tpl, {
+      videoW: 100,
+      videoH: 100,
+      fps: 25,
+      defaultDur: 1,
+    });
+    assert.equal(slides.length, 3);
+    const filler = slides[1];
+    assert.ok(filler);
+    assert.equal(filler.durationSec, 2);
+    assert.ok(filler.shapes && filler.shapes.length > 0);
+    assert.equal(filler.shapes?.[0].color, "#abcdef");
+  } finally {
+    paths.images = prevImages;
+    paths.tts = prevTts;
+  }
+});
+
 test(
   "buildTimelineFromLayout keeps filler background shapes even with downloaded image",
   () => {
