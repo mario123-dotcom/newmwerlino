@@ -42,9 +42,9 @@ test("getTextBoxFromTemplate uses anchors and keeps box inside canvas", () => {
     preserveOrigin: true,
     minWidthRatio: TEXT.MIN_BOX_WIDTH_RATIO,
   })!;
-  assert.equal(box.x, 20);
+  assert.equal(box.x, 15);
   assert.equal(box.y, 30);
-  assert.equal(box.w, 75);
+  assert.equal(box.w, 85);
   assert.equal(box.h, 40);
 });
 
@@ -113,8 +113,8 @@ test("getTextBoxFromTemplate mirrors point text margins", () => {
     preserveAnchor: true,
     minWidthRatio: TEXT.MIN_BOX_WIDTH_RATIO,
   })!;
-  assert.equal(box.x, 100);
-  assert.equal(box.w, 300);
+  assert.equal(box.x, 60);
+  assert.equal(box.w, 340);
   assert.equal(box.y, 20);
   assert.equal(box.h, 160);
 });
@@ -147,9 +147,9 @@ test("getTextBoxFromTemplate keeps anchors beyond 100 percent", () => {
     preserveAnchor: true,
     minWidthRatio: TEXT.MIN_BOX_WIDTH_RATIO,
   })!;
-  assert.equal(box.x, 25);
+  assert.equal(box.x, 15);
   assert.equal(box.y, 5);
-  assert.equal(box.w, 150);
+  assert.equal(box.w, 170);
   assert.equal(box.h, 50);
 });
 
@@ -180,7 +180,7 @@ test("getTextBoxFromTemplate clamps to slide bounds", () => {
     preserveOrigin: true,
     minWidthRatio: TEXT.MIN_BOX_WIDTH_RATIO,
   })!;
-  assert.equal(box.x, 25);
+  assert.equal(box.x, 15);
   assert.equal(box.y, 5);
 });
 
@@ -697,10 +697,14 @@ test("buildTimelineFromLayout adds extra padding to intro background", () => {
     assert.ok(primary.background);
     const pad = Math.round((primary.fontSize ?? 0) * TEXT.BOX_PAD_FACTOR);
     assert.ok(pad > 0);
-    assert.equal(primary.background?.x, box.x - pad);
-    assert.equal(primary.background?.y, box.y - pad);
-    assert.equal(primary.background?.width, box.w + pad * 2);
-    assert.equal(primary.background?.height, box.h + pad * 2);
+    const expectedBgX = Math.max(0, box.x - pad);
+    const expectedBgY = Math.max(0, box.y - pad);
+    const expectedBgW = Math.min(1920 - expectedBgX, box.w + pad * 2);
+    const expectedBgH = Math.min(1080 - expectedBgY, box.h + pad * 2);
+    assert.equal(primary.background?.x, expectedBgX);
+    assert.equal(primary.background?.y, expectedBgY);
+    assert.equal(primary.background?.width, expectedBgW);
+    assert.equal(primary.background?.height, expectedBgH);
     assert.equal(primary.background?.color, "#000000");
     assert.equal(primary.background?.alpha, 0.8);
     assert.equal(primary.box, true);
