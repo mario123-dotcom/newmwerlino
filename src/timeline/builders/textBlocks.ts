@@ -4,6 +4,7 @@ import {
   applyHorizontalAlignment,
   clampMaxChars,
   computeLineSpacingForBox,
+  estimateLineWidth,
   maxCharsForWidth,
   parseAlignmentFactor,
   parseLetterSpacing,
@@ -318,6 +319,27 @@ export function buildTextBlocks(params: BuildTextBlocksParams): BuildTextBlocksR
 
   applyHorizontalAlignment(block, lines, finalFont, letterSpacingPx, alignX, textBox, videoW);
 
+  const safeAlignX = alignX != null ? Math.max(0, Math.min(alignX, 1)) : undefined;
+  const baseOffsetX = block.x - textBox.x;
+  const computeLineOffset = (
+    line: string,
+    fallback: number
+  ): number => {
+    if (safeAlignX == null) return fallback;
+    const lineWidth = estimateLineWidth(line ?? "", finalFont, letterSpacingPx);
+    if (!(lineWidth > 0)) return fallback;
+    if (textBox.w > 0) {
+      const free = textBox.w - lineWidth;
+      if (!(free > 0)) return Math.max(0, fallback);
+      const offset = Math.min(free, Math.max(0, free * safeAlignX));
+      return Math.round(offset);
+    }
+    const available = videoW - lineWidth;
+    if (!(available >= 0)) return Math.max(0, fallback);
+    const offset = Math.max(0, Math.min(available, available * safeAlignX));
+    return Math.round(offset);
+  };
+
   const alignY = parseAlignmentFactor(templateProps?.y_alignment) ?? defaultAlignY;
   block.y = textBox.y;
   if (textBox.h > 0) {
@@ -337,13 +359,27 @@ export function buildTextBlocks(params: BuildTextBlocksParams): BuildTextBlocksR
   const lineHeight = (block.fontSize ?? 60) + (block.lineSpacing ?? 8);
   const backgroundRect = block.background ? { ...block.background } : undefined;
 
-  const blocks = textFiles.map((filePath, idx) => ({
-    ...block,
-    background: idx === 0 ? backgroundRect : undefined,
-    y: block.y + idx * lineHeight,
-    textFile: filePath,
-    animations: perLine[idx]?.length ? perLine[idx] : undefined,
-  }));
+  const blocks = textFiles.map((filePath, idx) => {
+    const line = lines[idx] ?? "";
+    const offset = computeLineOffset(line, baseOffsetX);
+    const lineX = textBox.x + offset;
+    return {
+      ...block,
+      x: lineX,
+      background: idx === 0 ? backgroundRect : undefined,
+      y: block.y + idx * lineHeight,
+      textFile: filePath,
+      animations: perLine[idx]?.length ? perLine[idx] : undefined,
+    };
+  });
 
-  return { base: block, lines, blocks };
+  const baseBlockAligned =
+    blocks.length > 0
+      ? {
+          ...block,
+          x: blocks[0].x,
+        }
+      : block;
+
+  return { base: baseBlockAligned, lines, blocks };
 }

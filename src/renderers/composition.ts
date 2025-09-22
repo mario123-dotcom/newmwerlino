@@ -233,7 +233,12 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
       `[${logoIndex}:v]format=rgba,` +
       `scale=${logoW}:${logoH}:flags=lanczos:force_original_aspect_ratio=decrease[lg]`
     );
-    f.push(`[${lastV}][lg]overlay=x=${logoX}:y=${logoY}:enable='between(t,0,${dur})'[v1]`);
+    const logoXExpr = `${logoX}+(${logoW}-overlay_w)/2`;
+    const logoYExpr = `${logoY}+(${logoH}-overlay_h)/2`;
+    f.push(
+      `[${lastV}][lg]overlay=` +
+        `x='${logoXExpr}':y='${logoYExpr}':enable='between(t,0,${dur})'[v1]`
+    );
     lastV = "v1";
   }
 
