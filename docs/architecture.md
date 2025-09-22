@@ -99,7 +99,11 @@ fetch degli asset, carica template e modifiche, costruisce la timeline,
 renderizza ogni segmento e infine concatena gli MP4 generati.
 
 ## Test automatizzati
-`src/tests/timeline.test.ts` copre le utility della timeline verificando che i
-box testo/loghi vengano estratti correttamente, che l'impaginazione del testo
-rispetti gli allineamenti previsti e che la costruzione delle slide gestisca le
-varie condizioni (durate, wrapping, visibilità, ecc.).
+La suite dei test automatici è suddivisa per area funzionale:
+- `src/tests/ffmpeg/filters.test.ts` assicura la corretta generazione delle
+  stringhe `drawtext` e la normalizzazione dei percorsi FFmpeg.
+- `src/tests/timeline/*.test.ts` contiene casi specifici per tipologie di
+  funzionalità della timeline (estrazione dei box testuali e del logo, layout
+  del testo, assegnazione dei font scaricati, gestione delle ombre, forme e
+  animazioni, flusso delle slide e wrapping). Ogni file isola un aspetto per
+  facilitare la diagnosi dei regressi.
