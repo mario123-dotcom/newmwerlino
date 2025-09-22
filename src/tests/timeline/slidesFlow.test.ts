@@ -65,7 +65,7 @@ test("buildTimelineFromLayout includes filler slide and outro", () => {
   assert.equal(slides[3].durationSec, 1);
 });
 
-test("buildTimelineFromLayout centers logo for gap filler", () => {
+test("buildTimelineFromLayout reuses template logo position for gap filler", () => {
   const tpl: TemplateDoc = {
     width: 800,
     height: 600,
@@ -115,8 +115,8 @@ test("buildTimelineFromLayout centers logo for gap filler", () => {
     const filler = slides[1];
     assert.equal(filler.logoWidth, 80);
     assert.equal(filler.logoHeight, 90);
-    assert.equal(filler.logoX, 360);
-    assert.equal(filler.logoY, 255);
+    assert.equal(filler.logoX, 440);
+    assert.equal(filler.logoY, 375);
   } finally {
     paths.images = prevImages;
     paths.tts = prevTts;
