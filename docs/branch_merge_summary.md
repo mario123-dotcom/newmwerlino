@@ -44,6 +44,4 @@
 - **Descrizione:** l'esecuzione di FFmpeg non controllava l'exit code e non permetteva di sostituire il binario.
 - **Soluzione:** l'helper `runFFmpeg` stampa il comando, gestisce errori/exit code e usa un path risolvibile tramite variabili d'ambiente dedicate.【F:src/ffmpeg/run.ts†L4-L39】【F:src/paths.ts†L6-L40】
 
-## Test end-to-end mancanti
-- **Descrizione:** le regressioni sulla timeline passavano inosservate per l'assenza di test automatizzati e script di esecuzione.
-- **Soluzione:** il progetto espone uno script `npm test` che compila TypeScript ed esegue la suite Node Test, coprendo costruzione timeline, wrap del testo, ombre e filtri FFmpeg.【F:package.json†L6-L12】【F:src/tests/timeline/slidesFlow.test.ts†L8-L135】
+

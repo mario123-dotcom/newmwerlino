@@ -79,7 +79,7 @@ export const STAGGER = { base: 0.1, growth: 0.1, jitter: 0.015 };
  */
 export const SHADE = {
   strength: 0.75,
-  gamma: 1.0,
+  gamma: 0.8,
   leftPower: 0.5,
   vertPower: 0.6,
   bias: 0,
