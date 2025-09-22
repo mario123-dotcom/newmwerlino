@@ -1,11 +1,23 @@
 import { join } from "path";
 
-/**
- * Percorsi standardizzati utilizzati da tutta la toolchain. Tutti i path sono
- * assoluti e vengono ricavati dalla working directory del processo.
- */
 const root = process.cwd();
 const downloads = join(root, "download");
+
+function resolveFFmpegBinary(): string {
+  const candidates = [
+    process.env.FFMPEG_PATH,
+    process.env.FFMPEG_BIN,
+    process.env.FFMPEG,
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate && candidate.trim()) {
+      return candidate.trim();
+    }
+  }
+
+  return "ffmpeg";
+}
 
 export const paths = {
   root,
@@ -19,8 +31,9 @@ export const paths = {
   templateDir: join(root, "template"),
   template: join(root, "template", "template_horizontal.json"),
   modifications: join(root, "template", "risposta_horizontal.json"),
+  ffmpeg: resolveFFmpegBinary(),
+  concatList: join(root, "src", "temp", "concat.txt"),
   finalVideo: join(root, "src", "output", "final_output.mp4"),
-  pipelinePlan: join(root, "src", "output", "pipeline-plan.json"),
   get bgAudio() {
     return join(this.audio, "bg.mp3");
   },
