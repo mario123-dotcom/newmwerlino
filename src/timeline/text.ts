@@ -231,6 +231,29 @@ export function parseAlignmentFactor(raw: unknown): number | undefined {
   return clamp01(parsed > 1 ? parsed / 100 : parsed);
 }
 
+export function resolveHorizontalAlignmentSource(element: unknown): unknown {
+  if (!element || typeof element !== "object") return undefined;
+  const props = element as Record<string, unknown>;
+  const candidates = [
+    props?.x_alignment,
+    props?.text_align,
+    props?.text_alignment,
+    props?.horizontal_alignment,
+    props?.align,
+    props?.alignment,
+    props?.xAlignment,
+    props?.textAlign,
+    props?.textAlignment,
+    props?.horizontalAlignment,
+    props?.xAlign,
+    props?.horizontalAlign,
+  ];
+  for (const candidate of candidates) {
+    if (candidate != null) return candidate;
+  }
+  return undefined;
+}
+
 export function estimateLineWidth(
   line: string,
   fontPx: number,

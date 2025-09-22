@@ -8,6 +8,7 @@ import {
   parseAlignmentFactor,
   parseLetterSpacing,
   parseLineHeightFactor,
+  resolveHorizontalAlignmentSource,
   resolveTextLayout,
   wrapText,
   fitTextWithTargetFont,
@@ -301,13 +302,7 @@ export function buildTextBlocks(params: BuildTextBlocksParams): BuildTextBlocksR
   const finalFont = block.fontSize ?? initialFontSize;
   applyExtraBackgroundPadding(block, finalFont, videoW, videoH);
 
-  const alignSource =
-    templateProps?.x_alignment ??
-    templateProps?.text_align ??
-    templateProps?.text_alignment ??
-    templateProps?.horizontal_alignment ??
-    templateProps?.align ??
-    templateProps?.alignment;
+  const alignSource = resolveHorizontalAlignmentSource(templateProps);
   const alignX = defaultAlignX ?? parseAlignmentFactor(alignSource);
   const letterSpacingPx = parseLetterSpacing(
     templateProps?.letter_spacing,
