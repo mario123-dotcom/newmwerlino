@@ -371,10 +371,7 @@ export function buildCopyrightBlock(
     (element as any)?.horizontal_alignment ??
     (element as any)?.align ??
     (element as any)?.alignment;
-  let alignX = parseAlignmentFactor(alignSource);
-  if (alignX == null) {
-    alignX = parseAlignmentFactor((element as any)?.x_anchor);
-  }
+  const alignX = parseAlignmentFactor(alignSource);
   if (alignX != null) {
     const letterSpacingPx = parseLetterSpacing(
       (element as any)?.letter_spacing,

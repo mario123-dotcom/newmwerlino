@@ -308,10 +308,7 @@ export function buildTextBlocks(params: BuildTextBlocksParams): BuildTextBlocksR
     templateProps?.horizontal_alignment ??
     templateProps?.align ??
     templateProps?.alignment;
-  let alignX = defaultAlignX ?? parseAlignmentFactor(alignSource);
-  if (alignX == null) {
-    alignX = parseAlignmentFactor(templateProps?.x_anchor);
-  }
+  const alignX = defaultAlignX ?? parseAlignmentFactor(alignSource);
   const letterSpacingPx = parseLetterSpacing(
     templateProps?.letter_spacing,
     finalFont,
