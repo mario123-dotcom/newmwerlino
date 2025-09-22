@@ -157,16 +157,8 @@ export function getLogoBoxFromTemplate(
   const w = pctToPx(logo.width, W) || 0;
   const h = pctToPx(logo.height, H) || 0;
 
-  const normalizeAnchor = (raw: number | undefined): number => {
-    if (typeof raw !== "number" || !Number.isFinite(raw)) return 0;
-    if (raw <= 0) return 0;
-    if (raw <= 1) return raw;
-    const ratio = raw / 100;
-    return Number.isFinite(ratio) && ratio > 0 ? ratio : 0;
-  };
-
-  const xAnchor = normalizeAnchor(pctToPx(logo.x_anchor, 100));
-  const yAnchor = normalizeAnchor(pctToPx(logo.y_anchor, 100));
+  const xAnchor = (pctToPx(logo.x_anchor, 100) || 50) / 100;
+  const yAnchor = (pctToPx(logo.y_anchor, 100) || 50) / 100;
 
   let left = typeof x === "number" ? x - w * xAnchor : undefined;
   let top = typeof y === "number" ? y - h * yAnchor : undefined;
