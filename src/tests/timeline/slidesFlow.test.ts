@@ -65,6 +65,64 @@ test("buildTimelineFromLayout includes filler slide and outro", () => {
   assert.equal(slides[3].durationSec, 1);
 });
 
+test("buildTimelineFromLayout reuses template logo position for gap filler", () => {
+  const tpl: TemplateDoc = {
+    width: 800,
+    height: 600,
+    elements: [
+      { type: "composition", name: "Slide_0", duration: 1, elements: [] },
+      {
+        type: "composition",
+        name: "Slide_1",
+        duration: 1,
+        elements: [
+          {
+            type: "image",
+            name: "Logo",
+            x: "60%",
+            y: "70%",
+            width: "10%",
+            height: "15%",
+            x_anchor: "50%",
+            y_anchor: "50%",
+          },
+          { type: "text", name: "Testo-1", x: "0%", y: "0%", width: "10%", height: "10%", x_anchor: "0%", y_anchor: "0%" },
+        ],
+      },
+    ],
+  } as any;
+
+  const mods = {
+    "Slide_0.time": "0 s",
+    "Slide_1.time": "5 s",
+    "Testo-1": "ciao",
+  };
+
+  const prevImages = paths.images;
+  const prevTts = paths.tts;
+  paths.images = "/tmp/no_img";
+  paths.tts = "/tmp/no_tts";
+
+  try {
+    const slides = buildTimelineFromLayout(mods, tpl, {
+      videoW: 800,
+      videoH: 600,
+      fps: 30,
+      defaultDur: 1,
+    });
+
+    assert.equal(slides.length, 3);
+    const filler = slides[1];
+    assert.equal(filler.logoWidth, 80);
+    assert.equal(filler.logoHeight, 90);
+    assert.equal(filler.logoX, 440);
+    assert.equal(filler.logoY, 375);
+  } finally {
+    paths.images = prevImages;
+    paths.tts = prevTts;
+  }
+});
+
 test("buildTimelineFromLayout inserts gap filler and extends to TTS length", () => {
   const tpl: TemplateDoc = {
     width: 100,

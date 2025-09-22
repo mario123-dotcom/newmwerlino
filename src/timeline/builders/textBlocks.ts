@@ -55,6 +55,36 @@ type BuildTextBlocksResult = {
   blocks: TextBlockSpec[];
 };
 
+function normalizeColorInput(raw: unknown): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  const value = raw.trim();
+  if (!value) return undefined;
+
+  const rgba = parseRGBA(value);
+  if (rgba) {
+    const alpha = Math.max(0, Math.min(1, rgba.alpha));
+    if (alpha < 1) {
+      const normalized = Number.isFinite(alpha) ? Number(alpha.toFixed(3)) : alpha;
+      return `${rgba.color}@${normalized}`;
+    }
+    return rgba.color;
+  }
+
+  const hex = value.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (hex) {
+    let body = hex[1].toLowerCase();
+    if (body.length === 3) {
+      body = body
+        .split("")
+        .map((c) => c + c)
+        .join("");
+    }
+    return `#${body}`;
+  }
+
+  return value;
+}
+
 function applyTemplateBackground(
   block: TextBlockSpec,
   textBox: TextBox,
@@ -176,6 +206,20 @@ export function buildTextBlocks(params: BuildTextBlocksParams): BuildTextBlocksR
   applyTemplateBackground(block, textBox, templateElement, videoW, videoH);
 
   const templateProps = (templateElement ?? {}) as any;
+  const colorCandidates: unknown[] = [
+    templateProps?.fill_color,
+    templateProps?.fillColor,
+    templateProps?.color,
+    templateProps?.font_color,
+    templateProps?.text_color,
+  ];
+  for (const candidate of colorCandidates) {
+    const normalized = normalizeColorInput(candidate);
+    if (normalized) {
+      block.fontColor = normalized;
+      break;
+    }
+  }
   const lineHeightFactor =
     parseLineHeightFactor(templateProps?.line_height) ?? defaultLineHeightFactor;
 
@@ -247,8 +291,14 @@ export function buildTextBlocks(params: BuildTextBlocksParams): BuildTextBlocksR
   const finalFont = block.fontSize ?? initialFontSize;
   applyExtraBackgroundPadding(block, finalFont, videoW, videoH);
 
-  const alignX =
-    defaultAlignX ?? parseAlignmentFactor(templateProps?.x_alignment);
+  const alignSource =
+    templateProps?.x_alignment ??
+    templateProps?.text_align ??
+    templateProps?.text_alignment ??
+    templateProps?.horizontal_alignment ??
+    templateProps?.align ??
+    templateProps?.alignment;
+  const alignX = defaultAlignX ?? parseAlignmentFactor(alignSource);
   const letterSpacingPx = parseLetterSpacing(
     templateProps?.letter_spacing,
     finalFont,

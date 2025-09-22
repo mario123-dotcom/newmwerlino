@@ -68,6 +68,103 @@ test("buildTimelineFromLayout aligns text horizontally inside box", () => {
   assert.equal(block!.x, expected);
 });
 
+test("buildTimelineFromLayout honors text_align keywords", () => {
+  const tpl: TemplateDoc = {
+    width: 400,
+    height: 200,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 2,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "25%",
+            y: "30%",
+            width: "50%",
+            height: "20%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+            text_align: "center",
+            font_size: 36,
+            line_height: "100%",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const slides = buildTimelineFromLayout({ "Testo-0": "NOTIZIA" }, tpl, {
+    videoW: 400,
+    videoH: 200,
+    fps: 25,
+    defaultDur: 2,
+  });
+
+  const slide = slides[0];
+  const block = slide.texts?.[0];
+  assert.ok(block);
+  assert.ok(block?.textFile);
+  const rendered = readFileSync(block!.textFile!, "utf8");
+  const lines = rendered.split(/\r?\n/);
+  const fontPx = block!.fontSize ?? 0;
+  const textWidth = Math.max(
+    ...lines.map((ln) => ln.length * fontPx * APPROX_CHAR_WIDTH_RATIO)
+  );
+  const box = getTextBoxFromTemplate(tpl, 0, undefined, {
+    preserveOrigin: true,
+    minWidthRatio: TEXT.MIN_BOX_WIDTH_RATIO,
+  })!;
+
+  const free = box.w - textWidth;
+  const expected = box.x + Math.round(Math.min(free, Math.max(0, free * 0.5)));
+  assert.equal(block!.x, expected);
+});
+
+test("buildTimelineFromLayout applies template text color", () => {
+  const tpl: TemplateDoc = {
+    width: 640,
+    height: 360,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 2,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "10%",
+            y: "20%",
+            width: "60%",
+            height: "30%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+            fill_color: "rgba(18, 52, 86, 0.5)",
+            font_size: 40,
+            line_height: "120%",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const slides = buildTimelineFromLayout({ "Testo-0": "COLORE" }, tpl, {
+    videoW: 640,
+    videoH: 360,
+    fps: 25,
+    defaultDur: 2,
+  });
+
+  const slide = slides[0];
+  assert.ok(slide);
+  const block = slide.texts?.[0];
+  assert.ok(block);
+  assert.equal(block!.fontColor, "#123456@0.5");
+});
+
 test("buildTimelineFromLayout scales template font with widened boxes", () => {
   const tpl: TemplateDoc = {
     width: 800,

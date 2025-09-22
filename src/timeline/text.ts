@@ -215,6 +215,12 @@ export function parseAlignmentFactor(raw: unknown): number | undefined {
   if (typeof raw !== "string") return undefined;
   const trimmed = raw.trim();
   if (!trimmed) return undefined;
+
+  const keyword = trimmed.toLowerCase();
+  if (keyword === "left" || keyword === "start") return 0;
+  if (keyword === "center" || keyword === "centre" || keyword === "middle") return 0.5;
+  if (keyword === "right" || keyword === "end") return 1;
+
   if (trimmed.endsWith("%")) {
     const parsed = parseFloat(trimmed.slice(0, -1));
     return Number.isFinite(parsed) ? clamp01(parsed / 100) : undefined;
