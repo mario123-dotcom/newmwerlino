@@ -364,6 +364,27 @@ export function buildCopyrightBlock(
     lineSpacing: spacing,
   };
 
+  const alignSource =
+    (element as any)?.x_alignment ??
+    (element as any)?.text_align ??
+    (element as any)?.text_alignment ??
+    (element as any)?.horizontal_alignment ??
+    (element as any)?.align ??
+    (element as any)?.alignment;
+  let alignX = parseAlignmentFactor(alignSource);
+  if (alignX == null) {
+    alignX = parseAlignmentFactor((element as any)?.x_anchor);
+  }
+  if (alignX != null) {
+    const letterSpacingPx = parseLetterSpacing(
+      (element as any)?.letter_spacing,
+      fontSize,
+      videoW,
+      videoH
+    );
+    applyHorizontalAlignment(block, lines, fontSize, letterSpacingPx, alignX, box, videoW);
+  }
+
   if (bg) {
     const approxCharWidth = fontSize * APPROX_CHAR_WIDTH_RATIO;
     const longestLine = lines.reduce((max, line) => Math.max(max, line.length), 0);

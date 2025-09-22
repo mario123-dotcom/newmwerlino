@@ -56,7 +56,8 @@ test("buildTimelineFromLayout aligns text horizontally inside box", () => {
   const lines = rendered.split(/\r?\n/);
   const fontPx = block!.fontSize ?? 0;
   const textWidth = Math.max(
-    ...lines.map((ln) => ln.length * fontPx * APPROX_CHAR_WIDTH_RATIO)
+    ...lines.map((ln) => ln.length * fontPx * APPROX_CHAR_WIDTH_RATIO),
+    0
   );
   const box = getTextBoxFromTemplate(tpl, 0, undefined, {
     preserveOrigin: true,
@@ -111,7 +112,63 @@ test("buildTimelineFromLayout honors text_align keywords", () => {
   const lines = rendered.split(/\r?\n/);
   const fontPx = block!.fontSize ?? 0;
   const textWidth = Math.max(
-    ...lines.map((ln) => ln.length * fontPx * APPROX_CHAR_WIDTH_RATIO)
+    ...lines.map((ln) => ln.length * fontPx * APPROX_CHAR_WIDTH_RATIO),
+    0
+  );
+  const box = getTextBoxFromTemplate(tpl, 0, undefined, {
+    preserveOrigin: true,
+    minWidthRatio: TEXT.MIN_BOX_WIDTH_RATIO,
+  })!;
+
+  const free = box.w - textWidth;
+  const expected = box.x + Math.round(Math.min(free, Math.max(0, free * 0.5)));
+  assert.equal(block!.x, expected);
+});
+
+test("buildTimelineFromLayout infers alignment from anchor when missing", () => {
+  const tpl: TemplateDoc = {
+    width: 400,
+    height: 200,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 2,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "40%",
+            y: "30%",
+            width: "40%",
+            height: "20%",
+            x_anchor: "50%",
+            y_anchor: "0%",
+            font_size: 36,
+            line_height: "100%",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const slides = buildTimelineFromLayout({ "Testo-0": "CENTRO" }, tpl, {
+    videoW: 400,
+    videoH: 200,
+    fps: 25,
+    defaultDur: 2,
+  });
+
+  const slide = slides[0];
+  const block = slide.texts?.[0];
+  assert.ok(block);
+  assert.ok(block?.textFile);
+  const rendered = readFileSync(block!.textFile!, "utf8");
+  const lines = rendered.split(/\r?\n/);
+  const fontPx = block!.fontSize ?? 0;
+  const textWidth = Math.max(
+    ...lines.map((ln) => ln.length * fontPx * APPROX_CHAR_WIDTH_RATIO),
+    0
   );
   const box = getTextBoxFromTemplate(tpl, 0, undefined, {
     preserveOrigin: true,
@@ -163,6 +220,71 @@ test("buildTimelineFromLayout applies template text color", () => {
   const block = slide.texts?.[0];
   assert.ok(block);
   assert.equal(block!.fontColor, "#123456@0.5");
+});
+
+test("buildTimelineFromLayout centers copyright text using anchor fallback", () => {
+  const tpl: TemplateDoc = {
+    width: 400,
+    height: 200,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 2,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "10%",
+            y: "10%",
+            width: "60%",
+            height: "30%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+            font_size: 36,
+            line_height: "120%",
+          },
+          {
+            type: "text",
+            name: "Copyright-0",
+            x: "50%",
+            y: "90%",
+            width: "60%",
+            height: "10%",
+            x_anchor: "50%",
+            y_anchor: "50%",
+            text: "CREDITS",
+            font_size: 24,
+            line_height: "100%",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const slides = buildTimelineFromLayout({}, tpl, {
+    videoW: 400,
+    videoH: 200,
+    fps: 25,
+    defaultDur: 2,
+  });
+
+  const slide = slides[0];
+  assert.ok(slide);
+  const copyright = slide.texts?.find((b) => b.text?.includes("CREDITS"));
+  assert.ok(copyright);
+  const fontPx = copyright!.fontSize ?? 0;
+  const lines = copyright!.text ? copyright!.text!.split(/\r?\n/) : [];
+  const textWidth = Math.max(
+    ...lines.map((ln) => ln.length * fontPx * APPROX_CHAR_WIDTH_RATIO),
+    0
+  );
+  const box = getTextBoxFromTemplate(tpl, 0, "Copyright-0", {
+    preserveOrigin: true,
+  })!;
+  const free = box.w - textWidth;
+  const expected = box.x + Math.round(Math.min(free, Math.max(0, free * 0.5)));
+  assert.equal(copyright!.x, expected);
 });
 
 test("buildTimelineFromLayout scales template font with widened boxes", () => {
