@@ -385,9 +385,9 @@ test("buildTimelineFromLayout uses fixed wipe timings", () => {
   const t0 = slides[0].texts!;
   assert.equal(t0.length >= 2, true);
   assert.deepEqual(t0[0].animations, [
-    { type: "wipe", time: 0, duration: 0.5, direction: "wipeleft" },
+    { type: "wipe", time: 0, duration: 0.8, direction: "wipeleft" },
   ]);
   assert.deepEqual(t0[1].animations, [
-    { type: "wipe", time: 0.5, duration: 0.5, direction: "wipeleft" },
+    { type: "wipe", time: 0.6, duration: 0.8, direction: "wipeleft" },
   ]);
 });

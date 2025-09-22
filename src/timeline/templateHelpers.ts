@@ -152,15 +152,45 @@ export function getLogoBoxFromTemplate(
   if (!comp || !logo) return {};
   const W = tpl.width;
   const H = tpl.height;
+  const parseAnchor = (
+    value: number | string | undefined,
+    fallback: number
+  ): number => {
+    if (value == null) return fallback;
+    const parsed = pctToPx(value as any, 100);
+    if (typeof parsed === "number" && Number.isFinite(parsed)) {
+      const ratio = parsed <= 1 ? parsed : parsed / 100;
+      if (Number.isFinite(ratio)) {
+        if (ratio <= 0) return 0;
+        if (ratio >= 1) return 1;
+        return ratio;
+      }
+    }
+    return fallback;
+  };
+
+  const xAnchor = parseAnchor(logo.x_anchor as any, 0.5);
+  const yAnchor = parseAnchor(logo.y_anchor as any, 0.5);
+
   const x = pctToPx(logo.x, W);
   const y = pctToPx(logo.y, H);
   const w = pctToPx(logo.width, W) || 0;
   const h = pctToPx(logo.height, H) || 0;
-  const xAnchor = (pctToPx(logo.x_anchor, 100) || 50) / 100;
-  const yAnchor = (pctToPx(logo.y_anchor, 100) || 50) / 100;
 
-  let left = typeof x === "number" ? x - w * xAnchor : undefined;
-  let top = typeof y === "number" ? y - h * yAnchor : undefined;
+  const fallbackX = Number.isFinite(W) ? W * xAnchor : undefined;
+  const fallbackY = Number.isFinite(H) ? H * yAnchor : undefined;
+
+  const anchorX = typeof x === "number" ? x : fallbackX;
+  const anchorY = typeof y === "number" ? y : fallbackY;
+
+  let left =
+    typeof anchorX === "number"
+      ? anchorX - (w > 0 ? w * xAnchor : 0)
+      : undefined;
+  let top =
+    typeof anchorY === "number"
+      ? anchorY - (h > 0 ? h * yAnchor : 0)
+      : undefined;
 
   if (typeof left === "number") {
     left = Math.max(0, Math.min(W - w, left));
@@ -333,6 +363,24 @@ export function buildCopyrightBlock(
     fontColor: fill?.color ?? "#ffffff",
     lineSpacing: spacing,
   };
+
+  const alignSource =
+    (element as any)?.x_alignment ??
+    (element as any)?.text_align ??
+    (element as any)?.text_alignment ??
+    (element as any)?.horizontal_alignment ??
+    (element as any)?.align ??
+    (element as any)?.alignment;
+  const alignX = parseAlignmentFactor(alignSource);
+  if (alignX != null) {
+    const letterSpacingPx = parseLetterSpacing(
+      (element as any)?.letter_spacing,
+      fontSize,
+      videoW,
+      videoH
+    );
+    applyHorizontalAlignment(block, lines, fontSize, letterSpacingPx, alignX, box, videoW);
+  }
 
   if (bg) {
     const approxCharWidth = fontSize * APPROX_CHAR_WIDTH_RATIO;

@@ -56,7 +56,8 @@ test("buildTimelineFromLayout aligns text horizontally inside box", () => {
   const lines = rendered.split(/\r?\n/);
   const fontPx = block!.fontSize ?? 0;
   const textWidth = Math.max(
-    ...lines.map((ln) => ln.length * fontPx * APPROX_CHAR_WIDTH_RATIO)
+    ...lines.map((ln) => ln.length * fontPx * APPROX_CHAR_WIDTH_RATIO),
+    0
   );
   const box = getTextBoxFromTemplate(tpl, 0, undefined, {
     preserveOrigin: true,
@@ -111,7 +112,8 @@ test("buildTimelineFromLayout honors text_align keywords", () => {
   const lines = rendered.split(/\r?\n/);
   const fontPx = block!.fontSize ?? 0;
   const textWidth = Math.max(
-    ...lines.map((ln) => ln.length * fontPx * APPROX_CHAR_WIDTH_RATIO)
+    ...lines.map((ln) => ln.length * fontPx * APPROX_CHAR_WIDTH_RATIO),
+    0
   );
   const box = getTextBoxFromTemplate(tpl, 0, undefined, {
     preserveOrigin: true,

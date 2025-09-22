@@ -5,6 +5,7 @@ import {
   APPROX_CHAR_WIDTH_RATIO,
   DEFAULT_CHARS_PER_LINE,
   LINE_WIPE_DURATION,
+  LINE_WIPE_OVERLAP,
   MIN_FONT_SIZE,
 } from "./constants";
 import type {
@@ -14,7 +15,7 @@ import type {
   TextLayoutResult,
 } from "./types";
 
-export { LINE_WIPE_DURATION };
+export { LINE_WIPE_DURATION, LINE_WIPE_OVERLAP };
 
 const MAX_FONT_LAYOUT_ITERATIONS = 6;
 
