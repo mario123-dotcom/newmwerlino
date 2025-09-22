@@ -24,7 +24,7 @@ in FFmpeg.
   parametri di ombreggiatura, layout del logo e valori audio di default.
 - **`src/paths.ts`** centralizza i percorsi assoluti di cartelle e file.
   Determina dinamicamente l'eseguibile FFmpeg rispettando eventuali override
-  tramite variabili d'ambiente o il pacchetto `ffmpeg-static`.
+  tramite variabili d'ambiente o, in assenza, la PATH di sistema.
 - **`src/fonts.ts`** normalizza i nomi dei font per individuare i file scaricati
   e verificare se un asset locale corrisponde alla famiglia richiesta.
 
@@ -82,9 +82,9 @@ dell'applicazione (`src/timeline/index.ts`). I file principali sono:
   esegue crop/zoom delle immagini di background, applica ombre sintetiche,
   sovrappone forme, logo e testi (con animazioni), sincronizza l'audio TTS o
   crea una traccia silenziosa e produce un MP4 intermedio.
-- **`src/ffmpeg/run.ts`** incapsula l'esecuzione sincrona di FFmpeg, loggando i
-  comandi e propagando gli errori; include helper per eseguire comandi con
-  output catturato e verificare l'esito.
+- **`src/ffmpeg/run.ts`** incapsula l'esecuzione sincrona di FFmpeg, mostrando i
+  processi avviati e propagando gli errori; include helper per avviare utility
+  come `ffprobe`, catturarne l'output e verificarne l'esito.
 - **`src/ffmpeg/filters.ts`** fornisce utility per convertire percorsi,
   eseguire escape dei testi e costruire stringhe `drawtext` complesse.
 - **`src/ffmpeg/probe.ts`** utilizza `ffprobe` per leggere la durata delle clip,

@@ -1,8 +1,5 @@
 import { spawnSync } from "child_process";
-import { appendFileSync } from "fs";
 import { paths } from "../paths";
-
-const LOG_FILE = "comandi.txt";
 
 /**
  * Invoca l'eseguibile FFmpeg calcolato in "paths" loggando l'intero comando.
@@ -13,9 +10,6 @@ export function runFFmpeg(args: string[], label = "FFmpeg") {
   const ff = paths.ffmpeg;
   const cmd = `${ff} ${args.join(" ")}`;
   console.log(`[${label}] ${cmd}`);
-
-  // Salva anche su file
-  appendFileSync(LOG_FILE, `[${label}] ${cmd}\n`);
 
   const res = spawnSync(ff, args, { stdio: "inherit" });
 
@@ -38,9 +32,6 @@ export function runFFmpeg(args: string[], label = "FFmpeg") {
 export function runPipe(cmd: string, args: string[], label: string) {
   const fullCmd = `${cmd} ${args.join(" ")}`;
   console.log(`[${label}] ${fullCmd}`);
-
-  // Salva anche su file
-  appendFileSync(LOG_FILE, `[${label}] ${fullCmd}\n`);
 
   return spawnSync(cmd, args, { stdio: "pipe", encoding: "utf-8" });
 }

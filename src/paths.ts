@@ -20,17 +20,10 @@ export const paths = {
   template: join(root, "template", "template_horizontal.json"),
   modifications: join(root, "template", "risposta_horizontal.json"),
   /**
-   * Rilevazione dell'eseguibile FFmpeg, con supporto a override da variabile
-   * d'ambiente, al pacchetto "ffmpeg-static" e, in ultima istanza, alla PATH.
+   * Rilevazione dell'eseguibile FFmpeg, con supporto esclusivo a variabili
+   * d'ambiente o, in assenza, al comando "ffmpeg" presente nella PATH.
    */
-  ffmpeg: (() => {
-    if (process.env.FFMPEG_PATH) return process.env.FFMPEG_PATH;
-    try {
-      return require("ffmpeg-static");
-    } catch {
-      return "ffmpeg";
-    }
-  })(),
+  ffmpeg: process.env.FFMPEG_PATH || "ffmpeg",
 
   concatList: join(root, "src", "temp", "concat.txt"),
   finalVideo: join(root, "src", "output", "final_output.mp4"),
