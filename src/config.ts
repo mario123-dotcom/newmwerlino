@@ -44,11 +44,11 @@ export const TEXT = {
   /** Limite consigliato di caratteri per riga nelle slide principali. */
   MAX_CHARS_PER_LINE: 30,
   /** Fattore massimo di scala per i font ricavati dalle percentuali template. */
-  MAX_FONT_SCALE: 1.8,
+  MAX_FONT_SCALE: 1,
   /** Padding extra applicato agli sfondi di testo in base al font size. */
   BOX_PAD_FACTOR: 0.3,
   /** Larghezza minima del box testo rispetto alla larghezza del video. */
-  MIN_BOX_WIDTH_RATIO: 0.85,
+  MIN_BOX_WIDTH_RATIO: 0.65,
 };
 
 /**
@@ -78,10 +78,10 @@ export const STAGGER = { base: 0.1, growth: 0.1, jitter: 0.015 };
  * il contrasto delle immagini di background.
  */
 export const SHADE = {
-  strength: 0.9,
+  strength: 0.75,
   gamma: 1.0,
   leftPower: 0.5,
-  vertPower: 1.0,
+  vertPower: 0.6,
   bias: 0,
   enableOnFirstSlide: false,
 };
