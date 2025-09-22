@@ -2,7 +2,6 @@ import { join } from "path";
 import { TEXT } from "../../config";
 import { paths } from "../../paths";
 import { findChildByName, findComposition, type TemplateDoc, type TemplateElement } from "../../template";
-import { probeDurationSec } from "../../ffmpeg/probe";
 import {
   buildCopyrightBlock,
   defaultTextBlock,
@@ -54,23 +53,9 @@ function computeSlideDuration(
   defaultDuration: number
 ): number {
   const base = parseSec(mods[`Slide_${index}.duration`], parseSec(comp?.duration, defaultDuration));
-  const ttsPath = findTTSForSlide(index);
   const hinted = parseSec(mods[`TTS-${index}.duration`], 0);
   let duration = base;
-  let ttsDuration = hinted;
-
-  if (ttsPath) {
-    const measured = probeDurationSec(ttsPath);
-    if (measured > 0) {
-      ttsDuration = measured;
-    }
-  }
-
-  if (ttsDuration > duration) {
-    duration = ttsDuration;
-  }
-
-  return duration;
+  return hinted > duration ? hinted : duration;
 }
 
 function collectShadowSources(

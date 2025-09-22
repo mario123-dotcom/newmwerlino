@@ -19,14 +19,8 @@ export const paths = {
   templateDir: join(root, "template"),
   template: join(root, "template", "template_horizontal.json"),
   modifications: join(root, "template", "risposta_horizontal.json"),
-  /**
-   * Rilevazione dell'eseguibile FFmpeg, con supporto esclusivo a variabili
-   * d'ambiente o, in assenza, al comando "ffmpeg" presente nella PATH.
-   */
-  ffmpeg: process.env.FFMPEG_PATH || "ffmpeg",
-
-  concatList: join(root, "src", "temp", "concat.txt"),
   finalVideo: join(root, "src", "output", "final_output.mp4"),
+  pipelinePlan: join(root, "src", "output", "pipeline-plan.json"),
   get bgAudio() {
     return join(this.audio, "bg.mp3");
   },

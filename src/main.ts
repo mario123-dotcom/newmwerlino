@@ -1,12 +1,12 @@
 #!/usr/bin/env ts-node
 import { join } from "path";
-import { existsSync, mkdirSync, readdirSync, rmSync } from "fs";
+import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "fs";
 import { DEFAULT_BG_VOL } from "./config";
 import { paths } from "./paths";
 import { loadTemplate, loadModifications } from "./template";
 import { buildTimelineFromLayout, SlideSpec } from "./timeline";
-import { renderSlideSegment } from "./renderers/composition";
-import { concatAndFinalizeDemuxer } from "./concat";
+import { renderSlideSegment, type SlideRenderPlan } from "./renderers/composition";
+import { concatAndFinalizeDemuxer, type ConcatPlan } from "./concat";
 import { fetchAssets } from "./fetchAssets";
 
 function ensureDir(dir: string) {
@@ -45,27 +45,41 @@ function clearDir(dir: string) {
     defaultDur: 7,
   });
 
-  // 4) Renderizza ogni segmento video con FFmpeg.
+  // 4) Calcola il piano di rendering per ogni segmento della timeline.
   const segFiles: string[] = [];
+  const slidePlans: SlideRenderPlan[] = [];
   for (let i = 0; i < slides.length; i++) {
     const out = join(paths.temp, `seg-${i.toString().padStart(3, "0")}.mp4`);
     slides[i].outPath = out;
     console.log(
       `[render] texts=${slides[i].texts?.length ?? 0} tts=${!!slides[i].ttsPath} dur=${slides[i].durationSec}s`
     );
-    await renderSlideSegment(slides[i]);
+    const plan = await renderSlideSegment(slides[i]);
+    slidePlans.push(plan);
     segFiles.push(out);
   }
 
-  // 5) Concatena i segmenti e mixa l'eventuale musica di background.
+  // 5) Produce il piano di concatenazione con l'eventuale musica di background.
   const bg = paths.bgAudio;
-  await concatAndFinalizeDemuxer({
+  const concatPlan: ConcatPlan = await concatAndFinalizeDemuxer({
     segments: segFiles,
     bgAudioPath: bg,
     outPath: paths.finalVideo,
-    concatTxtPath: paths.concatList,
     fps,
     bgVolume: DEFAULT_BG_VOL,
   });
+
+  const pipelinePlan = {
+    generatedAt: new Date().toISOString(),
+    template: {
+      width: videoW,
+      height: videoH,
+      fps,
+    },
+    slides: slidePlans,
+    concat: concatPlan,
+  };
+
+  writeFileSync(paths.pipelinePlan, JSON.stringify(pipelinePlan, null, 2), "utf8");
   process.exit(0);
 })();
