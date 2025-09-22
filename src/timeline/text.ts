@@ -208,6 +208,13 @@ function clamp01(value: number): number {
   return value;
 }
 
+function formatNumber(value: number): string {
+  if (!Number.isFinite(value)) return "0";
+  const rounded = Math.round(value * 10000) / 10000;
+  if (Number.isInteger(rounded)) return String(rounded);
+  return rounded.toFixed(4).replace(/0+$/, "").replace(/\.$/, "");
+}
+
 export function parseAlignmentFactor(raw: unknown): number | undefined {
   if (typeof raw === "number" && Number.isFinite(raw)) {
     const normalized = raw > 1 ? raw / 100 : raw;
@@ -229,6 +236,29 @@ export function parseAlignmentFactor(raw: unknown): number | undefined {
   const parsed = parseFloat(trimmed);
   if (!Number.isFinite(parsed)) return undefined;
   return clamp01(parsed > 1 ? parsed / 100 : parsed);
+}
+
+export function resolveHorizontalAlignmentSource(element: unknown): unknown {
+  if (!element || typeof element !== "object") return undefined;
+  const props = element as Record<string, unknown>;
+  const candidates = [
+    props?.x_alignment,
+    props?.text_align,
+    props?.text_alignment,
+    props?.horizontal_alignment,
+    props?.align,
+    props?.alignment,
+    props?.xAlignment,
+    props?.textAlign,
+    props?.textAlignment,
+    props?.horizontalAlignment,
+    props?.xAlign,
+    props?.horizontalAlign,
+  ];
+  for (const candidate of candidates) {
+    if (candidate != null) return candidate;
+  }
+  return undefined;
 }
 
 export function estimateLineWidth(
@@ -270,6 +300,7 @@ export function applyHorizontalAlignment(
   textBox: { x: number; w: number },
   maxWidth: number
 ): void {
+  block.xExpr = undefined;
   if (!lines.length) return;
   if (!(fontPx && fontPx > 0)) return;
   if (alignX == null) return;
@@ -277,23 +308,41 @@ export function applyHorizontalAlignment(
   const textWidth = estimateTextWidth(lines, fontPx, letterSpacingPx);
   if (!(textWidth > 0)) return;
 
+  let anchor: number | undefined;
   if (textBox.w > 0) {
-    const free = textBox.w - textWidth;
-    if (!(free > 0)) return;
-    const offset = Math.round(Math.min(free, Math.max(0, free * safeAlign)));
-    block.x = textBox.x + offset;
-    return;
+    anchor = textBox.x + textBox.w * safeAlign;
+  } else if (maxWidth > 0) {
+    anchor = textBox.x + maxWidth * safeAlign;
   }
 
-  const available = maxWidth - textWidth;
-  if (!(available >= 0)) {
-    block.x = 0;
-    return;
+  const computeOffset = (): number | undefined => {
+    if (anchor == null) return undefined;
+    return anchor - textWidth * safeAlign;
+  };
+
+  let desiredX = computeOffset();
+  if (desiredX == null) return;
+
+  if (maxWidth > 0) {
+    const maxAllowed = Math.max(0, Math.floor(maxWidth - textWidth));
+    if (desiredX > maxAllowed) {
+      desiredX = maxAllowed;
+    }
+    if (desiredX < 0) {
+      desiredX = 0;
+    }
   }
-  const offset = Math.round(Math.max(0, available) * safeAlign);
-  const upperBound = Math.max(0, Math.floor(available));
-  const clamped = Math.max(0, Math.min(upperBound, offset));
-  block.x = clamped;
+
+  block.x = Math.round(desiredX);
+
+  if (safeAlign > 0 && anchor != null && maxWidth > 0) {
+    const anchorStr = formatNumber(anchor);
+    const alignStr = formatNumber(safeAlign);
+    const maxWidthStr = formatNumber(maxWidth);
+    const maxAllowedExpr = `max(0,${maxWidthStr}-text_w)`;
+    const desiredExpr = `${anchorStr}-text_w*${alignStr}`;
+    block.xExpr = `max(0,min(${maxAllowedExpr},${desiredExpr}))`;
+  }
 }
 
 function linesEqual(a: string[], b: string[]): boolean {

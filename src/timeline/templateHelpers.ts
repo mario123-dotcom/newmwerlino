@@ -15,6 +15,7 @@ import {
   parseAlignmentFactor,
   parseLetterSpacing,
   parseLineHeightFactor,
+  resolveHorizontalAlignmentSource,
   resolveTextLayout,
   wrapText,
 } from "./text";
@@ -364,13 +365,7 @@ export function buildCopyrightBlock(
     lineSpacing: spacing,
   };
 
-  const alignSource =
-    (element as any)?.x_alignment ??
-    (element as any)?.text_align ??
-    (element as any)?.text_alignment ??
-    (element as any)?.horizontal_alignment ??
-    (element as any)?.align ??
-    (element as any)?.alignment;
+  const alignSource = resolveHorizontalAlignmentSource(element);
   const alignX = parseAlignmentFactor(alignSource);
   if (alignX != null) {
     const letterSpacingPx = parseLetterSpacing(

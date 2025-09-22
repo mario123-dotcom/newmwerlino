@@ -18,6 +18,7 @@ export type TextBlockSpec = {
 
   x: number;
   y: number;
+  xExpr?: string;
 
   fontFile?: string;
   fontSize?: number;
