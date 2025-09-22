@@ -282,7 +282,7 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
         fontFile: blockFontFile,
         fontSize: tb.fontSize ?? 60,
         fontColor: tb.fontColor ?? "white",
-        xExpr: String(tb.x),
+        xExpr: tb.xExpr ?? String(tb.x),
         yExpr: String(tb.y),
         lineSpacing: tb.lineSpacing ?? 8,
         box: !!tb.box,

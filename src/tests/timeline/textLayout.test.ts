@@ -5,6 +5,7 @@ import { join } from "path";
 
 import {
   buildTimelineFromLayout,
+  getLogoBoxFromTemplate,
   getTextBoxFromTemplate,
   wrapText,
   APPROX_CHAR_WIDTH_RATIO,
@@ -12,6 +13,60 @@ import {
 import { TEXT } from "../../config";
 import type { TemplateDoc } from "../../template";
 import { paths } from "../../paths";
+
+function formatNumberForExpr(value: number): string {
+  if (!Number.isFinite(value)) return "0";
+  const rounded = Math.round(value * 10000) / 10000;
+  if (Number.isInteger(rounded)) return String(rounded);
+  return rounded.toFixed(4).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+function buildExpectedXExpr(
+  box: { x: number; w: number },
+  align: number,
+  maxWidth: number
+): string {
+  const safeAlign = Math.max(0, Math.min(1, align));
+  const safeWidth = maxWidth > 0 ? maxWidth : 0;
+  const anchor =
+    box.w > 0
+      ? box.x + box.w * safeAlign
+      : safeWidth > 0
+      ? box.x + safeWidth * safeAlign
+      : box.x;
+  const maxAllowedExpr = `max(0,${formatNumberForExpr(safeWidth)}-text_w)`;
+  const desiredExpr = `${formatNumberForExpr(anchor)}-text_w*${formatNumberForExpr(safeAlign)}`;
+  return `max(0,min(${maxAllowedExpr},${desiredExpr}))`;
+}
+
+function computeCenteredOutroBox(
+  tpl: TemplateDoc,
+  videoW: number
+): { x: number; y: number; w: number; h: number } {
+  const rawBox =
+    getTextBoxFromTemplate(tpl, "Outro", "Testo-outro", { preserveAnchor: true }) ??
+    ({ x: 0, y: 0, w: 0, h: 0 } as const);
+  if (!(rawBox.w > 0) || !(videoW > 0)) {
+    return rawBox;
+  }
+  const logoBox = getLogoBoxFromTemplate(tpl, "Outro");
+  let centerTarget: number | undefined;
+  if (typeof logoBox.x === "number" && typeof logoBox.w === "number") {
+    centerTarget = logoBox.x + logoBox.w / 2;
+  } else {
+    centerTarget = videoW / 2;
+  }
+  if (!Number.isFinite(centerTarget)) {
+    return rawBox;
+  }
+  const desiredLeft = Math.round(centerTarget - rawBox.w / 2);
+  const maxLeft = Math.max(0, videoW - rawBox.w);
+  const safeLeft = Math.max(0, Math.min(maxLeft, desiredLeft));
+  if (safeLeft === rawBox.x) {
+    return rawBox;
+  }
+  return { ...rawBox, x: safeLeft };
+}
 
 test("buildTimelineFromLayout aligns text horizontally inside box", () => {
   const tpl: TemplateDoc = {
@@ -41,8 +96,9 @@ test("buildTimelineFromLayout aligns text horizontally inside box", () => {
     ],
   } as any;
 
+  const videoW = 400;
   const slides = buildTimelineFromLayout({ "Testo-0": "CIAO" }, tpl, {
-    videoW: 400,
+    videoW,
     videoH: 200,
     fps: 25,
     defaultDur: 2,
@@ -74,6 +130,8 @@ test("buildTimelineFromLayout aligns text horizontally inside box", () => {
   }
   const expected = Math.round(desired);
   assert.equal(block!.x, expected);
+  const expectedExpr = buildExpectedXExpr(box, align, videoW);
+  assert.equal(block!.xExpr, expectedExpr);
 });
 
 test("buildTimelineFromLayout honors text_align keywords", () => {
@@ -104,8 +162,9 @@ test("buildTimelineFromLayout honors text_align keywords", () => {
     ],
   } as any;
 
+  const videoW = 400;
   const slides = buildTimelineFromLayout({ "Testo-0": "NOTIZIA" }, tpl, {
-    videoW: 400,
+    videoW,
     videoH: 200,
     fps: 25,
     defaultDur: 2,
@@ -137,6 +196,8 @@ test("buildTimelineFromLayout honors text_align keywords", () => {
   }
   const expected = Math.round(desired);
   assert.equal(block!.x, expected);
+  const expectedExpr = buildExpectedXExpr(box, align, videoW);
+  assert.equal(block!.xExpr, expectedExpr);
 });
 
 test("buildTimelineFromLayout centers text when x_alignment is percentage", () => {
@@ -167,8 +228,9 @@ test("buildTimelineFromLayout centers text when x_alignment is percentage", () =
     ],
   } as any;
 
+  const videoW = 400;
   const slides = buildTimelineFromLayout({ "Testo-0": "TESTO ALLINEATO AL CENTRO" }, tpl, {
-    videoW: 400,
+    videoW,
     videoH: 200,
     fps: 25,
     defaultDur: 2,
@@ -200,6 +262,8 @@ test("buildTimelineFromLayout centers text when x_alignment is percentage", () =
   }
   const expected = Math.round(desired);
   assert.equal(block!.x, expected);
+  const expectedExpr = buildExpectedXExpr(box, align, videoW);
+  assert.equal(block!.xExpr, expectedExpr);
 });
 
 test("buildTimelineFromLayout applies template text color", () => {
@@ -355,11 +419,12 @@ test("buildTimelineFromLayout centers outro point text", () => {
     ],
   } as any;
 
+  const videoW = 600;
   const slides = buildTimelineFromLayout(
     { "Testo-0": "ciao", "Testo-outro": "HELLO" },
     tpl,
     {
-      videoW: 600,
+      videoW,
       videoH: 400,
       fps: 25,
       defaultDur: 2,
@@ -394,6 +459,8 @@ test("buildTimelineFromLayout centers outro point text", () => {
   }
   const expected = Math.round(desired);
   assert.equal(block!.x, expected);
+  const expectedExpr = buildExpectedXExpr(outroBox, align, videoW);
+  assert.equal(block!.xExpr, expectedExpr);
 });
 
 test("buildTimelineFromLayout centers outro textbox and text", () => {
@@ -454,6 +521,9 @@ test("buildTimelineFromLayout centers outro textbox and text", () => {
     const block = outro.texts?.[0];
     assert.ok(block);
     assert.ok(block?.background);
+    const outroBox = computeCenteredOutroBox(tpl, 800);
+    const expectedExpr = buildExpectedXExpr(outroBox, 0.5, 800);
+    assert.equal(block!.xExpr, expectedExpr);
 
     const bg = block!.background!;
     const expectedCenter = 800 / 2;

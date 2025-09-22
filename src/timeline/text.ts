@@ -208,6 +208,13 @@ function clamp01(value: number): number {
   return value;
 }
 
+function formatNumber(value: number): string {
+  if (!Number.isFinite(value)) return "0";
+  const rounded = Math.round(value * 10000) / 10000;
+  if (Number.isInteger(rounded)) return String(rounded);
+  return rounded.toFixed(4).replace(/0+$/, "").replace(/\.$/, "");
+}
+
 export function parseAlignmentFactor(raw: unknown): number | undefined {
   if (typeof raw === "number" && Number.isFinite(raw)) {
     const normalized = raw > 1 ? raw / 100 : raw;
@@ -293,6 +300,7 @@ export function applyHorizontalAlignment(
   textBox: { x: number; w: number },
   maxWidth: number
 ): void {
+  block.xExpr = undefined;
   if (!lines.length) return;
   if (!(fontPx && fontPx > 0)) return;
   if (alignX == null) return;
@@ -300,16 +308,16 @@ export function applyHorizontalAlignment(
   const textWidth = estimateTextWidth(lines, fontPx, letterSpacingPx);
   if (!(textWidth > 0)) return;
 
+  let anchor: number | undefined;
+  if (textBox.w > 0) {
+    anchor = textBox.x + textBox.w * safeAlign;
+  } else if (maxWidth > 0) {
+    anchor = textBox.x + maxWidth * safeAlign;
+  }
+
   const computeOffset = (): number | undefined => {
-    if (textBox.w > 0) {
-      const anchor = textBox.x + textBox.w * safeAlign;
-      return anchor - textWidth * safeAlign;
-    }
-    if (maxWidth > 0) {
-      const anchor = textBox.x + maxWidth * safeAlign;
-      return anchor - textWidth * safeAlign;
-    }
-    return undefined;
+    if (anchor == null) return undefined;
+    return anchor - textWidth * safeAlign;
   };
 
   let desiredX = computeOffset();
@@ -326,6 +334,15 @@ export function applyHorizontalAlignment(
   }
 
   block.x = Math.round(desiredX);
+
+  if (safeAlign > 0 && anchor != null && maxWidth > 0) {
+    const anchorStr = formatNumber(anchor);
+    const alignStr = formatNumber(safeAlign);
+    const maxWidthStr = formatNumber(maxWidth);
+    const maxAllowedExpr = `max(0,${maxWidthStr}-text_w)`;
+    const desiredExpr = `${anchorStr}-text_w*${alignStr}`;
+    block.xExpr = `max(0,min(${maxAllowedExpr},${desiredExpr}))`;
+  }
 }
 
 function linesEqual(a: string[], b: string[]): boolean {
