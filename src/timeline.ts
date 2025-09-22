@@ -1837,6 +1837,11 @@ export function buildTimelineFromLayout(
         w: 240,
         h: 140,
       };
+      const fillerLogoWidth = Math.max(fLogo.w ?? 240, 1);
+      const fillerLogoHeight = Math.max(fLogo.h ?? 140, 1);
+      const fillerLogoX = Math.round((videoW - fillerLogoWidth) / 2);
+      const fillerLogoY = Math.round((videoH - fillerLogoHeight) / 2);
+
       slides.push({
         width: videoW,
         height: videoH,
@@ -1844,10 +1849,10 @@ export function buildTimelineFromLayout(
         durationSec: gap,
         outPath: "",
         logoPath: join(paths.images, "logo.png"),
-        logoWidth: fLogo.w,
-        logoHeight: fLogo.h,
-        logoX: fLogo.x,
-        logoY: fLogo.y,
+        logoWidth: fillerLogoWidth,
+        logoHeight: fillerLogoHeight,
+        logoX: fillerLogoX,
+        logoY: fillerLogoY,
         backgroundAnimated: false,
       });
       prevEnd = start;
@@ -2147,6 +2152,12 @@ export function buildTimelineFromLayout(
 
     if (isFillerSlide) {
       slide.backgroundAnimated = false;
+      const fillerLogoWidth = Math.max(slide.logoWidth ?? logoBox.w ?? 240, 1);
+      const fillerLogoHeight = Math.max(slide.logoHeight ?? logoBox.h ?? 140, 1);
+      slide.logoWidth = fillerLogoWidth;
+      slide.logoHeight = fillerLogoHeight;
+      slide.logoX = Math.round((videoW - fillerLogoWidth) / 2);
+      slide.logoY = Math.round((videoH - fillerLogoHeight) / 2);
     } else if (bgImagePath && i > 0) {
       slide.backgroundAnimated = true;
     }
@@ -2184,6 +2195,11 @@ export function buildTimelineFromLayout(
         w: 240,
         h: 140,
       };
+      const fillerLogoWidth = Math.max(fLogo.w ?? 240, 1);
+      const fillerLogoHeight = Math.max(fLogo.h ?? 140, 1);
+      const fillerLogoX = Math.round((videoW - fillerLogoWidth) / 2);
+      const fillerLogoY = Math.round((videoH - fillerLogoHeight) / 2);
+
       slides.push({
         width: videoW,
         height: videoH,
@@ -2191,10 +2207,10 @@ export function buildTimelineFromLayout(
         durationSec: gap,
         outPath: "",
         logoPath: join(paths.images, "logo.png"),
-        logoWidth: fLogo.w,
-        logoHeight: fLogo.h,
-        logoX: fLogo.x,
-        logoY: fLogo.y,
+        logoWidth: fillerLogoWidth,
+        logoHeight: fillerLogoHeight,
+        logoX: fillerLogoX,
+        logoY: fillerLogoY,
       });
       prevEnd = outroStart;
     }
