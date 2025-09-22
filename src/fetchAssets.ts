@@ -19,9 +19,9 @@ function clearDir(dir: string) {
 const DEFAULT_HEADERS = {
   "User-Agent":
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
-  // chiedi esplicitamente di NON comprimere la risposta
+  // Richiede risposte non compresse per salvare i file così come forniti.
   "Accept-Encoding": "identity",
-  // accetta immagini come farebbe un browser
+  // Header Accept allineato a quello di un browser per asset grafici.
   "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
 };
 
@@ -54,7 +54,7 @@ function httpGet(url: string, options: HttpGetOptions = {}): Promise<HttpRespons
   const target = new URL(url);
   const lib = target.protocol === "https:" ? httpsRequest : httpRequest;
 
-  // alcuni server vogliono un Referer “sensato”
+  // Alcuni CDN richiedono un header Referer coerente con il dominio di origine.
   const headers = {
     ...DEFAULT_HEADERS,
     Referer: `${target.protocol}//${target.hostname}/`,
@@ -75,14 +75,14 @@ function httpGet(url: string, options: HttpGetOptions = {}): Promise<HttpRespons
         const status = res.statusCode ?? 0;
         const loc = res.headers.location;
 
-        // Redirect
+        // Gestione esplicita dei redirect HTTP 3xx.
         if (status >= 300 && status < 400 && loc) {
           const next = new URL(loc, target).toString();
           httpGet(next, options).then(resolve, reject);
           return;
         }
 
-        // 304 → non errore
+        // Le risposte 304 indicano che la risorsa non è cambiata.
         if (status === 304) {
           resolve({
             buffer: Buffer.alloc(0),
@@ -125,7 +125,7 @@ function withCacheBuster(url: string): string {
 async function downloadFile(url: string, outPath: string, options?: HttpGetOptions) {
   const hdrs = { ...(options?.headers || {}) };
 
-  // Se esiste già il file, prova richiesta condizionata
+  // Se il file esiste si effettua una richiesta condizionata con If-Modified-Since.
   if (existsSync(outPath)) {
     const mtime = statSync(outPath).mtime.toUTCString();
     hdrs["If-Modified-Since"] = mtime;
@@ -143,10 +143,10 @@ async function downloadFile(url: string, outPath: string, options?: HttpGetOptio
     res = await httpGet(withCacheBuster(url), options);
   }
 
-  // Se per qualche motivo il server ha compresso comunque, decomprimi
+  // Decompressione manuale nel caso il server ignori l'header Accept-Encoding.
   let data = decompressIfNeeded(res.buffer, res.headers);
 
-  // Sanity check: il server ci sta davvero dando un’immagine?
+  // Verifica che il content-type restituito corrisponda a un asset grafico.
   const ctype = String(res.headers["content-type"] || "").toLowerCase();
   if (ctype && !ctype.startsWith("image/")) {
     console.warn(
@@ -165,7 +165,7 @@ export async function fetchAssets() {
 
   ensureDir(paths.downloads);
 
-  // reset cartelle dinamiche
+  // Pulisce le cartelle di lavoro prima di scaricare i nuovi asset.
   ensureDir(paths.audio);
   clearDir(paths.audio);
   ensureDir(paths.images);
@@ -174,19 +174,19 @@ export async function fetchAssets() {
   clearDir(paths.tts);
   ensureDir(paths.fonts);
 
-  // Logo
+  // Scarica il logo aziendale se fornito dal payload delle modifications.
   const logoUrl = String(mods.Logo ?? "");
   if (logoUrl.startsWith("http")) {
     await downloadFile(logoUrl, join(paths.images, "logo.png"));
   }
 
-  // Audio di background
+  // Recupera la traccia di sottofondo opzionale.
   const audioUrl = String(mods.Audio ?? "");
   if (audioUrl.startsWith("http")) {
     await downloadFile(audioUrl, join(paths.audio, "bg.mp3"));
   }
 
-  // TTS
+  // Scarica tutte le clip TTS referenziate dalle modifiche.
   for (const key of Object.keys(mods)) {
     const m = key.match(/^TTS-(\d+)$/);
     if (m) {
@@ -197,7 +197,7 @@ export async function fetchAssets() {
     }
   }
 
-  // Immagini
+  // Scarica le immagini abbinate a ciascuna slide.
   for (const key of Object.keys(mods)) {
     const m = key.match(/^Immagine-(\d+)$/);
     if (m) {

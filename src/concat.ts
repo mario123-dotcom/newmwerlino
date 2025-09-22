@@ -1,5 +1,5 @@
 import { existsSync, writeFileSync } from "fs";
-import { runFFmpeg } from "./ffmpeg/run"; // ✅ percorso corretto
+import { runFFmpeg } from "./ffmpeg/run";
 
 type ConcatArgs = {
   segments: string[];
@@ -7,10 +7,10 @@ type ConcatArgs = {
   outPath: string;
   concatTxtPath: string;
   fps: number;
-  bgVolume?: number; // 0..1
+  bgVolume?: number; // Valore normalizzato tra 0 e 1.
 };
 
-// Rende il path sicuro per il demuxer concat: slash forward + apici singoli
+// Converte i percorsi in un formato compatibile con il demuxer concat (slash e apici singoli).
 function ffSafe(p: string): string {
   return p.replace(/\\/g, "/");
 }
@@ -20,7 +20,7 @@ export async function concatAndFinalizeDemuxer(args: ConcatArgs) {
 
   const hasBgAudio = !!(bgAudioPath && existsSync(bgAudioPath));
 
-  // Scrivi concat.txt (una riga per file)
+  // Genera il file concat.txt richiesto dal demuxer, una riga per segmento.
   const lines = segments.map((s) => `file '${ffSafe(s)}'`);
   writeFileSync(concatTxtPath, lines.join("\n"), "utf8");
 

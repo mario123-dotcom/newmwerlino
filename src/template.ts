@@ -14,15 +14,18 @@ function findInElements(
   return undefined;
 }
 
-/** Elemento generico del template Creatomate */
+/**
+ * Definizione tipizzata di un elemento Creatomate con gli attributi
+ * utilizzati dai builder per recuperare geometrie, testi e animazioni.
+ */
 export type TemplateElement = {
   name?: string;
-  type: string;              // es: 'composition', 'text', 'image', 'shape', 'audio'
-  time?: number;             // start in secondi (quando presente)
-  duration?: number;         // durata in secondi (quando presente)
+  type: string;              // Tipologia dell'elemento (composition, text, image, shape, audio).
+  time?: number;             // Istante di inizio in secondi se definito.
+  duration?: number;         // Durata in secondi ricavata dal template.
   visible?: boolean;
 
-  // geometria: possono essere numeri o stringhe tipo "54.2%"
+  // Coordinate e dimensioni possono essere espresse come numeri o percentuali.
   x?: number | string;
   y?: number | string;
   width?: number | string;
@@ -30,7 +33,7 @@ export type TemplateElement = {
   x_anchor?: number | string;
   y_anchor?: number | string;
 
-  // testo (quando type === 'text')
+  // Proprietà specifiche per i layer di testo.
   text?: string;
   font_size?: number | string;
   font_family?: string;
@@ -39,18 +42,18 @@ export type TemplateElement = {
   color?: string;
   background_color?: string;
 
-  // immagine / shape
+  // Attributi condivisi da immagini e forme vettoriali.
   fill_color?: string;
   opacity?: number;
 
-  // figli (quando type === 'composition' o gruppi con layers)
+  // Sotto-elementi annidati all'interno della composition corrente.
   elements?: TemplateElement[];
 
-  // metadati opzionali
+  // Campi opzionali di tagging utilizzati per ricerche semantiche.
   tags?: string | string[];
   tag?: string | string[];
 
-  // animazioni opzionali (es. fade, text-reveal...)
+  // Definizioni di animazioni esportate dal template.
   animations?: {
     time?: number | string;
     duration?: number | string;
@@ -60,37 +63,44 @@ export type TemplateElement = {
   }[];
 };
 
-/** Documento template (come template_horizontal.json) */
+/**
+ * Struttura del documento JSON esportato dal generatore (es. template_horizontal.json).
+ */
 export type TemplateDoc = {
   width: number;
   height: number;
   frame_rate?: number;
   duration?: number;
   elements: TemplateElement[];
-  // Alcuni export Creatomate includono anche "modifications" dentro al template: lo tolleriamo.
+  // Alcune esportazioni incorporano direttamente la sezione "modifications".
   modifications?: Record<string, any>;
 };
 
-/** Carica il template JSON (layout/posizioni) */
+/**
+ * Legge il file di template principale e valida la presenza dell'elenco elementi.
+ */
 export function loadTemplate(): TemplateDoc {
-  // Percorso standard nella cartella template/
+  // Legge il file template dalla cartella dedicata del progetto.
   const raw = readFileSync(paths.template, "utf8");
   const json = JSON.parse(raw);
-  // normalizzazione minima
+  // Validazione minima della struttura del JSON.
   if (!json || typeof json !== "object" || !Array.isArray(json.elements)) {
     throw new Error("template_horizontal.json non valido: manca 'elements'");
   }
   return json as TemplateDoc;
 }
 
-/** Carica le modifications (risposta) da risposta_horizontal.json */
+/**
+ * Carica le modifiche richieste dal backend, accettando sia file dedicati sia
+ * template che includono direttamente la sezione "modifications".
+ */
 export function loadModifications(): Record<string, any> {
-  // Prima prova: file separato risposta_horizontal.json nella cartella template/
+  // Prima tenta di leggere il file di risposta separato nella cartella template.
   const rp = paths.modifications;
   if (existsSync(rp)) {
     const raw = readFileSync(rp, "utf8");
     const json = JSON.parse(raw);
-    // a volte è già un oggetto "modifications", a volte è il payload completo
+    // Il payload può essere già la sezione "modifications" oppure l'intera risposta.
     if (json && typeof json === "object") {
       if (json.modifications && typeof json.modifications === "object") {
         return json.modifications;
@@ -98,17 +108,21 @@ export function loadModifications(): Record<string, any> {
       return json;
     }
   }
-  // fallback: alcune esportazioni mettono "modifications" dentro il template
+  // Come fallback si legge la sezione incorporata nel template principale.
   const t = loadTemplate();
   return (t as any).modifications || {};
 }
 
-/** Trova una composition per nome (Slide_0, Slide_1, Intro, Outro, ...) */
+/**
+ * Restituisce una composition identificata dal nome (es. Slide_0, Intro, Outro).
+ */
 export function findComposition(tpl: TemplateDoc, name: string): TemplateElement | undefined {
   return findInElements(tpl.elements, (e) => e.type === "composition" && e.name === name);
 }
 
-/** Trova un figlio per nome dentro una composition */
+/**
+ * Cerca ricorsivamente un elemento figlio con il nome indicato all'interno di una composition.
+ */
 export function findChildByName(
   parent: TemplateElement | undefined,
   name: string
@@ -117,7 +131,9 @@ export function findChildByName(
   return findInElements(parent.elements, (e) => e.name === name);
 }
 
-/** Converte percentuali o stringhe in pixel, altrimenti restituisce numeri come sono. */
+/**
+ * Converte valori percentuali o stringhe compatibili in pixel rispetto a una base.
+ */
 export function pctToPx(val: number | string | undefined, base: number): number | undefined {
   if (val == null) return undefined;
   if (typeof val === "number") return val;
@@ -131,11 +147,13 @@ export function pctToPx(val: number | string | undefined, base: number): number 
   return Number.isFinite(n) ? n : undefined;
 }
 
-/** Piccolo helper per avere un font di fallback cross-platform */
+/**
+ * Seleziona un font di sistema disponibile sulla piattaforma corrente da usare
+ * quando il template non specifica una famiglia scaricata.
+ */
 export function getDefaultFontPath(): string {
-  // Windows
+  // Percorsi noti sui sistemi principali: Windows e distribuzioni Linux.
   const w = "C:\\Windows\\Fonts\\arial.ttf";
-  // Linux/WSL
   const l1 = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
   const l2 = "/usr/share/fonts/truetype/freefont/FreeSans.ttf";
   try { if (existsSync(w)) return w; } catch {}

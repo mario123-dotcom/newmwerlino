@@ -21,23 +21,23 @@ function clearDir(dir: string) {
 }
 
 (async () => {
-  // prepara le cartelle di lavoro
+  // Prepara le cartelle temporanee e svuota l'output precedente.
   ensureDir(paths.temp);
   ensureDir(paths.output);
   clearDir(paths.temp);
   clearDir(paths.output);
 
-  // 1) scarica asset
+  // 1) Scarica gli asset remoti specificati dal backend.
   await fetchAssets();
 
-  // 2) carica template + modifications
+  // 2) Carica layout Creatomate e personalizzazioni ricevute.
   const tpl = loadTemplate();
   const mods = loadModifications();
   const videoW = tpl.width || 1920;
   const videoH = tpl.height || 1080;
   const fps = tpl.frame_rate || 30;
 
-  // 3) costruisci slide
+  // 3) Genera la sequenza di SlideSpec a partire da template e dati.
   const slides: SlideSpec[] = buildTimelineFromLayout(mods, tpl, {
     videoW,
     videoH,
@@ -45,7 +45,7 @@ function clearDir(dir: string) {
     defaultDur: 7,
   });
 
-  // 4) renderizza ogni slide
+  // 4) Renderizza ogni segmento video con FFmpeg.
   const segFiles: string[] = [];
   for (let i = 0; i < slides.length; i++) {
     const out = join(paths.temp, `seg-${i.toString().padStart(3, "0")}.mp4`);
@@ -57,13 +57,13 @@ function clearDir(dir: string) {
     segFiles.push(out);
   }
 
-  // 5) concat & mix finale
-  const bg = paths.bgAudio; // ✅ usa la property esistente in paths
+  // 5) Concatena i segmenti e mixa l'eventuale musica di background.
+  const bg = paths.bgAudio;
   await concatAndFinalizeDemuxer({
     segments: segFiles,
     bgAudioPath: bg,
-    outPath: paths.finalVideo,   // ✅ prima era paths.final
-    concatTxtPath: paths.concatList, // ✅ prima era paths.concat
+    outPath: paths.finalVideo,
+    concatTxtPath: paths.concatList,
     fps,
     bgVolume: DEFAULT_BG_VOL,
   });

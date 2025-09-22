@@ -1,12 +1,12 @@
-// Minimal FFmpeg text utilities
+// Utility dedicate alla costruzione di filtri FFmpeg per i testi.
 
-// Convert a filesystem path into a form accepted by FFmpeg on any platform.
+// Converte un percorso di filesystem nel formato accettato da FFmpeg su ogni piattaforma.
 // Example: `C:\foo\bar` -> `C\:/foo/bar`
 export function toFFPath(p: string): string {
   return p.replace(/\\/g, "/").replace(/^([A-Za-z]):/, "$1\\:");
 }
 
-// Escape characters that would otherwise break the drawtext filter.
+// Effettua l'escape dei caratteri che interromperebbero il filtro drawtext.
 export function escTextForDrawText(s: string): string {
   return s
     .replace(/\\/g, "\\\\")
@@ -17,23 +17,23 @@ export function escTextForDrawText(s: string): string {
 }
 
 export type DrawTextOpts = {
-  label: string;        // buffer label (e.g. "tx_0")
-  textFile?: string;    // path to file containing the text
-  text?: string;        // inline text alternative
+  label: string;        // Nome del buffer intermedio generato dal filtro (es. "tx_0").
+  textFile?: string;    // Percorso di un file con il testo da visualizzare.
+  text?: string;        // Testo inline alternativo se non si usa un file.
   fontFile: string;
   fontSize: number;
-  fontColor: string;    // e.g. "white"
-  xExpr: string;        // expression for x position
-  yExpr: string;        // expression for y position
+  fontColor: string;    // Colore del testo (es. "white").
+  xExpr: string;        // Espressione che determina la coordinata X.
+  yExpr: string;        // Espressione che determina la coordinata Y.
   lineSpacing?: number;
   box?: boolean;
   boxColor?: string;
-  boxAlpha?: number;    // 0..1
-  boxBorderW?: number;  // pixels
-  enableExpr?: string;  // e.g. "between(t,0,7)"
+  boxAlpha?: number;    // Trasparenza della box, normalizzata 0..1.
+  boxBorderW?: number;  // Spessore del bordo in pixel.
+  enableExpr?: string;  // Espressione che abilita/disabilita il disegno nel tempo.
 };
 
-// Build the drawtext filter snippet for the given options.
+// Costruisce la stringa del filtro drawtext in base alle opzioni ricevute.
 export function buildDrawText(opts: DrawTextOpts): string {
   const {
     label,

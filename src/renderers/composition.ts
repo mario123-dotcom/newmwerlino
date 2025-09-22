@@ -4,11 +4,10 @@ import type { SlideSpec } from "../timeline";
 import { getDefaultFontPath } from "../template";
 
 /**
- * Renderizza UN segmento (slide) con:
- * - background cover+crop,
- * - logo non deformato (altezza fissa, AR preservato),
- * - testo posizionato,
- * - TTS in stereo (o silenzio se assente).
+ * Renderizza un singolo "SlideSpec" generando il video MP4 relativo.
+ * Il comando risultante gestisce background statici o animati,
+ * sovrappone ombre, forme e logo, posiziona i testi con le animazioni
+ * previste e garantisce un audio coerente (TTS o silenzio).
  */
 export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
   const W = slide.width ?? 1920;
@@ -24,10 +23,10 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
 
   const fontFile = slide.fontFile ?? getDefaultFontPath();
 
-  // --- INPUTS
+  // Prepara gli input di base per il comando FFmpeg.
   const args: string[] = ["-y"];
 
-  // base nera
+  // Sorgente iniziale: un canvas nero in formato RGBA.
   args.push("-f","lavfi","-t",`${dur}`,"-r",String(fps),"-i",`color=c=black:s=${W}x${H}`);
 
   let hasBG = false;
@@ -50,7 +49,7 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
     hasTTS = true;
   }
 
-  // --- FILTER COMPLEX
+  // Costruzione del grafo filter_complex.
   const f: string[] = [];
   f.push(`[0:v]format=rgba[base]`);
 
@@ -61,7 +60,7 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
   const cropFilter =
     `crop=w='${cropWidthExpr}':h='${cropHeightExpr}':x='(iw-ow)/2':y='(ih-oh)/2'`;
 
-  // Background: cover + crop (usa "increase", non 'cover' che in scale è una stringa non valida)
+  // Gestione del background: crop centrale e adattamento al canvas con eventuale zoom animato.
   let lastV = "base";
   if (hasBG) {
     if (animateBackground && dur > 0) {
@@ -80,7 +79,7 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
         const framesMinusOne = totalFrames - 1;
         const framesMinusOneExpr = framesMinusOne.toFixed(6);
         const baseZoomProgressExpr = `(min(on\,${framesMinusOne})/${framesMinusOneExpr})`;
-        // Cubic ease-out for an even quicker acceleration than the previous quadratic curve.
+        // Curva ease-out cubica per ottenere un movimento inizialmente rapido e poi più morbido.
         const cubicEaseOutExpr = `1-pow(1-${baseZoomProgressExpr},3)`;
         const lingerEaseExpr = `pow(${cubicEaseOutExpr},1.12)`;
         const zoomSpeedMultiplier = 1.22;
@@ -148,10 +147,10 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
       const xRatio = `(X/${swExpr})`;
       const yDelta = `max(${hMinusOne}-Y,0)`;
       const yRatio = `(${yDelta}/${shExpr})`;
-      // Expand the wedge so the corner goes nearly black while retaining a
-      // visible fade across the rest of the slide. Bring the diagonal cutoff
-      // in slightly and steepen the exponent so the opacity stays strong in the
-      // lower-left while easing off sooner across the frame.
+      // Modella il gradiente d'ombra per mantenere il bordo inferiore scuro
+      // senza perdere la sfumatura sul resto dell'immagine; regola la diagonale
+      // e l'esponente per lasciare l'opacità elevata nella zona del logo
+      // riducendola progressivamente sul resto del frame.
       const diagCutoff = 1.14;
       const diagMetric = `hypot(${xRatio},${yRatio})`;
       const diagNorm = `(${diagMetric}/${diagCutoff.toFixed(6)})`;
@@ -226,7 +225,7 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
     }
   }
 
-  // Logo (preserva AR dentro al box indicato)
+  // Sovrappone il logo mantenendo il rapporto d'aspetto all'interno del box definito.
   if (hasLogo) {
     const logoIndex = hasBG ? 2 : 1;
     f.push(
@@ -237,7 +236,7 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
     lastV = "v1";
   }
 
-  // Testi
+  // Disegna tutti i blocchi di testo e relative animazioni.
   if (slide.texts && slide.texts.length) {
     for (let i = 0; i < slide.texts.length; i++) {
       const tb = slide.texts[i];
@@ -262,7 +261,7 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
         lastV = bgOut;
       }
 
-      // layer trasparente su cui disegnare il testo; il "blank" serve solo per xfade
+      // Layer trasparente dedicato al testo; l'input blank serve per gli xfade delle wipe.
       const wipeAnims = tb.animations?.filter((a) => a.type === "wipe") ?? [];
       let blankEnd = 0;
       if (wipeAnims.length) {
@@ -292,21 +291,21 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
         enableExpr: `between(t,0,${dur})`,
       });
 
-      f.push(draw); // -> [tx_i]
+      f.push(draw); // Il filtro produce il buffer video [tx_i].
 
       let cur = `tx_${i}`;
       if (tb.animations && tb.animations.length) {
         tb.animations.forEach((an, ai) => {
-          if ("reversed" in an && (an as any).reversed) return; // ignora animazioni "out"
+          if ("reversed" in an && (an as any).reversed) return; // Ignora le animazioni di uscita definite nel template.
           if (an.type === "fade") {
             const st = typeof an.time === "number" ? an.time : Math.max(0, dur - an.duration);
-            // salta fade che finirebbero oltre la durata del segmento (fade-out)
+            // Evita fade che terminerebbero oltre la durata del segmento (fade-out).
             if (st + an.duration >= dur) return;
             const lbl = `tx_${i}_anim${ai}`;
             f.push(`[${cur}]fade=t=in:st=${st}:d=${an.duration}:alpha=1,format=rgba[${lbl}]`);
             cur = lbl;
           } else if (an.type === "wipe" && wipeAnims.length) {
-            // salta wipe oltre la durata (evita wipe-out)
+            // Evita wipe posizionati oltre la durata del segmento (wipe-out).
             if (an.time + an.duration >= dur) return;
             const tmp = `tx_${i}_tmp${ai}`;
             const lbl = `tx_${i}_anim${ai}`;
@@ -326,10 +325,10 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
     }
   }
 
-  // --- AUDIO
+  // Configurazione del percorso audio.
   if (hasTTS) {
-    // indice audio del TTS:
-    // base + (bg?) + (logo?) -> poi tts
+    // Individua l'indice di input della traccia TTS nella sequenza di sorgenti.
+    // La posizione dipende dalla presenza di background e logo come input video.
     const ttsAIndex = hasBG && hasLogo ? 3 : (hasBG || hasLogo ? 2 : 1);
     f.push(
       `[${ttsAIndex}:a]aformat=sample_rates=44100,` +
@@ -338,7 +337,7 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
       `asetpts=PTS-STARTPTS[aout]`
     );
   } else {
-    // traccia silenziosa stereo
+    // In assenza di parlato genera una traccia stereo silenziosa.
     f.push(
       `anullsrc=channel_layout=stereo:sample_rate=44100,atrim=0:${dur},asetpts=PTS-STARTPTS[aout]`
     );
@@ -346,7 +345,7 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
 
   const filterComplex = f.join(";");
 
-  // --- MAP & CODECS
+  // Mapping finale degli stream e impostazione dei codec.
   args.push(
     "-filter_complex", filterComplex,
     "-map", `[${lastV}]`,
