@@ -1,5 +1,5 @@
 import { existsSync, writeFileSync } from "fs";
-import { runFFmpeg } from "./ffmpeg/run"; // ✅ percorso corretto
+import { runFFmpeg } from "./ffmpeg/run";
 
 type ConcatArgs = {
   segments: string[];

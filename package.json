@@ -4,15 +4,14 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
+    "prebuild": "node scripts/clean-dist.js",
     "build": "tsc",
     "start": "npm run build && node dist/main.js",
     "start:reuse": "npm run build && node dist/main.js --reuse-segs",
     "start:reuse:dir": "npm run build && node dist/main.js --reuse-segs --segsDir src/temp",
-    "test": "npm run build && node --test dist/**/*.test.js"
+    "test": "npm run build && node --test dist/tests"
   },
-  "dependencies": {
-    "ffmpeg-static": "^5.2.0"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@types/node": "^20.11.0",
     "typescript": "^5.5.0"

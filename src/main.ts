@@ -58,12 +58,12 @@ function clearDir(dir: string) {
   }
 
   // 5) concat & mix finale
-  const bg = paths.bgAudio; // ✅ usa la property esistente in paths
+  const bg = paths.bgAudio;
   await concatAndFinalizeDemuxer({
     segments: segFiles,
     bgAudioPath: bg,
-    outPath: paths.finalVideo,   // ✅ prima era paths.final
-    concatTxtPath: paths.concatList, // ✅ prima era paths.concat
+    outPath: paths.finalVideo,
+    concatTxtPath: paths.concatList,
     fps,
     bgVolume: DEFAULT_BG_VOL,
   });

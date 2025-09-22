@@ -1,13 +1,21 @@
-// src/core/config.ts
+/**
+ * Raccolta di costanti condivise fra pipeline di timeline e renderer.
+ * Le impostazioni regolano orientamento, tipografia, loghi, immagini e audio
+ * in modo coerente per tutti i segmenti generati.
+ */
 export type Orientation = "landscape" | "portrait";
 export type OrientationMode = "auto" | Orientation;
 
-export const ORIENTATION_MODE: OrientationMode = "auto"; // "auto" | "landscape" | "portrait"
+/**
+ * Modalità scelta per l'orientamento del video finale.
+ * "auto" lascia che l'orientamento venga dedotto dal template, mentre
+ * "landscape" e "portrait" consentono di forzare un layout fisso.
+ */
+export const ORIENTATION_MODE: OrientationMode = "auto";
 
 /**
- * Determina l'orientamento (orizzontale/verticale) del video.
- * Se `ORIENTATION_MODE` è impostato manualmente, viene rispettato; altrimenti
- * l'orientamento viene dedotto confrontando larghezza e altezza del template.
+ * Determina l'orientamento del progetto partendo da larghezza e altezza del
+ * template. Se è stata definita una modalità esplicita, quella prevale.
  */
 export function deriveOrientation(w: number, h: number): Orientation {
   if (ORIENTATION_MODE === "landscape" || ORIENTATION_MODE === "portrait") {
@@ -16,7 +24,11 @@ export function deriveOrientation(w: number, h: number): Orientation {
   return w >= h ? "landscape" : "portrait";
 }
 
-/** Font + testo */
+/**
+ * Parametri utilizzati dal motore testuale per derivare dimensioni e layout.
+ * I valori vengono letti dai builder della timeline come base quando il
+ * template non fornisce indicazioni più precise.
+ */
 export const TEXT = {
   LINE_HEIGHT: 1.42,
   MIN_SIZE: 28,
@@ -25,37 +37,46 @@ export const TEXT = {
     landscape: 0.05,
     portrait: 0.08,
   },
-  /** margine sx per allineamento left (solo landscape slide 1) */
+  /** Margine aggiuntivo sul primo blocco per allineamenti manuali. */
   LEFT_MARGIN_P: 0.08,
-  /** rapporto medio larghezza/carattere in px ≈ k * fontsize */
-  CHAR_WIDTH_K: 0.55, // 0.52–0.58 a seconda del font
-  /** limite massimo indicativo di caratteri per riga sulle slide principali */
-
+  /** Rapporto medio larghezza/carattere usato per stimare gli ingombri. */
+  CHAR_WIDTH_K: 0.55,
+  /** Limite consigliato di caratteri per riga nelle slide principali. */
   MAX_CHARS_PER_LINE: 30,
-  /** fattore massimo di scala per i font ricavati dal template quando il box si allarga */
+  /** Fattore massimo di scala per i font ricavati dalle percentuali template. */
   MAX_FONT_SCALE: 1.8,
-  /** padding extra per gli sfondi del testo (in multipli del font size) */
-  BOX_PAD_FACTOR: 0.30,
-  /** larghezza minima del box testo (percentuale della larghezza video) */
+  /** Padding extra applicato agli sfondi di testo in base al font size. */
+  BOX_PAD_FACTOR: 0.3,
+  /** Larghezza minima del box testo rispetto alla larghezza del video. */
   MIN_BOX_WIDTH_RATIO: 0.85,
-
 };
 
-/** Scale di base (fontsize ≈ scale * videoH) */
+/**
+ * Scala di grandezza predefinita per i titoli nelle varie tipologie di slide.
+ * Il valore viene moltiplicato per l'altezza del video per ottenere un font
+ * iniziale realistico.
+ */
 export const SCALES = {
-  landscape: { FIRST: 0.20, OTHER: 0.15, OUTRO: 0.03 },
-  portrait:  { FIRST: 0.11, OTHER: 0.10, OUTRO: 0.028 },
+  landscape: { FIRST: 0.2, OTHER: 0.15, OUTRO: 0.03 },
+  portrait: { FIRST: 0.11, OTHER: 0.1, OUTRO: 0.028 },
 };
 
-/** Target “wrapping” di partenza (caratteri) — verrà adattato in autosize */
+/**
+ * Target iniziali per la funzione di wrapping automatico del testo.
+ * I builder possono discostarsi da questi valori in base alla larghezza del box.
+ */
 export const WRAP_TARGET = {
   landscape: { FIRST: 40, OTHER: 30 },
-  portrait:  { FIRST: 24, OTHER: 20 },
+  portrait: { FIRST: 24, OTHER: 20 },
 };
 
-export const STAGGER = { base: 0.10, growth: 0.10, jitter: 0.015 };
+/** Ritmo dell'animazione "stagger" applicata nelle slide dinamiche. */
+export const STAGGER = { base: 0.1, growth: 0.1, jitter: 0.015 };
 
-// Shade (immagini)
+/**
+ * Parametri per il filtro "shade" utilizzato nel renderer per enfatizzare
+ * il contrasto delle immagini di background.
+ */
 export const SHADE = {
   strength: 0.9,
   gamma: 1.0,
@@ -65,7 +86,7 @@ export const SHADE = {
   enableOnFirstSlide: false,
 };
 
-// Footer / Logo
+/** Spaziature di riferimento per footer e logo aziendale. */
 export const FOOTER = {
   LOGO_HEIGHT: 100,
   LINE_THICKNESS: 3,
@@ -73,23 +94,25 @@ export const FOOTER = {
   GAP: 12,
 };
 
-// Audio
+/** Volume di base per le clip TTS. */
 export const DEFAULT_TTS_VOL = 0.9;
-// Volume predefinito dell'audio di background: abbastanza alto da essere
-// percepito chiaramente, ma ancora sotto la voce TTS.
-export const DEFAULT_BG_VOL  = 0.2;
+/** Livello di default della musica di sottofondo rispetto alla voce. */
+export const DEFAULT_BG_VOL = 0.2;
 
+/** Configurazione per il ducking applicato quando è presente audio parlato. */
 export const DUCK = {
   threshold: 0.03,
   ratio: 20,
   attack: 5,
   release: 300,
-  makeup: 1, // FFmpeg richiede >=1
+  makeup: 1,
 };
 
-// Altro
+/** Durata extra in millisecondi mantenuta sulle slide alla fine del parlato. */
 export const HOLD_EXTRA_MS = 250;
+/** Curva di easing utilizzata nelle animazioni dei testi. */
 export const EASE: "linear" | "cubicOut" | "quartOut" = "quartOut";
+/** Impostazioni predefinite per la fase di concatenazione finale. */
 export const CONCAT_DEFAULTS = {
   allowSkipBroken: true,
   tryAutoRepair: true,

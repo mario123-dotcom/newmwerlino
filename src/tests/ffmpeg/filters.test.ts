@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { toFFPath, buildDrawText } from "./filters";
+import { toFFPath, buildDrawText } from "../../ffmpeg/filters";
 
 test("toFFPath converts Windows paths", () => {
   const win = "C:/foo/bar".replace(/\//g, "\\");

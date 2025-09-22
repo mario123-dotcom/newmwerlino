@@ -1,103 +1,113 @@
 # Architettura del progetto
 
-Questo documento descrive passo passo tutto il codice presente nella
-repository, spiegando le funzioni principali in modo comprensibile anche per
-chi non conosce TypeScript o FFmpeg.
+Questo documento descrive l'intero flusso di generazione video, evidenziando i
+moduli TypeScript e le responsabilità di ciascuno. La pipeline parte dal
+caricamento dei dati di template e delle modifiche richieste, costruisce una
+sequenza strutturata di slide e termina producendo i file multimediali
+attraverso invocazioni dirette di FFmpeg.
 
-## Panoramica generale
-1. **fetchAssets.ts** scarica immagini, tracce TTS, font e musica di
-   background partendo dalla risposta JSON.
-2. **template.ts** legge il file di template (layout delle slide) e le
-   modifiche fornite dalla risposta.
-3. **timeline.ts** combina template e risposta per calcolare la durata di ogni
-   slide, le posizioni di testi e logo e i riempimenti nei vuoti temporali.
-4. **renderers/composition.ts** genera i singoli video delle slide costruendo
-   il comando `ffmpeg` con overlay, testi e audio.
-5. **concat.ts** unisce i segmenti e sovrappone la musica di sottofondo.
-6. **main.ts** orchestral l'intero processo eseguendo i passi precedenti.
+## Flusso generale
+1. `src/main.ts` prepara le cartelle di lavoro e avvia l'orchestrazione.
+2. `src/fetchAssets.ts` scarica logo, immagini, font, clip TTS e musica in base
+   alle modifiche ricevute.
+3. `src/template.ts` carica il template Creatomate e le relative modifiche.
+4. Il pacchetto `src/timeline/` combina template e dati in una serie di
+   `SlideSpec` descrivendo ogni segmento da renderizzare.
+5. `src/renderers/composition.ts` costruisce il filtro video e audio per ogni
+   slide e invoca FFmpeg per generare i segmenti `.mp4` intermedi.
+6. `src/concat.ts` scrive il file `concat.txt`, concatena i segmenti e, se
+   presente, mixa l'audio di background producendo il video finale in
+   `src/output/final_output.mp4`.
 
-Di seguito il dettaglio di ogni file.
+## Moduli di configurazione e percorsi
+- **`src/config.ts`** raccoglie tutte le costanti condivise. Contiene le
+  impostazioni per orientamento, tipografia (wrap, line-height, scaling),
+  parametri di ombreggiatura, layout del logo e valori audio di default.
+- **`src/paths.ts`** centralizza i percorsi assoluti di cartelle e file, risolve
+  il binario di FFmpeg rispettando eventuali variabili d'ambiente (`FFMPEG_PATH`,
+  `FFMPEG_BIN`, `FFMPEG`) e fornisce sia le directory di lavoro sia il percorso
+  del file `concat.txt` utilizzato dal demuxer.
+- **`src/fonts.ts`** normalizza i nomi dei font per individuare i file scaricati
+  e verificare se un asset locale corrisponde alla famiglia richiesta.
 
-## src/config.ts
-Definisce costanti usate in più punti, come l'orientamento del video, i valori
-predefiniti per testo e logo e i volumi audio di default【F:src/config.ts†L1-L50】.
+## Gestione template e assets
+- **`src/template.ts`** offre funzioni per leggere il template JSON, caricare le
+  modifiche (`loadTemplate`, `loadModifications`), trovare composizioni o
+  elementi specifici (`findComposition`, `findChildByName`) e convertire valori
+  percentuali in pixel (`pctToPx`). Include inoltre utility per dedurre il box
+  testo, il box logo e un font di fallback disponibile sul sistema.
+- **`src/fetchAssets.ts`** ripulisce le cartelle di download, esegue richieste
+  HTTP con gestione di redirect e caching condizionale, decomprime eventuali
+  risposte compresse e salva logo, immagini, clip TTS, font Google e audio di
+  background secondo le chiavi presenti nelle modifiche.
 
-## src/paths.ts
-Calcola i percorsi delle cartelle usate dal progetto (download, temp, output,
-... ) e individua l'eseguibile `ffmpeg` da utilizzare【F:src/paths.ts†L1-L28】.
+## Costruzione della timeline (`src/timeline/`)
+Il namespace `timeline` esporta funzioni e tipi utilizzati dal resto
+dell'applicazione (`src/timeline/index.ts`). I file principali sono:
 
-## src/template.ts
-Contiene le funzioni per:
-- caricare il template grafico dal file `template/template_horizontal.json`
-- caricare la risposta `risposta_horizontal.json`
-- cercare elementi (slide, testo, logo) all'interno del template
-- convertire valori percentuali in pixel
-- ottenere un font di fallback se quello richiesto non è disponibile【F:src/template.ts†L1-L87】【F:src/template.ts†L88-L114】.
+- **`constants.ts`** definisce valori base per wrapping, durata delle wipe e
+  dimensione minima dei font.
+- **`types.ts`** espone i tipi strutturali (`SlideSpec`, `TextBlockSpec`,
+  `ShapeBlockSpec`, `AnimationSpec`, ecc.) condivisi fra builder e renderer.
+- **`utils.ts`** offre conversioni generiche: parsing di durate (`parseSec`),
+  normalizzazione di lunghezze (`lenToPx`), percentuali, colori RGBA e valori
+  utilizzati nelle ombre.
+- **`templateHelpers.ts`** incapsula la logica di lettura dal template: calcolo
+  dei box testo/logo, ricostruzione dei font, generazione di blocchi copyright
+  e default text block. Applica le preferenze di allineamento, padding, wrapping
+  e scrittura dei testi su file temporanei.
+- **`text.ts`** contiene l'algoritmo di impaginazione del testo: wrapping,
+  stima dell'ampiezza, calcolo dello spacing verticale, ricampionamento del
+  font per rispettare il box disponibile e applicazione degli allineamenti.
+- **`assets.ts`** gestisce path verso immagini, TTS e font scaricati, oltre a
+  creare i file temporanei con le singole righe di testo (`writeTextFilesForSlide`).
+- **`shapes.ts`** individua le forme vettoriali nel template, calcola colori e
+  animazioni associate per sovrapporle come layer aggiuntivi.
+- **`shadows.ts`** estrae parametri d'ombra dalle composizioni (gradienti,
+  proprietà shadow_*, overrides nelle modifiche) e fornisce heuristics per
+  determinare se abilitare l'ombreggiatura nel renderer.
+- **`builders/`** ospita i costruttori di slide:
+  - `timeline.ts` orchestra la costruzione sequenziale delle slide,
+    identificando eventuali gap temporali e aggiungendo filler con solo il logo.
+  - `standardSlide.ts` compone la slide principale: stima la durata partendo
+    dalle indicazioni del backend, individua testo, TTS, forme, ombre e
+    immagini, genera i blocchi testuali e costruisce il `SlideSpec` finale.
+  - `textBlocks.ts` trasforma il testo grezzo in blocchi renderizzabili,
+    applicando wrapping, animazioni (fade/wipe), background e scrittura delle
+    linee su file.
+  - `gapSlide.ts` crea slide riempitive con il solo logo centrato.
+  - `outroSlide.ts` gestisce la slide di chiusura, compresi eventuali gap
+    precedenti e blocchi copyright dedicati.
 
-## src/fetchAssets.ts
-Si occupa di scaricare tutti gli asset esterni:
-- pulisce le cartelle di download
-- scarica logo, audio di background, TTS e immagini
-- analizza il template per trovare i nomi dei font e li scarica da Google Fonts【F:src/fetchAssets.ts†L1-L96】【F:src/fetchAssets.ts†L97-L150】.
-Ogni file salvato viene mostrato a console con il percorso locale.
+## Rendering multimediale
+- **`src/renderers/composition.ts`** prende ogni `SlideSpec` e costruisce gli
+  argomenti FFmpeg necessari per il rendering. Combina un layer di base nero,
+  il background con eventuale animazione `zoompan`, l'ombra sintetica, le forme
+  vettoriali animate, il logo non deformato e i blocchi di testo tramite filtri
+  `drawtext`. Se la slide ha una traccia TTS, l'audio viene collegato al mux;
+  in caso contrario viene generato un canale silenzioso coerente con la durata
+  del segmento.
+- **`src/ffmpeg/filters.ts`** fornisce utility per convertire percorsi ed
+  eseguire escape dei testi producendo le stringhe `drawtext` utilizzate nel
+  filtro complesso.
+- **`src/ffmpeg/run.ts`** incapsula l'esecuzione sincrona del binario FFmpeg,
+  gestendo messaggi d'errore quando il processo non termina correttamente.
+- **`src/concat.ts`** scrive la lista demuxer, forza la generazione dei PTS,
+  concatena i segmenti video e, se disponibile, mixa l'audio di background con
+  il parlato applicando normalizzazione dei formati e controllo del volume.
 
-## src/timeline.ts
-Trasforma template e risposta in una lista di **SlideSpec** che descrivono
-ciascun segmento da renderizzare. Principali operazioni:
-- ricerca delle immagini, del TTS e del font per ogni slide
-- calcolo delle coordinate del testo e del logo partendo dai valori presenti
-  nel template e convertendo le percentuali in pixel
-- suddivisione del testo in più righe in base alla larghezza del box
-- estensione della durata della slide se il TTS è più lungo
-- inserimento di segmenti di riempimento con solo il logo quando ci sono
-  buchi temporali tra una slide e la successiva
-- generazione dell'eventuale slide di outro con logo e testo finale【F:src/timeline.ts†L1-L115】【F:src/timeline.ts†L116-L210】【F:src/timeline.ts†L211-L330】【F:src/timeline.ts†L331-L439】.
+## Punto di ingresso
+`src/main.ts` coordina le operazioni: prepara le cartelle temporanee, invoca il
+fetch degli asset, carica template e modifiche, costruisce la timeline,
+renderizza ogni segmento invocando FFmpeg e infine esegue la concatenazione
+finale producendo il file MP4 definitivo.
 
-## src/renderers/composition.ts
-Per ogni **SlideSpec** costruisce e lancia un comando `ffmpeg` che produce il
-video corrispondente:
-- crea un canvas nero
-- sovrappone l'immagine di background scalata e ritagliata
-- aggiunge il logo nella posizione richiesta
-- disegna il testo usando il filtro `drawtext`
-- inserisce la traccia TTS oppure un audio silenzioso
-- codifica il tutto in H.264 con audio AAC【F:src/renderers/composition.ts†L1-L120】【F:src/renderers/composition.ts†L121-L181】.
-
-## src/ffmpeg/filters.ts
-Piccole utility per lavorare con FFmpeg:
-- `toFFPath` normalizza i percorsi per Windows
-- `escTextForDrawText` mette in escape i caratteri speciali
-- `buildDrawText` genera la stringa di filtro `drawtext` pronta da inserire
-  nel comando FFmpeg【F:src/ffmpeg/filters.ts†L1-L40】【F:src/ffmpeg/filters.ts†L41-L83】.
-
-## src/ffmpeg/run.ts
-Fornisce la funzione `runFFmpeg` che esegue l'eseguibile scelto,
-stampa il comando, lo salva in `comandi.txt` e segnala eventuali errori.
-Include anche `runPipe` (esecuzione con output catturato) e `ok` per controllare
-l'esito dei processi【F:src/ffmpeg/run.ts†L1-L46】.
-
-## src/ffmpeg/probe.ts
-Funzione `probeDurationSec` che usa `ffprobe` per leggere la durata di un file
-multimediale, utile per conoscere la lunghezza reale delle tracce TTS【F:src/ffmpeg/probe.ts†L1-L20】.
-
-## src/concat.ts
-Scrive l'elenco dei segmenti in `concat.txt` e invoca FFmpeg con il demuxer
-`concat` per unirli. Se è presente una traccia di background la riproduce in
-loop e la mescola con l'audio TTS. Il risultato finale viene salvato in
-`src/output/final_output.mp4`【F:src/concat.ts†L1-L58】.
-
-## src/main.ts
-Punto d'ingresso dell'applicazione:
-1. prepara le cartelle di lavoro
-2. scarica gli asset
-3. carica template e risposta
-4. costruisce la timeline
-5. renderizza ogni slide
-6. concatena i segmenti con l'audio di sottofondo【F:src/main.ts†L1-L56】.
-
-## src/tests/timeline.test.ts
-Verifica le funzioni di `timeline.ts`, in particolare il parsing del template
-e la generazione della sequenza di slide【F:src/tests/timeline.test.ts†L1-L40】.
-
-Con queste informazioni un programmatore alle prime armi può orientarsi nel
-codice e capire come viene generato il video finale.
+## Test automatizzati
+La suite dei test automatici è suddivisa per area funzionale:
+- `src/tests/ffmpeg/filters.test.ts` assicura la corretta generazione delle
+  stringhe `drawtext` e la normalizzazione dei percorsi FFmpeg.
+- `src/tests/timeline/*.test.ts` contiene casi specifici per tipologie di
+  funzionalità della timeline (estrazione dei box testuali e del logo, layout
+  del testo, assegnazione dei font scaricati, gestione delle ombre, forme e
+  animazioni, flusso delle slide e wrapping). Ogni file isola un aspetto per
+  facilitare la diagnosi dei regressi.
