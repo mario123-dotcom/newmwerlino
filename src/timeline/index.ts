@@ -21,6 +21,7 @@ export {
   fitTextWithTargetFont,
   clampMaxChars,
   LINE_WIPE_DURATION,
+  LINE_WIPE_OVERLAP,
 } from "./text";
 export {
   extractShadow,

@@ -12,7 +12,11 @@ import {
   wrapText,
   fitTextWithTargetFont,
 } from "../text";
-import { DEFAULT_CHARS_PER_LINE, LINE_WIPE_DURATION } from "../constants";
+import {
+  DEFAULT_CHARS_PER_LINE,
+  LINE_WIPE_DURATION,
+  LINE_WIPE_OVERLAP,
+} from "../constants";
 import type { AnimationSpec, FontSizingInfo, TextBlockSpec } from "../types";
 import type { TemplateElement } from "../../template";
 import { clampRect, lenToPx, parseRGBA, parseSec } from "../utils";
@@ -165,11 +169,17 @@ function buildLineAnimations(
       const anchor = String(reveal.x_anchor ?? "").trim();
       direction = anchor === "100%" ? "wipeleft" : "wiperight";
     }
+    const baseDuration = Math.max(LINE_WIPE_DURATION, 0.01);
+    const maxOverlap = Math.max(0, baseDuration - 0.01);
+    const overlap = Math.max(0, Math.min(LINE_WIPE_OVERLAP, maxOverlap));
+    const step = overlap > 0 ? baseDuration - overlap : baseDuration;
+    const duration = Number(baseDuration.toFixed(4));
     for (let idx = 0; idx < perLine.length; idx++) {
+      const start = Number((idx * step).toFixed(4));
       perLine[idx].push({
         type: "wipe",
-        time: idx * LINE_WIPE_DURATION,
-        duration: LINE_WIPE_DURATION,
+        time: start,
+        duration,
         direction,
       });
     }
