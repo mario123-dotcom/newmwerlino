@@ -64,8 +64,15 @@ test("buildTimelineFromLayout aligns text horizontally inside box", () => {
     minWidthRatio: TEXT.MIN_BOX_WIDTH_RATIO,
   })!;
 
-  const free = box.w - textWidth;
-  const expected = box.x + Math.round(Math.min(free, Math.max(0, free)));
+  const slideWidth = slide.width ?? tpl.width ?? 0;
+  const align = 1;
+  let desired = box.x + box.w * align - textWidth * align;
+  if (slideWidth > 0) {
+    const maxX = Math.max(0, Math.floor(slideWidth - textWidth));
+    if (desired > maxX) desired = maxX;
+    if (desired < 0) desired = 0;
+  }
+  const expected = Math.round(desired);
   assert.equal(block!.x, expected);
 });
 
@@ -120,8 +127,78 @@ test("buildTimelineFromLayout honors text_align keywords", () => {
     minWidthRatio: TEXT.MIN_BOX_WIDTH_RATIO,
   })!;
 
-  const free = box.w - textWidth;
-  const expected = box.x + Math.round(Math.min(free, Math.max(0, free * 0.5)));
+  const slideWidth = slide.width ?? tpl.width ?? 0;
+  const align = 0.5;
+  let desired = box.x + box.w * align - textWidth * align;
+  if (slideWidth > 0) {
+    const maxX = Math.max(0, Math.floor(slideWidth - textWidth));
+    if (desired > maxX) desired = maxX;
+    if (desired < 0) desired = 0;
+  }
+  const expected = Math.round(desired);
+  assert.equal(block!.x, expected);
+});
+
+test("buildTimelineFromLayout centers text when x_alignment is percentage", () => {
+  const tpl: TemplateDoc = {
+    width: 400,
+    height: 200,
+    elements: [
+      {
+        type: "composition",
+        name: "Slide_0",
+        duration: 2,
+        elements: [
+          {
+            type: "text",
+            name: "Testo-0",
+            x: "20%",
+            y: "25%",
+            width: "25%",
+            height: "20%",
+            x_anchor: "0%",
+            y_anchor: "0%",
+            x_alignment: "50%",
+            font_size: 36,
+            line_height: "100%",
+          },
+        ],
+      },
+    ],
+  } as any;
+
+  const slides = buildTimelineFromLayout({ "Testo-0": "TESTO ALLINEATO AL CENTRO" }, tpl, {
+    videoW: 400,
+    videoH: 200,
+    fps: 25,
+    defaultDur: 2,
+  });
+
+  const slide = slides[0];
+  const block = slide.texts?.[0];
+  assert.ok(block);
+  assert.ok(block?.textFile);
+  const rendered = readFileSync(block!.textFile!, "utf8");
+  const lines = rendered.split(/\r?\n/);
+  const fontPx = block!.fontSize ?? 0;
+  const textWidth = Math.max(
+    ...lines.map((ln) => ln.length * fontPx * APPROX_CHAR_WIDTH_RATIO),
+    0
+  );
+  const box = getTextBoxFromTemplate(tpl, 0, undefined, {
+    preserveOrigin: true,
+    minWidthRatio: TEXT.MIN_BOX_WIDTH_RATIO,
+  })!;
+
+  const slideWidth = slide.width ?? tpl.width ?? 0;
+  const align = 0.5;
+  let desired = box.x + box.w * align - textWidth * align;
+  if (slideWidth > 0) {
+    const maxX = Math.max(0, Math.floor(slideWidth - textWidth));
+    if (desired > maxX) desired = maxX;
+    if (desired < 0) desired = 0;
+  }
+  const expected = Math.round(desired);
   assert.equal(block!.x, expected);
 });
 
@@ -303,10 +380,19 @@ test("buildTimelineFromLayout centers outro point text", () => {
       Math.max(ln.length - 1, 0) * letterSpacingPx
     )
   );
-  const available = 600 - textWidth;
-  const offset = Math.round(Math.max(0, available) * 0.5);
-  const clamped = Math.max(0, Math.min(Math.max(0, Math.floor(available)), offset));
-  const expected = clamped;
+  const outroBox = getTextBoxFromTemplate(tpl, "Outro", "Testo-outro", {
+    preserveOrigin: true,
+    minWidthRatio: TEXT.MIN_BOX_WIDTH_RATIO,
+  })!;
+  const outroWidth = outro.width ?? 600;
+  const align = 0.5;
+  let desired = outroBox.x + outroBox.w * align - textWidth * align;
+  if (outroWidth > 0) {
+    const maxX = Math.max(0, Math.floor(outroWidth - textWidth));
+    if (desired > maxX) desired = maxX;
+    if (desired < 0) desired = 0;
+  }
+  const expected = Math.round(desired);
   assert.equal(block!.x, expected);
 });
 

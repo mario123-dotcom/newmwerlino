@@ -300,23 +300,32 @@ export function applyHorizontalAlignment(
   const textWidth = estimateTextWidth(lines, fontPx, letterSpacingPx);
   if (!(textWidth > 0)) return;
 
-  if (textBox.w > 0) {
-    const free = textBox.w - textWidth;
-    if (!(free > 0)) return;
-    const offset = Math.round(Math.min(free, Math.max(0, free * safeAlign)));
-    block.x = textBox.x + offset;
-    return;
+  const computeOffset = (): number | undefined => {
+    if (textBox.w > 0) {
+      const anchor = textBox.x + textBox.w * safeAlign;
+      return anchor - textWidth * safeAlign;
+    }
+    if (maxWidth > 0) {
+      const anchor = textBox.x + maxWidth * safeAlign;
+      return anchor - textWidth * safeAlign;
+    }
+    return undefined;
+  };
+
+  let desiredX = computeOffset();
+  if (desiredX == null) return;
+
+  if (maxWidth > 0) {
+    const maxAllowed = Math.max(0, Math.floor(maxWidth - textWidth));
+    if (desiredX > maxAllowed) {
+      desiredX = maxAllowed;
+    }
+    if (desiredX < 0) {
+      desiredX = 0;
+    }
   }
 
-  const available = maxWidth - textWidth;
-  if (!(available >= 0)) {
-    block.x = 0;
-    return;
-  }
-  const offset = Math.round(Math.max(0, available) * safeAlign);
-  const upperBound = Math.max(0, Math.floor(available));
-  const clamped = Math.max(0, Math.min(upperBound, offset));
-  block.x = clamped;
+  block.x = Math.round(desiredX);
 }
 
 function linesEqual(a: string[], b: string[]): boolean {
