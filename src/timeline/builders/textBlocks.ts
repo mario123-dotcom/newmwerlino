@@ -4,7 +4,6 @@ import {
   applyHorizontalAlignment,
   clampMaxChars,
   computeLineSpacingForBox,
-  estimateLineWidth,
   maxCharsForWidth,
   parseAlignmentFactor,
   parseLetterSpacing,
@@ -59,6 +58,32 @@ type BuildTextBlocksResult = {
   lines: string[];
   blocks: TextBlockSpec[];
 };
+
+function formatExprNumber(value: number): string {
+  if (!Number.isFinite(value)) return "0";
+  const rounded = Math.round(value);
+  if (Math.abs(rounded - value) < 1e-4) {
+    return String(rounded);
+  }
+  return String(Number(value.toFixed(4)));
+}
+
+function buildHorizontalAlignExpr(
+  align: number,
+  textBox: TextBox,
+  fallbackX: number,
+  videoW: number
+): string {
+  const fallback = formatExprNumber(fallbackX);
+  const alignVal = formatExprNumber(align);
+  if (textBox.w > 0) {
+    const left = formatExprNumber(textBox.x);
+    const width = formatExprNumber(textBox.w);
+    return `if(gte(text_w,${width}),${fallback},${left}+(${width}-text_w)*${alignVal})`;
+  }
+  const stageWidth = formatExprNumber(Math.max(videoW, 0));
+  return `if(gte(text_w,${stageWidth}),${fallback},(${stageWidth}-text_w)*${alignVal})`;
+}
 
 function normalizeColorInput(raw: unknown): string | undefined {
   if (typeof raw !== "string") return undefined;
@@ -320,25 +345,13 @@ export function buildTextBlocks(params: BuildTextBlocksParams): BuildTextBlocksR
   applyHorizontalAlignment(block, lines, finalFont, letterSpacingPx, alignX, textBox, videoW);
 
   const safeAlignX = alignX != null ? Math.max(0, Math.min(alignX, 1)) : undefined;
-  const baseOffsetX = block.x - textBox.x;
-  const computeLineOffset = (
-    line: string,
-    fallback: number
-  ): number => {
-    if (safeAlignX == null) return fallback;
-    const lineWidth = estimateLineWidth(line ?? "", finalFont, letterSpacingPx);
-    if (!(lineWidth > 0)) return fallback;
-    if (textBox.w > 0) {
-      const free = textBox.w - lineWidth;
-      if (!(free > 0)) return Math.max(0, fallback);
-      const offset = Math.min(free, Math.max(0, free * safeAlignX));
-      return Math.round(offset);
-    }
-    const available = videoW - lineWidth;
-    if (!(available >= 0)) return Math.max(0, fallback);
-    const offset = Math.max(0, Math.min(available, available * safeAlignX));
-    return Math.round(offset);
-  };
+  const fallbackX = Number.isFinite(block.x) ? Math.round(block.x) : Math.round(textBox.x);
+  block.x = fallbackX;
+  if (safeAlignX != null) {
+    block.xExpr = buildHorizontalAlignExpr(safeAlignX, textBox, fallbackX, videoW);
+  } else if (block.xExpr) {
+    delete (block as any).xExpr;
+  }
 
   const alignY = parseAlignmentFactor(templateProps?.y_alignment) ?? defaultAlignY;
   block.y = textBox.y;
@@ -359,27 +372,15 @@ export function buildTextBlocks(params: BuildTextBlocksParams): BuildTextBlocksR
   const lineHeight = (block.fontSize ?? 60) + (block.lineSpacing ?? 8);
   const backgroundRect = block.background ? { ...block.background } : undefined;
 
-  const blocks = textFiles.map((filePath, idx) => {
-    const line = lines[idx] ?? "";
-    const offset = computeLineOffset(line, baseOffsetX);
-    const lineX = textBox.x + offset;
-    return {
-      ...block,
-      x: lineX,
-      background: idx === 0 ? backgroundRect : undefined,
-      y: block.y + idx * lineHeight,
-      textFile: filePath,
-      animations: perLine[idx]?.length ? perLine[idx] : undefined,
-    };
-  });
+  const blocks = textFiles.map((filePath, idx) => ({
+    ...block,
+    background: idx === 0 ? backgroundRect : undefined,
+    y: block.y + idx * lineHeight,
+    textFile: filePath,
+    animations: perLine[idx]?.length ? perLine[idx] : undefined,
+  }));
 
-  const baseBlockAligned =
-    blocks.length > 0
-      ? {
-          ...block,
-          x: blocks[0].x,
-        }
-      : block;
+  const baseBlockAligned = { ...block };
 
   return { base: baseBlockAligned, lines, blocks };
 }
