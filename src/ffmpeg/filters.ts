@@ -33,6 +33,11 @@ export type DrawTextOpts = {
   enableExpr?: string;  // Espressione che abilita/disabilita il disegno nel tempo.
 };
 
+function escapeDrawTextExpr(expr: string): string {
+  if (!expr) return "0";
+  return expr.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+}
+
 // Costruisce la stringa del filtro drawtext in base alle opzioni ricevute.
 export function buildDrawText(opts: DrawTextOpts): string {
   const {
@@ -57,8 +62,8 @@ export function buildDrawText(opts: DrawTextOpts): string {
     `fontfile='${ffFont}'`,
     `fontsize=${fontSize}`,
     `fontcolor=${fontColor}`,
-    `x=${xExpr}`,
-    `y=${yExpr}`,
+    `x='${escapeDrawTextExpr(xExpr)}'`,
+    `y='${escapeDrawTextExpr(yExpr)}'`,
     `line_spacing=${lineSpacing}`,
     `box=${box ? 1 : 0}`,
     `boxcolor=${boxColor}@${boxAlpha}`,

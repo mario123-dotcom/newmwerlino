@@ -59,6 +59,32 @@ type BuildTextBlocksResult = {
   blocks: TextBlockSpec[];
 };
 
+function formatExprNumber(value: number): string {
+  if (!Number.isFinite(value)) return "0";
+  const rounded = Math.round(value);
+  if (Math.abs(rounded - value) < 1e-4) {
+    return String(rounded);
+  }
+  return String(Number(value.toFixed(4)));
+}
+
+function buildHorizontalAlignExpr(
+  align: number,
+  textBox: TextBox,
+  fallbackX: number,
+  videoW: number
+): string {
+  const fallback = formatExprNumber(fallbackX);
+  const alignVal = formatExprNumber(align);
+  if (textBox.w > 0) {
+    const left = formatExprNumber(textBox.x);
+    const width = formatExprNumber(textBox.w);
+    return `if(gte(text_w,${width}),${fallback},${left}+(${width}-text_w)*${alignVal})`;
+  }
+  const stageWidth = formatExprNumber(Math.max(videoW, 0));
+  return `if(gte(text_w,${stageWidth}),${fallback},(${stageWidth}-text_w)*${alignVal})`;
+}
+
 function normalizeColorInput(raw: unknown): string | undefined {
   if (typeof raw !== "string") return undefined;
   const value = raw.trim();
@@ -318,6 +344,15 @@ export function buildTextBlocks(params: BuildTextBlocksParams): BuildTextBlocksR
 
   applyHorizontalAlignment(block, lines, finalFont, letterSpacingPx, alignX, textBox, videoW);
 
+  const safeAlignX = alignX != null ? Math.max(0, Math.min(alignX, 1)) : undefined;
+  const fallbackX = Number.isFinite(block.x) ? Math.round(block.x) : Math.round(textBox.x);
+  block.x = fallbackX;
+  if (safeAlignX != null) {
+    block.xExpr = buildHorizontalAlignExpr(safeAlignX, textBox, fallbackX, videoW);
+  } else if (block.xExpr) {
+    delete (block as any).xExpr;
+  }
+
   const alignY = parseAlignmentFactor(templateProps?.y_alignment) ?? defaultAlignY;
   block.y = textBox.y;
   if (textBox.h > 0) {
@@ -345,5 +380,7 @@ export function buildTextBlocks(params: BuildTextBlocksParams): BuildTextBlocksR
     animations: perLine[idx]?.length ? perLine[idx] : undefined,
   }));
 
-  return { base: block, lines, blocks };
+  const baseBlockAligned = { ...block };
+
+  return { base: baseBlockAligned, lines, blocks };
 }

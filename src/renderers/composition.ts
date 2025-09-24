@@ -233,7 +233,12 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
       `[${logoIndex}:v]format=rgba,` +
       `scale=${logoW}:${logoH}:flags=lanczos:force_original_aspect_ratio=decrease[lg]`
     );
-    f.push(`[${lastV}][lg]overlay=x=${logoX}:y=${logoY}:enable='between(t,0,${dur})'[v1]`);
+    const logoXExpr = `${logoX}+(${logoW}-overlay_w)/2`;
+    const logoYExpr = `${logoY}+(${logoH}-overlay_h)/2`;
+    f.push(
+      `[${lastV}][lg]overlay=` +
+        `x='${logoXExpr}':y='${logoYExpr}':enable='between(t,0,${dur})'[v1]`
+    );
     lastV = "v1";
   }
 
@@ -282,8 +287,8 @@ export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
         fontFile: blockFontFile,
         fontSize: tb.fontSize ?? 60,
         fontColor: tb.fontColor ?? "white",
-        xExpr: String(tb.x),
-        yExpr: String(tb.y),
+        xExpr: tb.xExpr ?? String(tb.x),
+        yExpr: tb.yExpr ?? String(tb.y),
         lineSpacing: tb.lineSpacing ?? 8,
         box: !!tb.box,
         boxColor: tb.boxColor ?? "black",
