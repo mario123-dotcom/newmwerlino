@@ -388,6 +388,6 @@ test("buildTimelineFromLayout uses fixed wipe timings", () => {
     { type: "wipe", time: 0, duration: 0.8, direction: "wipeleft" },
   ]);
   assert.deepEqual(t0[1].animations, [
-    { type: "wipe", time: 0.6, duration: 0.8, direction: "wipeleft" },
+    { type: "wipe", time: 0.4, duration: 0.8, direction: "wipeleft" },
   ]);
 });
