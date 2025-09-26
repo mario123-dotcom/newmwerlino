@@ -9,10 +9,20 @@ import { renderSlideSegment } from "./renderers/composition";
 import { concatAndFinalizeDemuxer } from "./concat";
 import { fetchAssets } from "./fetchAssets";
 
+/**
+ * Crea la cartella indicata se assente, includendo gli eventuali antenati.
+ *
+ * @param dir Percorso assoluto della directory da rendere disponibile.
+ */
 function ensureDir(dir: string) {
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 }
 
+/**
+ * Svuota completamente una directory rimuovendo file e sottocartelle.
+ *
+ * @param dir Cartella di lavoro da ripulire; se non esiste viene ignorata.
+ */
 function clearDir(dir: string) {
   if (!existsSync(dir)) return;
   for (const f of readdirSync(dir)) {
@@ -21,6 +31,14 @@ function clearDir(dir: string) {
 }
 
 (async () => {
+  /**
+   * Pipeline principale:
+   * 1. Prepara cartelle temporanee e output.
+   * 2. Scarica asset remoti.
+   * 3. Carica template e modifiche.
+   * 4. Costruisce la timeline e renderizza ogni slide.
+   * 5. Concatena i segmenti con eventuale musica di sottofondo.
+   */
   // prepara le cartelle di lavoro
   ensureDir(paths.temp);
   ensureDir(paths.output);

@@ -11,6 +11,16 @@ import {
 } from "./utils";
 import type { AnimationSpec, ShapeBlockSpec } from "./types";
 
+/**
+ * Determina colore e opacità finali di una shape considerando overrides nelle
+ * modifications e valori del template.
+ *
+ * @param element Elemento shape analizzato.
+ * @param mods Modifiche backend.
+ * @param compName Nome della composition corrente.
+ * @param globalIndex Indice progressivo globale delle shape.
+ * @returns Colore e alpha normalizzati oppure `undefined`.
+ */
 export function resolveShapeColor(
   element: TemplateElement,
   mods: Record<string, any>,
@@ -64,6 +74,14 @@ export function resolveShapeColor(
   return parsed.alpha > 0 ? parsed : undefined;
 }
 
+/**
+ * Converte le animazioni Creatomate di una shape in specifiche supportate dal
+ * renderer (fade e wipe).
+ *
+ * @param element Elemento sorgente.
+ * @param rect Dimensioni della shape per determinare la direzione.
+ * @returns Lista di animazioni normalizzate.
+ */
 export function extractShapeAnimations(
   element: TemplateElement,
   rect: { width: number; height: number }
@@ -118,6 +136,16 @@ export function extractShapeAnimations(
   return out;
 }
 
+/**
+ * Analizza una composition e ne estrae le shape rettangolari renderizzabili.
+ *
+ * @param comp Composition Creatomate.
+ * @param mods Modifiche backend.
+ * @param width Larghezza del video.
+ * @param height Altezza del video.
+ * @param startIndex Offset globale per generare nomi di override.
+ * @returns Array di {@link ShapeBlockSpec} pronti per il renderer.
+ */
 export function extractShapesFromComposition(
   comp: TemplateElement | undefined,
   mods: Record<string, any>,

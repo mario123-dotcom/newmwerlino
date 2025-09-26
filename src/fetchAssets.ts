@@ -6,9 +6,19 @@ import { brotliDecompressSync, gunzipSync, inflateSync } from "zlib";
 import { paths } from "./paths";
 import { loadModifications } from "./template";
 
+/**
+ * Crea la directory indicata (e gli eventuali antenati) se non esiste già.
+ *
+ * @param dir Percorso assoluto della cartella da garantire.
+ */
 function ensureDir(dir: string) {
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 }
+/**
+ * Elimina tutti i file e le cartelle contenuti nel percorso indicato.
+ *
+ * @param dir Cartella di cui svuotare il contenuto. Se non esiste non fa nulla.
+ */
 function clearDir(dir: string) {
   if (!existsSync(dir)) return;
   for (const file of readdirSync(dir)) {
@@ -38,6 +48,14 @@ type HttpResponse = {
   finalUrl: string;
 };
 
+/**
+ * Decompressione opportunistica di una risposta HTTP in base all'header
+ * `Content-Encoding`.
+ *
+ * @param buffer Il payload raw ricevuto via HTTP.
+ * @param headers Gli header della risposta utilizzati per determinare l'algoritmo.
+ * @returns Il buffer originale oppure il risultato della decompressione.
+ */
 function decompressIfNeeded(buffer: Buffer, headers: HttpHeaders): Buffer {
   const enc = String(headers["content-encoding"] || "").toLowerCase();
   try {
@@ -50,6 +68,13 @@ function decompressIfNeeded(buffer: Buffer, headers: HttpHeaders): Buffer {
   return buffer;
 }
 
+/**
+ * Esegue una richiesta HTTP/HTTPS con redirect automatici e headers da browser.
+ *
+ * @param url Risorsa remota da recuperare.
+ * @param options Opzioni opzionali, in particolare headers aggiuntivi.
+ * @returns Una Promise che risolve con buffer, headers, status e URL finale.
+ */
 function httpGet(url: string, options: HttpGetOptions = {}): Promise<HttpResponse> {
   const target = new URL(url);
   const lib = target.protocol === "https:" ? httpsRequest : httpRequest;
@@ -116,12 +141,25 @@ function httpGet(url: string, options: HttpGetOptions = {}): Promise<HttpRespons
   });
 }
 
+/**
+ * Applica un parametro query `cb=<timestamp>` per forzare l'invalidazione cache.
+ *
+ * @param url URL originale.
+ * @returns L'URL con parametro di cache busting aggiuntivo.
+ */
 function withCacheBuster(url: string): string {
   const u = new URL(url);
   u.searchParams.set("cb", Date.now().toString());
   return u.toString();
 }
 
+/**
+ * Scarica un file remoto gestendo richieste condizionali e decompressione.
+ *
+ * @param url Percorso assoluto dell'asset da scaricare.
+ * @param outPath Destinazione locale sul filesystem.
+ * @param options Headers opzionali e impostazioni aggiuntive.
+ */
 async function downloadFile(url: string, outPath: string, options?: HttpGetOptions) {
   const hdrs = { ...(options?.headers || {}) };
 
@@ -160,6 +198,13 @@ async function downloadFile(url: string, outPath: string, options?: HttpGetOptio
   console.log(`Scaricato: ${outPath}`);
 }
 
+/**
+ * Scarica tutti gli asset necessari (logo, immagini, TTS, musica, font)
+ * basandosi sulle modifiche fornite dal backend e pulendo le cartelle di
+ * lavoro prima del nuovo fetch.
+ *
+ * @returns Una Promise risolta quando tutti i download sono completati.
+ */
 export async function fetchAssets() {
   const mods = loadModifications() || {};
 

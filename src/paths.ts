@@ -3,6 +3,12 @@ import { join } from "path";
 const root = process.cwd();
 const downloads = join(root, "download");
 
+/**
+ * Determina il binario di FFmpeg da utilizzare, controllando variabili
+ * d'ambiente comuni prima di ricadere sul comando di sistema.
+ *
+ * @returns Percorso (assoluto o relativo) del binario FFmpeg da eseguire.
+ */
 function resolveFFmpegBinary(): string {
   const candidates = [
     process.env.FFMPEG_PATH,

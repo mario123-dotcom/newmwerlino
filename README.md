@@ -21,5 +21,5 @@ npm install
 2. Lancia `npm start` per scaricare gli asset, costruire le slide, renderizzare i
    segmenti e concatenarli in `src/output/final_output.mp4`.
 
-Per una spiegazione dettagliata di ogni file e della pipeline completa, consulta
-[docs/architecture.md](docs/architecture.md).
+Per una spiegazione dettagliata di ogni modulo e della pipeline completa, consulta
+[docs/technical_documentation.md](docs/technical_documentation.md).

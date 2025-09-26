@@ -20,6 +20,13 @@ import {
 } from "./text";
 import { APPROX_CHAR_WIDTH_RATIO, DEFAULT_CHARS_PER_LINE, MIN_FONT_SIZE } from "./constants";
 
+/**
+ * Restituisce i parametri base di un blocco testo (posizione e stile neutro).
+ *
+ * @param x Coordinata X iniziale.
+ * @param y Coordinata Y iniziale.
+ * @returns Blocco testo con valori di default.
+ */
 export function defaultTextBlock(x = 120, y = 160): TextBlockSpec {
   return {
     x,
@@ -31,6 +38,16 @@ export function defaultTextBlock(x = 120, y = 160): TextBlockSpec {
   };
 }
 
+/**
+ * Recupera dal template il box dedicato al testo di una slide, traducendo
+ * valori percentuali in pixel e gestendo ancore/origini.
+ *
+ * @param tpl Documento Creatomate.
+ * @param slideIndexOrName Indice numerico o nome della composition.
+ * @param textName Nome dell'elemento testo (fallback a Testo-<index>).
+ * @param opts Opzioni per preservare anchor/origine e larghezza minima.
+ * @returns Box con coordinate e dimensioni in pixel, se disponibile.
+ */
 export function getTextBoxFromTemplate(
   tpl: TemplateDoc,
   slideIndexOrName: number | string,
@@ -138,6 +155,14 @@ export function getTextBoxFromTemplate(
   return { x: Math.round(left), y: Math.round(top), w: Math.round(w), h: Math.round(h) };
 }
 
+/**
+ * Ricava posizione e dimensioni del logo da una composition o slide.
+ *
+ * @param tpl Documento template.
+ * @param slideIndexOrName Indice o nome della slide di riferimento.
+ * @param logoName Nome dell'elemento logo (default "Logo").
+ * @returns Box del logo con coordinate e dimensioni opzionali.
+ */
 export function getLogoBoxFromTemplate(
   tpl: TemplateDoc,
   slideIndexOrName: number | string,
@@ -207,6 +232,14 @@ export function getLogoBoxFromTemplate(
   };
 }
 
+/**
+ * Individua la famiglia di font usata da un elemento testo del template.
+ *
+ * @param tpl Documento Creatomate.
+ * @param slideIndexOrName Indice o nome della slide/composition.
+ * @param textName Nome dell'elemento testo (fallback automatico).
+ * @returns Nome della famiglia tipografica oppure `undefined`.
+ */
 export function getFontFamilyFromTemplate(
   tpl: TemplateDoc,
   slideIndexOrName: number | string,
@@ -225,6 +258,12 @@ export function getFontFamilyFromTemplate(
   return typeof fam === "string" ? fam : undefined;
 }
 
+/**
+ * Verifica se un flag rappresenta esplicitamente il valore `false`.
+ *
+ * @param value Input generico.
+ * @returns `true` se rappresenta un falso esplicito.
+ */
 function isExplicitlyFalse(value: unknown): boolean {
   if (value === false) return true;
   if (value === 0) return true;
@@ -236,6 +275,18 @@ function isExplicitlyFalse(value: unknown): boolean {
   return false;
 }
 
+/**
+ * Costruisce il blocco copyright partendo dal template e dalle eventuali
+ * modifiche utente.
+ *
+ * @param template Documento Creatomate.
+ * @param mods Modifiche ricevute dal backend.
+ * @param compName Nome della composition.
+ * @param elementName Nome dell'elemento copyright nel template.
+ * @param videoW Larghezza del video.
+ * @param videoH Altezza del video.
+ * @returns Blocco testo pronto per il renderer oppure `undefined`.
+ */
 export function buildCopyrightBlock(
   template: TemplateDoc,
   mods: Record<string, any>,

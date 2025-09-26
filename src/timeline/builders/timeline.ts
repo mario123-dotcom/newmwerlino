@@ -7,16 +7,35 @@ import { buildOutroSegment } from "./outroSlide";
 import { createGapSlide } from "./gapSlide";
 import { findImageForSlide, findTTSForSlide } from "../assets";
 
+/**
+ * Restituisce la larghezza del template garantendo un valore numerico valido.
+ *
+ * @param template Documento Creatomate caricato.
+ * @param fallback Valore da usare se la larghezza nel template non è valida.
+ * @returns Larghezza positiva in pixel.
+ */
 function resolveTemplateWidth(template: TemplateDoc, fallback: number): number {
   const { width } = template;
   return typeof width === "number" && Number.isFinite(width) && width > 0 ? width : fallback;
 }
 
+/**
+ * Deriva il numero massimo di caratteri per riga partendo dalla configurazione.
+ *
+ * @returns Limite di caratteri o `undefined` se non impostato.
+ */
 function resolveSlideMaxChars(): number | undefined {
   const raw = TEXT.MAX_CHARS_PER_LINE;
   return typeof raw === "number" && raw > 0 ? raw : undefined;
 }
 
+/**
+ * Interpreta flag eterogenei (boolean, stringa, numero) per stabilire se una
+ * slide deve essere visibile.
+ *
+ * @param value Valore letto dalle modifiche.
+ * @returns `true` se la slide è attiva, `false` in caso di disattivazione esplicita.
+ */
 function isVisibleFlag(value: unknown): boolean {
   if (value === false || value === 0) return false;
   if (typeof value === "string") {
@@ -26,6 +45,12 @@ function isVisibleFlag(value: unknown): boolean {
   return true;
 }
 
+/**
+ * Analizza le modifiche alla ricerca dell'ultimo indice di slide da costruire.
+ *
+ * @param mods Oggetto con le chiavi provenienti dal backend.
+ * @returns L'indice massimo individuato o -1 se nessuna slide è presente.
+ */
 function detectLastSlideIndex(mods: Record<string, any>): number {
   let maxIdx = -1;
   const slideTimeRe = /^Slide_(\d+)\.time$/;
@@ -46,6 +71,15 @@ function detectLastSlideIndex(mods: Record<string, any>): number {
   return maxIdx;
 }
 
+/**
+ * Costruisce la sequenza di slide partendo dal template e dal payload di
+ * modifiche, generando eventuali gap e slide finali.
+ *
+ * @param modifications Dati provenienti dal backend (testi, immagini, tempi).
+ * @param template Documento Creatomate originale.
+ * @param opts Dimensioni video, FPS e durata di default.
+ * @returns Array ordinato di {@link SlideSpec} pronti per il rendering.
+ */
 export function buildTimelineFromLayout(
   modifications: Record<string, any>,
   template: TemplateDoc,

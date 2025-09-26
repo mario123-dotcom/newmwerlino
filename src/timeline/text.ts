@@ -19,6 +19,13 @@ export { LINE_WIPE_DURATION, LINE_WIPE_OVERLAP };
 
 const MAX_FONT_LAYOUT_ITERATIONS = 6;
 
+/**
+ * Esegue il word-wrapping semplice dividendo il testo per lunghezza massima.
+ *
+ * @param text Contenuto da spezzare.
+ * @param maxPerLine Numero massimo di caratteri per riga.
+ * @returns Array di righe pronte per il rendering.
+ */
 export function wrapText(text: string, maxPerLine: number): string[] {
   const words = text.split(/\s+/).filter(Boolean);
   const lines: string[] = [];
@@ -39,6 +46,13 @@ export function wrapText(text: string, maxPerLine: number): string[] {
   return lines;
 }
 
+/**
+ * Normalizza e limita il numero massimo di caratteri consentiti.
+ *
+ * @param value Valore base calcolato.
+ * @param cap Tetto superiore opzionale.
+ * @returns Numero minimo 1, rispettando il cap se presente.
+ */
 export function clampMaxChars(value: number, cap?: number): number {
   const numeric = Number.isFinite(value) ? Math.floor(value) : 0;
   const safeValue = Math.max(1, numeric);
@@ -48,6 +62,15 @@ export function clampMaxChars(value: number, cap?: number): number {
   return Math.max(1, limited);
 }
 
+/**
+ * Stima quanti caratteri possono entrare in una larghezza data, basandosi su
+ * un rapporto medio larghezza/carattere.
+ *
+ * @param width Larghezza disponibile in pixel.
+ * @param fontSize Dimensione del font.
+ * @param cap Limite massimo opzionale.
+ * @returns Numero massimo di caratteri per riga.
+ */
 export function maxCharsForWidth(
   width: number,
   fontSize: number,
@@ -62,6 +85,15 @@ export function maxCharsForWidth(
   return clampMaxChars(maxChars || 0, cap);
 }
 
+/**
+ * Calcola lo spacing verticale fra righe per riempire un box disponibile.
+ *
+ * @param font Dimensione del font in pixel.
+ * @param lineCount Numero di righe.
+ * @param boxHeight Altezza del box (facoltativa).
+ * @param lineHeightFactor Fattore di interlinea richiesto.
+ * @returns Spazio verticale in pixel.
+ */
 export function computeLineSpacingForBox(
   font: number,
   lineCount: number,
@@ -81,6 +113,17 @@ export function computeLineSpacingForBox(
   return spacing > 0 ? spacing : 0;
 }
 
+/**
+ * Ricostruisce font iniziale e funzione di clamp basandosi su preferenze
+ * template (min/max size, scale multiplier).
+ *
+ * @param element Elemento template con possibili indicazioni di font.
+ * @param fallback Dimensione fallback se mancano informazioni.
+ * @param canvasWidth Larghezza video.
+ * @param canvasHeight Altezza video.
+ * @param opts Opzioni aggiuntive (es. scaleMultiplier).
+ * @returns Informazioni su font iniziale e funzione di clamp.
+ */
 export function deriveFontSizing(
   element: TemplateElement | undefined,
   fallback: number,
@@ -145,6 +188,15 @@ export function deriveFontSizing(
   return { initial, clamp };
 }
 
+/**
+ * Confronta la larghezza del box finale con quella definita nel template per
+ * calcolare un fattore di scala da applicare ai font.
+ *
+ * @param element Elemento template di riferimento.
+ * @param finalWidth Larghezza effettiva del box nel video.
+ * @param templateWidth Larghezza del canvas template.
+ * @returns Fattore di scala >= 1.
+ */
 export function computeWidthScaleFromTemplate(
   element: TemplateElement | undefined,
   finalWidth: number,
@@ -160,6 +212,12 @@ export function computeWidthScaleFromTemplate(
   return ratio;
 }
 
+/**
+ * Interpreta fattori di interlinea espressi come numero o percentuale.
+ *
+ * @param raw Valore dal template.
+ * @returns Fattore numerico o `undefined` se non valido.
+ */
 export function parseLineHeightFactor(raw: unknown): number | undefined {
   if (typeof raw === "number" && Number.isFinite(raw)) {
     if (raw <= 0) return undefined;
@@ -177,6 +235,15 @@ export function parseLineHeightFactor(raw: unknown): number | undefined {
   return parsed > 10 ? parsed / 100 : parsed;
 }
 
+/**
+ * Converte letter spacing espressi come px, %, stringa numerica o numero.
+ *
+ * @param raw Valore origine.
+ * @param fontPx Dimensione del font in pixel.
+ * @param canvasWidth Larghezza di riferimento.
+ * @param canvasHeight Altezza di riferimento.
+ * @returns Spaziatura in pixel o `undefined`.
+ */
 export function parseLetterSpacing(
   raw: unknown,
   fontPx: number | undefined,
@@ -201,6 +268,9 @@ export function parseLetterSpacing(
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+/**
+ * Limita un numero nell'intervallo [0,1] gestendo NaN e infiniti.
+ */
 function clamp01(value: number): number {
   if (!Number.isFinite(value)) return 0;
   if (value <= 0) return 0;
@@ -208,6 +278,13 @@ function clamp01(value: number): number {
   return value;
 }
 
+/**
+ * Traducce le varianti di allineamento (parole chiave, percentuali, numeri)
+ * in un fattore 0..1 utilizzato per posizionare il testo.
+ *
+ * @param raw Valore originario.
+ * @returns Numero compreso tra 0 e 1 oppure `undefined`.
+ */
 export function parseAlignmentFactor(raw: unknown): number | undefined {
   if (typeof raw === "number" && Number.isFinite(raw)) {
     const normalized = raw > 1 ? raw / 100 : raw;
@@ -231,6 +308,14 @@ export function parseAlignmentFactor(raw: unknown): number | undefined {
   return clamp01(parsed > 1 ? parsed / 100 : parsed);
 }
 
+/**
+ * Stima la larghezza di una singola riga di testo sulla base del font.
+ *
+ * @param line Testo della riga.
+ * @param fontPx Dimensione font in pixel.
+ * @param letterSpacingPx Spaziatura aggiuntiva.
+ * @returns Larghezza approssimativa in pixel.
+ */
 export function estimateLineWidth(
   line: string,
   fontPx: number,
@@ -247,6 +332,14 @@ export function estimateLineWidth(
   return total > 0 ? total : 0;
 }
 
+/**
+ * Calcola la larghezza massima fra più righe di testo.
+ *
+ * @param lines Righe da analizzare.
+ * @param fontPx Dimensione font.
+ * @param letterSpacingPx Spaziatura fra lettere.
+ * @returns Larghezza approssimativa in pixel.
+ */
 export function estimateTextWidth(
   lines: string[],
   fontPx: number,
@@ -261,6 +354,17 @@ export function estimateTextWidth(
   return max;
 }
 
+/**
+ * Aggiorna la coordinata X del blocco testo in base all'allineamento richiesto.
+ *
+ * @param block Blocco drawtext da modificare.
+ * @param lines Righe di testo effettive.
+ * @param fontPx Dimensione font.
+ * @param letterSpacingPx Spaziatura tra caratteri.
+ * @param alignX Fattore di allineamento 0..1.
+ * @param textBox Box di riferimento.
+ * @param maxWidth Larghezza massima quando il box è flessibile.
+ */
 export function applyHorizontalAlignment(
   block: TextBlockSpec,
   lines: string[],
@@ -305,6 +409,16 @@ function linesEqual(a: string[], b: string[]): boolean {
   return true;
 }
 
+/**
+ * Cerca un layout di testo (font + righe) che rispetta il box disponibile.
+ *
+ * @param text Testo sorgente.
+ * @param box Dimensioni del box disponibile.
+ * @param initialFont Font iniziale da cui partire.
+ * @param lineHeightFactor Fattore di interlinea richiesto.
+ * @param opts Opzioni di wrapping (scale, max chars).
+ * @returns Layout ottimizzato o `undefined` se non possibile.
+ */
 export function resolveTextLayout(
   text: string,
   box: { w?: number; h?: number },
@@ -412,6 +526,20 @@ export function resolveTextLayout(
   return layouts[layouts.length - 1];
 }
 
+/**
+ * Prova a riadattare il testo per raggiungere un font target rispettando box e
+ * limiti di overflow.
+ *
+ * @param text Testo sorgente.
+ * @param layoutWidth Larghezza disponibile per il wrapping.
+ * @param actualBox Box reale utilizzato per il rendering.
+ * @param desiredFont Font desiderato.
+ * @param minimumFont Font minimo accettabile.
+ * @param widthScale Fattore di scala derivato dal template.
+ * @param lineHeightFactor Fattore di interlinea.
+ * @param maxCharsPerLine Limite opzionale di caratteri.
+ * @returns Layout ottenuto oppure `undefined` se non raggiungibile.
+ */
 export function fitTextWithTargetFont(
   text: string,
   layoutWidth: number | undefined,
@@ -463,6 +591,15 @@ export function fitTextWithTargetFont(
   return undefined;
 }
 
+/**
+ * Amplia il background del blocco testo per evitare tagli con font grandi.
+ *
+ * @param block Blocco drawtext da aggiornare.
+ * @param fontPx Font utilizzato.
+ * @param maxW Larghezza massima del video.
+ * @param maxH Altezza massima del video.
+ * @returns Pixel di padding aggiunto.
+ */
 export function applyExtraBackgroundPadding(
   block: TextBlockSpec,
   fontPx: number | undefined,

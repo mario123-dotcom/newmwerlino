@@ -1,3 +1,10 @@
+/**
+ * Converte valori temporali (numero, stringa con unità ms/s) in secondi.
+ *
+ * @param value Valore da interpretare.
+ * @param fallback Durata di ripiego se l'input non è valido.
+ * @returns Numero di secondi.
+ */
 export function parseSec(value: unknown, fallback: number): number {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value !== "string") return fallback;
@@ -14,6 +21,14 @@ export function parseSec(value: unknown, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+/**
+ * Converte lunghezze CSS-like (px, vw, vh, vmin, vmax) in pixel assoluti.
+ *
+ * @param value Valore originario.
+ * @param width Larghezza di riferimento.
+ * @param height Altezza di riferimento.
+ * @returns Lunghezza in pixel o `undefined` se non interpretabile.
+ */
 export function lenToPx(value: unknown, width: number, height: number): number | undefined {
   if (value == null) return undefined;
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -45,6 +60,17 @@ export function lenToPx(value: unknown, width: number, height: number): number |
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+/**
+ * Limita un rettangolo entro i confini forniti assicurando dimensioni positive.
+ *
+ * @param x Coordinata X iniziale.
+ * @param y Coordinata Y iniziale.
+ * @param w Larghezza richiesta.
+ * @param h Altezza richiesta.
+ * @param maxW Larghezza massima consentita.
+ * @param maxH Altezza massima consentita.
+ * @returns Rettangolo corretto oppure `undefined` se non valido.
+ */
 export function clampRect(
   x: number,
   y: number,
@@ -78,6 +104,12 @@ export function clampRect(
   };
 }
 
+/**
+ * Normalizza valori di opacità accettando stringhe con percentuale o numeri.
+ *
+ * @param value Input da convertire.
+ * @returns Valore 0..1 oppure `undefined`.
+ */
 export function parseAlpha(value: unknown): number | undefined {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value !== "string") return undefined;
@@ -91,6 +123,12 @@ export function parseAlpha(value: unknown): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+/**
+ * Interpreta valori booleani espressi come stringhe, numeri o booleani.
+ *
+ * @param value Input generico.
+ * @returns Boolean normalizzato o `undefined` se non interpretabile.
+ */
 export function parseBooleanish(value: unknown): boolean | undefined {
   if (typeof value === "boolean") return value;
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -104,6 +142,12 @@ export function parseBooleanish(value: unknown): boolean | undefined {
   return undefined;
 }
 
+/**
+ * Converte una stringa `rgb()`/`rgba()` in colore HEX + alfa normalizzato.
+ *
+ * @param input Stringa da analizzare.
+ * @returns Oggetto con colore HEX e alpha oppure `undefined`.
+ */
 export function parseRGBA(input: unknown): { color: string; alpha: number } | undefined {
   if (typeof input !== "string") return undefined;
   const match = input
@@ -118,6 +162,12 @@ export function parseRGBA(input: unknown): { color: string; alpha: number } | un
   return { color: `#${hex}`, alpha: a };
 }
 
+/**
+ * Converte percentuali espresse come numero o stringa in un valore 0..1.
+ *
+ * @param value Input sorgente.
+ * @returns Percentuale 0..1 oppure `undefined`.
+ */
 export function parsePercent(value: unknown): number | undefined {
   if (value == null) return undefined;
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -141,6 +191,12 @@ export function parsePercent(value: unknown): number | undefined {
   return Math.max(0, Math.min(1, parsed / 100));
 }
 
+/**
+ * Converte stringhe numeriche (con `deg` o `°`) in gradi decimali.
+ *
+ * @param value Input grezzo.
+ * @returns Valore in gradi oppure `undefined`.
+ */
 export function parseAngleDeg(value: unknown): number | undefined {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value !== "string") return undefined;
@@ -152,12 +208,24 @@ export function parseAngleDeg(value: unknown): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+/**
+ * Riporta un angolo nell'intervallo [0, 360) gestendo overflow e valori negativi.
+ *
+ * @param angle Angolo in gradi.
+ * @returns Angolo normalizzato.
+ */
 export function normalizeAngle(angle: number): number {
   let normalized = angle % 360;
   if (normalized < 0) normalized += 360;
   return normalized;
 }
 
+/**
+ * Converte input generici in colori adatti per le ombre, preservando alfa.
+ *
+ * @param raw Valore proveniente dalle modifiche o dal template.
+ * @returns Colore normalizzato con eventuale alpha.
+ */
 export function parseShadowColor(raw: unknown): { color: string; alpha?: number } | undefined {
   if (typeof raw !== "string") return undefined;
   const input = raw.trim();
@@ -178,6 +246,15 @@ export function parseShadowColor(raw: unknown): { color: string; alpha?: number 
   return { color: input };
 }
 
+/**
+ * Traduce lunghezze shadow (px o percentuali) in pixel, rispettando asse.
+ *
+ * @param value Input originale.
+ * @param axis Asse di riferimento (x o y).
+ * @param width Larghezza del canvas.
+ * @param height Altezza del canvas.
+ * @returns Lunghezza in pixel oppure `undefined`.
+ */
 export function parseShadowLength(
   value: unknown,
   axis: "x" | "y",
@@ -198,6 +275,12 @@ export function parseShadowLength(
   return lenToPx(value, width, height);
 }
 
+/**
+ * Converte stringhe colore (HEX o RGBA) in un oggetto con colore e alpha.
+ *
+ * @param raw Valore originario.
+ * @returns Colore normalizzato con alpha oppure `undefined`.
+ */
 export function parseShapeColor(raw: unknown): { color: string; alpha: number } | undefined {
   if (typeof raw !== "string") return undefined;
   const input = raw.trim();
@@ -218,6 +301,12 @@ export function parseShapeColor(raw: unknown): { color: string; alpha: number } 
   return undefined;
 }
 
+/**
+ * Restituisce un array di nomi ripuliti e senza duplicati, preservando l'ordine.
+ *
+ * @param names Lista di nomi (potenzialmente duplicati/vuoti).
+ * @returns Array filtrato e unico.
+ */
 export function uniqueNames(names: string[]): string[] {
   const seen = new Set<string>();
   const output: string[] = [];

@@ -15,7 +15,12 @@ export const ORIENTATION_MODE: OrientationMode = "auto";
 
 /**
  * Determina l'orientamento del progetto partendo da larghezza e altezza del
- * template. Se è stata definita una modalità esplicita, quella prevale.
+ * template o da una modalità forzata.
+ *
+ * @param w Larghezza del template (in pixel) utilizzata come riferimento.
+ * @param h Altezza del template (in pixel) utilizzata come riferimento.
+ * @returns "landscape" o "portrait" a seconda del rapporto d'aspetto oppure
+ *          della modalità configurata.
  */
 export function deriveOrientation(w: number, h: number): Orientation {
   if (ORIENTATION_MODE === "landscape" || ORIENTATION_MODE === "portrait") {
