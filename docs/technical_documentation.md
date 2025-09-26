@@ -158,5 +158,82 @@ La fase conclusiva è gestita da `concat.ts`, che concatenando i segmenti con au
 3. **Caricamento template** – `template.ts` fornisce il documento Creatomate e il payload di modifiche.
 4. **Costruzione timeline** – I moduli in `src/timeline/` trasformano template+mods in `SlideSpec` con testi, immagini, forme, ombre e audio.
 5. **Rendering segmenti** – `renderers/composition.ts` invoca FFmpeg per ogni slide.
-6. **Concatenazione** – `concat.ts` unisce i segmenti e mixa la musica di sottofondo.
 
+## 6. Metodo di progettazione e sviluppo (sequenziale)
+Il progetto è stato organizzato secondo un processo **sequenziale strutturato**, motivato dalla necessità di garantire coerenza con i payload JSON di template e modifiche *già definiti a priori* dal team prodotto. Le fasi principali sono state pianificate come segue:
+
+1. **Analisi dei requisiti e dei JSON esistenti**  
+   - Revisione congiunta del template Creatomate e dei file di modifica forniti dal backend per individuare tutti i campi di configurazione necessari.  
+   - Definizione puntuale dei requisiti funzionali (download asset, generazione timeline, rendering, concatenazione) e non funzionali (portabilità, manutenibilità, consistenza tipografica) derivati direttamente dalla struttura dei JSON preesistenti.  
+   - Redazione della matrice di tracciabilità requisiti → moduli, approvata prima di passare alla fase successiva.
+
+2. **Progettazione architetturale di dettaglio**  
+   - Produzione degli schemi di suddivisione in moduli (`fetchAssets`, `template`, `timeline`, `renderers`, `concat`) e definizione delle interfacce TypeScript, garantendo l’aderenza agli attributi già codificati nei JSON.  
+   - Formalizzazione dei contratti dati (tipi `SlideSpec`, `TextBlockSpec`, ecc.) fissando versioni e responsabilità; le strutture sono state congelate prima di iniziare l’implementazione per evitare ritorni iterativi sui file JSON forniti.
+
+3. **Implementazione modulare**  
+   - Sviluppo in sequenza delle componenti chiave, partendo da `paths` e `config`, proseguendo con `fetchAssets`, `template`, `timeline` e infine `renderers`/`concat`.  
+   - Ogni modulo è stato completato e verificato contro gli esempi JSON esistenti prima di passare al successivo, così da rispettare la natura sequenziale del processo.
+
+4. **Integrazione lungo la pipeline**  
+   - Collegamento progressivo dei moduli nell’entry point (`main.ts`) seguendo il flusso definito: preparazione cartelle → download asset → caricamento template/modifiche → costruzione timeline → rendering → concatenazione.  
+   - Validazione manuale dei casi nominali sfruttando i JSON ufficiali per assicurare che le interfacce congelate nella fase precedente funzionassero senza modifiche.
+
+5. **Verifica e collaudo**  
+   - Esecuzione degli script di test unitari disponibili (`src/tests`) focalizzati su timeline e filtergraph, con checklist di accettazione basata sui requisiti funzionali.  
+   - Sessioni di rendering end-to-end con gli asset di esempio per confermare sincronizzazione audio/video e correttezza grafica.
+
+6. **Rilascio e manutenzione controllata**  
+   - Consegna dei build artefacts e predisposizione di una guida operativa per l’esecuzione (`npm run build`, variabili d’ambiente FFmpeg).  
+   - Documentazione delle procedure di change management: eventuali nuove richieste comportano la revisione formale dei JSON upstream prima di attivare un nuovo ciclo sequenziale.
+
+## 7. Diagramma del processo principale
+```mermaid
+flowchart LR
+  start([JSON definiti]) --> prep[Preparazione cartelle]
+  prep --> fetch[Download asset]
+  fetch --> load[Caricamento template & modifiche]
+  load --> timeline[Costruzione timeline]
+  timeline --> render[Rendering slide con FFmpeg]
+  render --> concat[Concatenazione & mix finale]
+  concat --> output[Video finale]
+```
+Il diagramma evidenzia che l’intera pipeline utilizza i file JSON già stabiliti come fonte dati costante, senza ritorni iterativi sulle fasi precedenti.
+
+## 8. Vista architetturale di massima
+```mermaid
+flowchart TB
+  subgraph Infrastruttura condivisa
+    Paths[(paths.ts)]
+    Config[(config.ts)]
+  end
+  TemplateLoader[template.ts] --> TimelineEngine[src/timeline/*]
+  AssetFetcher[fetchAssets.ts] --> TimelineEngine
+  TimelineEngine --> Renderer[renderers/composition.ts]
+  Renderer --> Concat[concat.ts]
+  Concat --> Output[(src/output/final_output.mp4)]
+  Paths --> AssetFetcher
+  Paths --> Renderer
+  Config --> TimelineEngine
+  Config --> Renderer
+```
+Questa vista ribadisce la separazione netta tra moduli, coerente con il processo sequenziale: ogni componente riceve in ingresso dati consolidati (inclusi i JSON predefiniti) e produce artefatti stabili per il passo successivo.
+
+## 9. Tecnologie abilitanti
+- **Node.js ≥ 18** per l’orchestrazione CLI e l’esecuzione del codice TypeScript compilato.
+- **TypeScript** con toolchain `tsc` per garantire tipizzazione statica e contratti chiari tra moduli.
+- **FFmpeg** come motore multimediale esterno, risolto tramite variabili d’ambiente (`FFMPEG_PATH`, `FFMPEG_BIN`, `FFMPEG`).
+- **Template Creatomate + JSON di modifiche** già definiti come sorgente dati per layout, testi, immagini e animazioni.
+
+## 10. Requisiti funzionali e non funzionali
+### Requisiti funzionali
+1. Scaricare e normalizzare gli asset remoti (logo, immagini, clip TTS, musica, font) prima del rendering.
+2. Caricare template Creatomate e modifiche JSON predefinite per determinare dimensioni video, orientamento e contenuti.
+3. Costruire la timeline interpretando i payload di modifica, includendo gap temporali e slide finali.
+4. Renderizzare ogni slide generando filtergraph FFmpeg con background, forme, logo, testo e tracce audio.
+5. Concatenare i segmenti generati, mixare audio di background con parlato e produrre l’MP4 finale.
+
+### Requisiti non funzionali
+- **Configurabilità grafico-tipografica** – Dimensioni testo, wrapping, spaziature e volumi audio centralizzati in `config.ts`.
+- **Portabilità dell’esecuzione** – Risoluzione dinamica del binario FFmpeg via variabili d’ambiente, fallback sul sistema.
+- **Manutenibilità modulare** – Codice suddiviso in moduli specializzati per minimizzare le dipendenze e semplificare future estensioni.
