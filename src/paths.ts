@@ -39,6 +39,7 @@ export const paths = {
   modifications: join(root, "template", "risposta_horizontal.json"),
   ffmpeg: resolveFFmpegBinary(),
   concatList: join(root, "src", "temp", "concat.txt"),
+  ffmpegLog: join(root, "ffmpeg-commands.log"),
   finalVideo: join(root, "src", "output", "final_output.mp4"),
   get bgAudio() {
     return join(this.audio, "bg.mp3");
