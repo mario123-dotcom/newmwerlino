@@ -1,19 +1,19 @@
 # Documentazione Tecnica del generatore Merlino
 
-Questa documentazione descrive in dettaglio la struttura del progetto, i moduli TypeScript e le funzioni principali utilizzate per generare i video automatici. Ogni sezione è pensata per supportare un'analisi accademica del codice, con attenzione alle responsabilità, ai dati in ingresso e alle trasformazioni prodotte.
+Questa documentazione descrive in dettaglio la struttura del progetto, i moduli TypeScript e le funzioni principali utilizzate per generare i video automatici. Ogni sezione è pensata con attenzione alle responsabilità, ai dati in ingresso e alle trasformazioni prodotte.
 
 ## 1. Struttura generale del repository
 - **`src/`** – Contiene tutta la logica applicativa per scaricare gli asset, costruire la timeline e invocare FFmpeg.
 - **`download/`** – Directory popolata a runtime con logo, immagini, clip TTS, musica e font scaricati.
 - **`template/`** – Contiene il template Creatomate (`template_horizontal.json`) e il payload di modifiche (`risposta_horizontal.json`).
-- **`scripts/`** – Utility ausiliarie (non modificate in questa revisione) per automazioni locali.
+- **`scripts/`** – Utility ausiliarie  per automazioni locali.
 - **`docs/`** – Documentazione tecnica (questo file).
 - **`src/tests/`** – Suite di test unitari per i moduli timeline e filtri FFmpeg.
 
 ## 2. Moduli principali in `src/`
 
 ### 2.1 `main.ts`
-Punto di ingresso dell'applicazione. Le funzioni interne `ensureDir(dir)` e `clearDir(dir)` si occupano di creare o svuotare le cartelle di lavoro. L'IIFE finale orchestra l'intera pipeline:
+Punto di ingresso dell'applicazione. Le funzioni interne `ensureDir(dir)` e `clearDir(dir)` si occupano di creare o svuotare le cartelle di lavoro. L'IIFE (Immediately Invoked Function Expression) finale orchestra l'intera pipeline:
 1. Prepara cartelle temporanee e di output.
 2. Invoca `fetchAssets()` per scaricare logo, immagini, audio e font.
 3. Carica template e modifiche tramite `loadTemplate()` e `loadModifications()`.
@@ -33,7 +33,7 @@ Modulo dedicato al download degli asset remoti.
 - `httpGet(url, options)` effettua richieste HTTP/HTTPS seguendo redirect, impostando header "browser-like" e gestendo le risposte 304.
 - `withCacheBuster(url)` aggiunge un query param per invalidare la cache.
 - `downloadFile(url, outPath, options)` scarica un asset singolo, applica richieste condizionali (`If-Modified-Since`) e salva su disco.
-- `fetchAssets()` legge le modifiche, ripulisce le cartelle di download e scarica logo, musica di background, clip TTS, immagini e font richiesti.
+- `fetchAssets()` legge le modifiche, ripulisce le cartelle di download e scarica logo, musica di background, clip TTS e immagini richiesti.
 
 ### 2.5 `concat.ts`
 Definisce il tipo `ConcatArgs` e le funzioni per la fase finale di montaggio.
@@ -46,7 +46,7 @@ Utility per la gestione dei font scaricati.
 - `fileNameMatchesFamily(fileName, family)` confronta un file scaricato con la famiglia richiesta.
 
 ### 2.7 `template.ts`
-Wrapper attorno al template Creatomate.
+Wrapper attorno ai template.
 - `loadTemplate()` legge e valida il JSON principale.
 - `loadModifications()` recupera le modifiche da file dedicato o dal template stesso.
 - `findComposition(tpl, name)` e `findChildByName(parent, name)` effettuano ricerche ricorsive.
@@ -160,4 +160,3 @@ La fase conclusiva è gestita da `concat.ts`, che concatenando i segmenti con au
 5. **Rendering segmenti** – `renderers/composition.ts` invoca FFmpeg per ogni slide.
 6. **Concatenazione** – `concat.ts` unisce i segmenti e mixa la musica di sottofondo.
 
-Questa documentazione può essere utilizzata come base per un'analisi accademica, evidenziando le responsabilità di ciascun file e la cooperazione tra i moduli per ottenere il risultato finale.
