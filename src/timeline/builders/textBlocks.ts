@@ -59,6 +59,12 @@ type BuildTextBlocksResult = {
   blocks: TextBlockSpec[];
 };
 
+/**
+ * Converte un numero in stringa ottimizzata per le espressioni drawtext.
+ *
+ * @param value Valore numerico da formattare.
+ * @returns Stringa breve (intero o decimale con 4 cifre).
+ */
 function formatExprNumber(value: number): string {
   if (!Number.isFinite(value)) return "0";
   const rounded = Math.round(value);
@@ -68,6 +74,15 @@ function formatExprNumber(value: number): string {
   return String(Number(value.toFixed(4)));
 }
 
+/**
+ * Costruisce l'espressione FFmpeg che centra o allinea il testo orizzontalmente.
+ *
+ * @param align Fattore 0..1 indicante l'allineamento (0=left, 0.5=center, 1=right).
+ * @param textBox Box di layout calcolato.
+ * @param fallbackX Coordinata X da utilizzare come fallback.
+ * @param videoW Larghezza del video, usata quando il box è flessibile.
+ * @returns Espressione aritmetica per drawtext.
+ */
 function buildHorizontalAlignExpr(
   align: number,
   textBox: TextBox,
@@ -85,6 +100,12 @@ function buildHorizontalAlignExpr(
   return `if(gte(text_w,${stageWidth}),${fallback},(${stageWidth}-text_w)*${alignVal})`;
 }
 
+/**
+ * Normalizza un colore accettando stringhe HEX, RGBA e valori Creatomate.
+ *
+ * @param raw Valore proveniente dal template.
+ * @returns Rappresentazione standard (es. "#ffffff" o "white@0.8").
+ */
 function normalizeColorInput(raw: unknown): string | undefined {
   if (typeof raw !== "string") return undefined;
   const value = raw.trim();
@@ -115,6 +136,15 @@ function normalizeColorInput(raw: unknown): string | undefined {
   return value;
 }
 
+/**
+ * Applica al blocco di testo gli eventuali background configurati nel template.
+ *
+ * @param block Blocco testo da aggiornare.
+ * @param textBox Area destinata al testo.
+ * @param element Elemento template di riferimento.
+ * @param videoW Larghezza del video.
+ * @param videoH Altezza del video.
+ */
 function applyTemplateBackground(
   block: TextBlockSpec,
   textBox: TextBox,
@@ -160,6 +190,13 @@ function applyTemplateBackground(
   }
 }
 
+/**
+ * Traduce le animazioni raw del template in liste per riga (fade/wipe).
+ *
+ * @param anims Animazioni raw provenienti dal template.
+ * @param lineCount Numero di righe di testo.
+ * @returns Array di animazioni per riga.
+ */
 function buildLineAnimations(
   anims: RawAnimation[] | undefined,
   lineCount: number
@@ -214,6 +251,13 @@ function buildLineAnimations(
   return perLine;
 }
 
+/**
+ * Genera blocchi drawtext pronti al rendering partendo da testo, layout e
+ * preferenze tipografiche del template.
+ *
+ * @param params Parametri di layout e tipografia.
+ * @returns Blocchi finali, linee testuali e configurazione base.
+ */
 export function buildTextBlocks(params: BuildTextBlocksParams): BuildTextBlocksResult {
   const {
     text,

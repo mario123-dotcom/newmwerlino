@@ -6,6 +6,18 @@ import type { SlideSpec } from "../types";
 
 type GapTarget = number | string;
 
+/**
+ * Costruisce una slide filler che mostra solo il logo centrato quando esistono
+ * gap temporali fra segmenti.
+ *
+ * @param template Documento Creatomate di riferimento per recuperare il box logo.
+ * @param target Indice o nome della slide originale a cui riferirsi.
+ * @param videoW Larghezza del video finale.
+ * @param videoH Altezza del video finale.
+ * @param fps Fotogrammi al secondo del progetto.
+ * @param durationSec Durata del gap in secondi da coprire.
+ * @returns Uno {@link SlideSpec} minimale con solo il logo visibile.
+ */
 export function createGapSlide(
   template: TemplateDoc,
   target: GapTarget,

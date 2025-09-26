@@ -1,6 +1,14 @@
 import { readFileSync, existsSync } from "fs";
 import { paths } from "./paths";
 
+/**
+ * Cerca ricorsivamente in un array di elementi Creatomate finché non trova un
+ * elemento che soddisfa il predicato fornito.
+ *
+ * @param elements Lista di elementi (può essere `undefined`).
+ * @param predicate Funzione di test che ritorna `true` per l'elemento cercato.
+ * @returns Il primo elemento che soddisfa il predicato oppure `undefined`.
+ */
 function findInElements(
   elements: TemplateElement[] | undefined,
   predicate: (el: TemplateElement) => boolean
@@ -78,6 +86,8 @@ export type TemplateDoc = {
 
 /**
  * Legge il file di template principale e valida la presenza dell'elenco elementi.
+ *
+ * @returns Il documento JSON del template tipizzato come {@link TemplateDoc}.
  */
 export function loadTemplate(): TemplateDoc {
   // Legge il file template dalla cartella dedicata del progetto.
@@ -93,6 +103,8 @@ export function loadTemplate(): TemplateDoc {
 /**
  * Carica le modifiche richieste dal backend, accettando sia file dedicati sia
  * template che includono direttamente la sezione "modifications".
+ *
+ * @returns Oggetto plain con chiavi/valori delle modifiche.
  */
 export function loadModifications(): Record<string, any> {
   // Prima tenta di leggere il file di risposta separato nella cartella template.
@@ -115,13 +127,22 @@ export function loadModifications(): Record<string, any> {
 
 /**
  * Restituisce una composition identificata dal nome (es. Slide_0, Intro, Outro).
+ *
+ * @param tpl Documento del template da analizzare.
+ * @param name Nome esatto della composition ricercata.
+ * @returns L'elemento corrispondente oppure `undefined` se assente.
  */
 export function findComposition(tpl: TemplateDoc, name: string): TemplateElement | undefined {
   return findInElements(tpl.elements, (e) => e.type === "composition" && e.name === name);
 }
 
 /**
- * Cerca ricorsivamente un elemento figlio con il nome indicato all'interno di una composition.
+ * Cerca ricorsivamente un elemento figlio con il nome indicato all'interno di
+ * una composition.
+ *
+ * @param parent Elemento padre da cui partire con la ricerca.
+ * @param name Nome dell'elemento figlio da trovare.
+ * @returns Il figlio corrispondente oppure `undefined`.
  */
 export function findChildByName(
   parent: TemplateElement | undefined,
@@ -132,7 +153,12 @@ export function findChildByName(
 }
 
 /**
- * Converte valori percentuali o stringhe compatibili in pixel rispetto a una base.
+ * Converte valori percentuali o stringhe numeriche in pixel rispetto a una
+ * dimensione base.
+ *
+ * @param val Valore espresso come numero o stringa (es. "45%").
+ * @param base Grandezza di riferimento su cui calcolare la percentuale.
+ * @returns Valore numerico in pixel o `undefined` se non interpretabile.
  */
 export function pctToPx(val: number | string | undefined, base: number): number | undefined {
   if (val == null) return undefined;
@@ -150,6 +176,8 @@ export function pctToPx(val: number | string | undefined, base: number): number 
 /**
  * Seleziona un font di sistema disponibile sulla piattaforma corrente da usare
  * quando il template non specifica una famiglia scaricata.
+ *
+ * @returns Percorso assoluto del file TTF individuato.
  */
 export function getDefaultFontPath(): string {
   // Percorsi noti sui sistemi principali: Windows e distribuzioni Linux.

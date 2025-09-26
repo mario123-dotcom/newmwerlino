@@ -4,11 +4,11 @@ import type { SlideSpec } from "../timeline";
 import { getDefaultFontPath } from "../template";
 
 /**
- * Renderizza UN segmento (slide) con:
- * - background cover+crop,
- * - logo non deformato (altezza fissa, AR preservato),
- * - testo posizionato,
- * - TTS in stereo (o silenzio se assente).
+ * Renderizza un singolo segmento di slide costruendo il filtergraph FFmpeg,
+ * applicando background, logo, testo e audio TTS (o silenzio).
+ *
+ * @param slide Specifica completa della slide da renderizzare.
+ * @returns Promise risolta quando FFmpeg ha generato il file segmentato.
  */
 export async function renderSlideSegment(slide: SlideSpec): Promise<void> {
   const W = slide.width ?? 1920;

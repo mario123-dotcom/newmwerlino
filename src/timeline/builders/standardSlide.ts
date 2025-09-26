@@ -42,10 +42,26 @@ type SlideBuildResult = {
   shapesUsed: number;
 };
 
+/**
+ * Valuta se un valore rappresenta un testo non vuoto.
+ *
+ * @param value Qualsiasi input proveniente dalle modifiche.
+ * @returns `true` se contiene testo significativo.
+ */
 function isTruthyText(value: unknown): boolean {
   return typeof value === "string" && value.trim() !== "";
 }
 
+/**
+ * Calcola la durata effettiva della slide combinando le informazioni del
+ * template, delle modifiche e dell'eventuale durata TTS.
+ *
+ * @param index Indice della slide.
+ * @param comp Elemento composition del template relativo alla slide.
+ * @param mods Modifiche provenienti dal backend.
+ * @param defaultDuration Durata fallback se nessun dato è presente.
+ * @returns Durata in secondi.
+ */
 function computeSlideDuration(
   index: number,
   comp: TemplateElement | undefined,
@@ -58,6 +74,17 @@ function computeSlideDuration(
   return hinted > duration ? hinted : duration;
 }
 
+/**
+ * Prepara una lista di funzioni che provano a estrarre informazioni di shadow
+ * da diverse fonti (template e modifiche).
+ *
+ * @param comp Composition della slide.
+ * @param mods Modifiche utente.
+ * @param index Indice numerico della slide.
+ * @param videoW Larghezza del video in pixel.
+ * @param videoH Altezza del video in pixel.
+ * @returns Array di factory che producono {@link ShadowInfo} opzionali.
+ */
 function collectShadowSources(
   comp: TemplateElement | undefined,
   mods: Record<string, any>,
@@ -74,6 +101,17 @@ function collectShadowSources(
   ];
 }
 
+/**
+ * Aggiunge il blocco copyright alla lista dei testi se il template lo prevede.
+ *
+ * @param texts Blocchi di testo già generati.
+ * @param template Documento Creatomate completo.
+ * @param mods Modifiche del backend.
+ * @param index Indice della slide.
+ * @param videoW Larghezza del video.
+ * @param videoH Altezza del video.
+ * @returns Lista di blocchi aggiornata con eventuale copyright.
+ */
 function enrichTextsWithCopyright(
   texts: TextBlockSpec[],
   template: TemplateDoc,
@@ -94,6 +132,12 @@ function enrichTextsWithCopyright(
   return [...texts, copyright];
 }
 
+/**
+ * Genera la slide standard combinando testi, immagini, ombre, forme e audio.
+ *
+ * @param params Parametri raccolti (template, modifiche, dimensioni video, ecc.).
+ * @returns Risultato contenente lo {@link SlideSpec} e metadati di durata.
+ */
 export function buildStandardSlide(params: SlideBuildParams): SlideBuildResult {
   const { index, mods, template, templateWidth, videoW, videoH, fps, defaultDuration, globalShapeIndex, slideMaxChars } = params;
 

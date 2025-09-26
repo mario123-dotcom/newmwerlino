@@ -1,12 +1,22 @@
 // Utility dedicate alla costruzione di filtri FFmpeg per i testi.
 
-// Converte un percorso di filesystem nel formato accettato da FFmpeg su ogni piattaforma.
-// Example: `C:\foo\bar` -> `C\:/foo/bar`
+/**
+ * Converte un percorso di filesystem nel formato accettato da FFmpeg su ogni
+ * piattaforma (es. `C:\\foo\\bar` -> `C\\:/foo/bar`).
+ *
+ * @param p Percorso locale da utilizzare in un filtro FFmpeg.
+ * @returns Stringa compatibile con FFmpeg.
+ */
 export function toFFPath(p: string): string {
   return p.replace(/\\/g, "/").replace(/^([A-Za-z]):/, "$1\\:");
 }
 
-// Effettua l'escape dei caratteri che interromperebbero il filtro drawtext.
+/**
+ * Effettua l'escape dei caratteri speciali che interromperebbero `drawtext`.
+ *
+ * @param s Testo originale da visualizzare.
+ * @returns Versione escapata del testo per FFmpeg.
+ */
 export function escTextForDrawText(s: string): string {
   return s
     .replace(/\\/g, "\\\\")
@@ -33,12 +43,23 @@ export type DrawTextOpts = {
   enableExpr?: string;  // Espressione che abilita/disabilita il disegno nel tempo.
 };
 
+/**
+ * Effettua l'escape minimo necessario per espressioni numeriche di drawtext.
+ *
+ * @param expr Espressione originale.
+ * @returns Espressione sicura da inserire in un filtro FFmpeg.
+ */
 function escapeDrawTextExpr(expr: string): string {
   if (!expr) return "0";
   return expr.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
 }
 
-// Costruisce la stringa del filtro drawtext in base alle opzioni ricevute.
+/**
+ * Costruisce la stringa del filtro `drawtext` a partire da opzioni tipizzate.
+ *
+ * @param opts Impostazioni del blocco di testo (font, posizione, box, ecc.).
+ * @returns Stringa FFmpeg pronta per essere concatenata nel filtergraph.
+ */
 export function buildDrawText(opts: DrawTextOpts): string {
   const {
     label,

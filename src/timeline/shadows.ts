@@ -11,6 +11,12 @@ import {
 
 export type { ShadowInfo } from "./types";
 
+/**
+ * Verifica se un elemento può rappresentare una sorgente di ombra valida.
+ *
+ * @param element Elemento del template.
+ * @returns `true` se l'elemento non è esplicitamente escluso.
+ */
 function isShadowCandidate(element: TemplateElement | undefined): boolean {
   if (!element) return false;
   if ((element as any)?.visible === false) return false;
@@ -28,6 +34,13 @@ function isShadowCandidate(element: TemplateElement | undefined): boolean {
   return true;
 }
 
+/**
+ * Controlla ricorsivamente se un elemento o i suoi figli contengono hint di
+ * shadow (gradienti dedicati o proprietà shadow_*).
+ *
+ * @param element Nodo di partenza.
+ * @returns `true` se sono stati trovati indizi di shadow.
+ */
 function hasShadowHintElement(element: TemplateElement | undefined): boolean {
   if (!element) return false;
   if (isGradientShadowElement(element)) return true;
@@ -54,6 +67,13 @@ function hasShadowHintElement(element: TemplateElement | undefined): boolean {
   return false;
 }
 
+/**
+ * Determina se un elemento shape rappresenta una sfumatura utilizzata come
+ * ombra sintetica.
+ *
+ * @param element Elemento da analizzare.
+ * @returns `true` quando il shape contiene stop trasparenti/opachi.
+ */
 function isGradientShadowElement(element: TemplateElement | undefined): boolean {
   if (!element) return false;
   if ((element as any)?.visible === false) return false;
@@ -80,6 +100,14 @@ function isGradientShadowElement(element: TemplateElement | undefined): boolean 
   return hasTransparentStop && hasOpaqueStop;
 }
 
+/**
+ * Costruisce le informazioni d'ombra partendo da un shape a gradiente.
+ *
+ * @param source Elemento shape candidato.
+ * @param width Larghezza video.
+ * @param height Altezza video.
+ * @returns Dettagli di shadow oppure `undefined`.
+ */
 function extractGradientShadow(
   source: TemplateElement,
   width: number,
@@ -117,6 +145,14 @@ function extractGradientShadow(
   return info;
 }
 
+/**
+ * Estrae le proprietà shadow_* direttamente esposte da un elemento template.
+ *
+ * @param source Elemento sorgente.
+ * @param width Larghezza video.
+ * @param height Altezza video.
+ * @returns Informazioni d'ombra dichiarate dall'elemento.
+ */
 function extractShadowFromElementProps(
   source: TemplateElement,
   width: number,
@@ -175,6 +211,12 @@ function extractShadowFromElementProps(
   return info;
 }
 
+/**
+ * Unisce più strutture shadow sovrascrivendo i valori definiti.
+ *
+ * @param parts Segmenti di shadow (alcuni undefined).
+ * @returns Shadow combinata risultante.
+ */
 function mergeShadows(...parts: (ShadowInfo | undefined)[]): ShadowInfo {
   const merged: ShadowInfo = {};
   for (const part of parts) {
@@ -188,6 +230,14 @@ function mergeShadows(...parts: (ShadowInfo | undefined)[]): ShadowInfo {
   return merged;
 }
 
+/**
+ * Cerca nelle modifications un valore shadow_* con il prefisso richiesto.
+ *
+ * @param mods Modifiche backend.
+ * @param prefix Prefisso dell'elemento (es. "Slide_0").
+ * @param keys Lista di possibili suffissi.
+ * @returns Valore trovato oppure `undefined`.
+ */
 function readShadowMod(mods: Record<string, any>, prefix: string, keys: string[]): any {
   for (const key of keys) {
     const full = `${prefix}.${key}`;
@@ -196,6 +246,13 @@ function readShadowMod(mods: Record<string, any>, prefix: string, keys: string[]
   return undefined;
 }
 
+/**
+ * Controlla se nelle modifications esistono indizi di shadow per un elemento.
+ *
+ * @param mods Modifiche backend.
+ * @param prefix Prefisso dell'elemento.
+ * @returns `true` se sono presenti chiavi shadow non disattivate.
+ */
 function hasShadowHintInMods(mods: Record<string, any>, prefix: string): boolean {
   if (!mods) return false;
   const prefixLower = prefix.toLowerCase();
@@ -218,6 +275,16 @@ function hasShadowHintInMods(mods: Record<string, any>, prefix: string): boolean
   return false;
 }
 
+/**
+ * Ricostruisce le informazioni d'ombra partendo esclusivamente dalle
+ * modifications fornite dal backend.
+ *
+ * @param mods Oggetto modifications.
+ * @param prefix Prefisso dell'elemento (es. "Slide_0").
+ * @param width Larghezza video.
+ * @param height Altezza video.
+ * @returns Shadow dichiarata o `undefined`.
+ */
 export function extractShadowFromMods(
   mods: Record<string, any>,
   prefix: string,
@@ -283,6 +350,12 @@ export function extractShadowFromMods(
   return info;
 }
 
+/**
+ * Cerca ricorsivamente un figlio che possiede proprietà shadow significative.
+ *
+ * @param parent Nodo da esplorare.
+ * @returns Primo discendente con shadow dichiarata.
+ */
 function findShadowBearingDescendant(
   parent: TemplateElement | undefined
 ): TemplateElement | undefined {
@@ -303,6 +376,13 @@ function findShadowBearingDescendant(
   return undefined;
 }
 
+/**
+ * Cerca nel template l'elemento da cui ereditare le impostazioni di shadow.
+ *
+ * @param comp Composition corrente.
+ * @param candidates Nomi preferenziali da provare.
+ * @returns Elemento sorgente oppure `undefined`.
+ */
 export function findShadowSource(
   comp: TemplateElement | undefined,
   candidates: string[]
@@ -315,6 +395,14 @@ export function findShadowSource(
   return findShadowBearingDescendant(comp);
 }
 
+/**
+ * Estrae o deduce i parametri dell'ombra partendo da un elemento template.
+ *
+ * @param source Elemento sorgente.
+ * @param width Larghezza video.
+ * @param height Altezza video.
+ * @returns Informazioni shadow o `undefined` se non applicabile.
+ */
 export function extractShadow(
   source: TemplateElement | undefined,
   width: number,
@@ -330,6 +418,12 @@ export function extractShadow(
   return hasShadowHintElement(source) ? { declared: true } : undefined;
 }
 
+/**
+ * Restituisce i nomi più comuni per gli sfondi delle slide standard.
+ *
+ * @param index Indice della slide.
+ * @returns Lista di nomi univoci da provare nel template.
+ */
 export function slideBackgroundNameCandidates(index: number): string[] {
   const idx = String(index);
   return uniqueNames([
@@ -360,6 +454,11 @@ export function slideBackgroundNameCandidates(index: number): string[] {
   ]);
 }
 
+/**
+ * Elenca i nomi più probabili degli sfondi utilizzati nella slide outro.
+ *
+ * @returns Lista di nomi univoci.
+ */
 export function outroBackgroundNameCandidates(): string[] {
   return uniqueNames([
     "Immagine-outro",

@@ -35,6 +35,13 @@ type OutroResult = {
   endTime: number;
 };
 
+/**
+ * Interpreta il flag di visibilità dell'outro proveniente dal template o dalle
+ * modifiche, accettando stringhe e numeri.
+ *
+ * @param value Valore generico (booleano, stringa, numero).
+ * @returns `true` se la slide deve essere mostrata.
+ */
 function isVisibleFlag(value: unknown): boolean {
   if (value === false || value === 0) return false;
   if (typeof value === "string") {
@@ -44,6 +51,14 @@ function isVisibleFlag(value: unknown): boolean {
   return true;
 }
 
+/**
+ * Riposiziona il box del testo outro per centrarlo rispetto al logo o al frame.
+ *
+ * @param box Box testuale estratto dal template.
+ * @param logoBox Coordinate del logo outro.
+ * @param videoW Larghezza del video in pixel.
+ * @returns Nuovo box testuale centrato.
+ */
 function centerTextBox(
   box: { x: number; y: number; w: number; h: number },
   logoBox: { x?: number; w?: number },
@@ -64,6 +79,19 @@ function centerTextBox(
   return { ...box, x: safeLeft };
 }
 
+/**
+ * Genera i blocchi di testo dell'outro rispettando eventuali a capo manuali.
+ *
+ * @param text Testo grezzo dell'outro.
+ * @param fileIndex Indice progressivo dei file temporanei drawtext.
+ * @param textBox Area disponibile nel video.
+ * @param baseBlock Parametri di default (font size, colore, ecc.).
+ * @param templateElement Elemento Creatomate di origine.
+ * @param videoW Larghezza video.
+ * @param videoH Altezza video.
+ * @param templateWidth Larghezza del template originale.
+ * @returns Array di blocchi di testo renderizzabili.
+ */
 function buildOutroTexts(
   text: string,
   fileIndex: number,
@@ -97,6 +125,15 @@ function buildOutroTexts(
   return result.blocks;
 }
 
+/**
+ * Prepara i generatori di shadow per la slide outro combinando template e mods.
+ *
+ * @param comp Composition dell'outro.
+ * @param mods Modifiche utente.
+ * @param videoW Larghezza video.
+ * @param videoH Altezza video.
+ * @returns Funzioni factory che producono {@link ShadowInfo} opzionali.
+ */
 function collectOutroShadowSources(
   comp: TemplateElement | undefined,
   mods: Record<string, any>,
@@ -112,6 +149,13 @@ function collectOutroShadowSources(
   ];
 }
 
+/**
+ * Costruisce l'outro finale, includendo un eventuale gap precedente e il blocco
+ * copyright.
+ *
+ * @param params Parametri collezionati (template, modifiche, dimensioni video).
+ * @returns Oggetto con gap opzionale, slide outro e tempo finale raggiunto.
+ */
 export function buildOutroSegment(params: OutroParams): OutroResult {
   const { mods, template, templateWidth, videoW, videoH, fps, defaultDuration, prevEnd, fileIndex } = params;
   const outroComp = findComposition(template, "Outro");
