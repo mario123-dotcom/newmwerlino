@@ -1,5 +1,34 @@
 import { spawnSync } from "child_process";
+import { appendFileSync, existsSync, mkdirSync } from "fs";
+import { dirname } from "path";
 import { paths } from "../paths";
+
+function shellQuote(arg: string): string {
+  if (arg === "") {
+    return "''";
+  }
+
+  if (/^[A-Za-z0-9_@%+=:,./-]+$/.test(arg)) {
+    return arg;
+  }
+
+  return `'${arg.replace(/'/g, "'\\''")}'`;
+}
+
+function appendCommandToLog(command: string) {
+  const logFile = paths.ffmpegLog;
+  try {
+    const dir = dirname(logFile);
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+
+    appendFileSync(logFile, `${command}\n`, "utf-8");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[FFmpeg] Unable to write command log: ${message}`);
+  }
+}
 
 /**
  * Esegue `ffmpeg` con gli argomenti specificati stampando il comando.
@@ -10,8 +39,10 @@ import { paths } from "../paths";
  */
 export function runFFmpeg(args: string[], label = "FFmpeg") {
   const ff = paths.ffmpeg;
-  const cmd = `${ff} ${args.join(" ")}`;
-  console.log(`[${label}] ${cmd}`);
+  const printable = [ff, ...args].map(shellQuote).join(" ");
+
+  console.log(`[${label}] ${printable}`);
+  appendCommandToLog(printable);
 
   const res = spawnSync(ff, args, { stdio: "inherit" });
 
